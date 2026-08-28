@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viabilità Ferrara - Segnalazioni</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    
+    <header class="glass-header">
+        <div class="header-content">
+            <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            <h1>Gestione Viabilità <span>Ferrara</span></h1>
+            <span id="sync-badge" class="sync-badge">☁️ Inizializzazione...</span>
+            <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
+            <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
+        </div>
+        <p class="subtitle" id="header-subtitle">Modalità Visualizzazione: clicca sui marker per i dettagli</p>
+    </header>
+
+    <!-- Admin Search Box -->
+    <div id="admin-search-container" class="search-container hidden">
+        <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
+        <button id="admin-search-btn">Cerca</button>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Modal for adding markers -->
+    <div id="marker-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nuova Segnalazione</h2>
+                <button id="close-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">Seleziona il tipo di problema riscontrato nel punto indicato.</p>
+            
+            <div class="options-grid">
+                <button class="option-card" data-type="lavori">
+                    <div class="icon-wrapper works">🚧</div>
+                    <span>Lavori in corso</span>
+                </button>
+                <button class="option-card" data-type="chiusa">
+                    <div class="icon-wrapper closed">⛔</div>
+                    <span>Strada chiusa</span>
+                </button>
+                <button class="option-card" data-type="ponte">
+                    <div class="icon-wrapper bridge">🌉</div>
+                    <span>Ponte interrotto</span>
+                </button>
+                <button class="option-card" data-type="incidente">
+                    <div class="icon-wrapper accident">⚠️</div>
+                    <span>Incidente</span>
+                </button>
+                <button class="option-card" data-type="mercato">
+                    <div class="icon-wrapper mercato">🛒</div>
+                    <span>Mercato settimanale</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Admin Login -->
+    <div id="login-modal" class="modal-overlay hidden">
+        <div class="modal-content login-content">
+            <div class="modal-header">
+                <h2>Accesso Amministratore</h2>
+                <button id="close-login" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">Inserisci la password per aggiungere o rimuovere segnalazioni.</p>
+            <div class="login-form">
+                <input type="password" id="admin-password" placeholder="Password (es. admin)" />
+                <p id="login-error" class="error-msg hidden">Password errata!</p>
+                <button id="submit-login" class="primary-btn">Accedi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Firebase SDK (CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    
+    <!-- Custom Script -->
+    <script src="script.js"></script>
+</body>
+</html>
