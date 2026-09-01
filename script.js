@@ -24,6 +24,28 @@ const ICONS = {
     chiusa: { emoji: '⛔', label: 'Strada chiusa' },
     ponte: { emoji: '🌉', label: 'Ponte interrotto' },
     incidente: { emoji: '⚠️', label: 'Incidente' },
+    mercato: { emoji: '🛒', label: 'Mercato settimanale' },
+    semaforo: { emoji: '🚦', label: 'Senso unico alternato' }
+};
+
+    lavori: { emoji: '🚧', label: 'Lavori in corso' },
+    chiusa: { emoji: '⛔', label: 'Strada chiusa' },
+    ponte: { emoji: '🌉', label: 'Ponte interrotto' },
+    incidente: { emoji: '⚠️', label: 'Incidente' },
+    mercato: { emoji: '🛒', label: 'Mercato settimanale' },
+    semaforo: { emoji: '🚦', label: 'Senso unico alternato' }
+};
+    lavori: { emoji: '🚧', label: 'Lavori in corso' },
+    chiusa: { emoji: '⛔', label: 'Strada chiusa' },
+    ponte: { emoji: '🌉', label: 'Ponte interrotto' },
+    incidente: { emoji: '⚠️', label: 'Incidente' },
+    mercato: { emoji: '🛒', label: 'Mercato settimanale' },
+    semaforo: { emoji: '🚦', label: 'Senso unico alternato' }
+
+    lavori: { emoji: '🚧', label: 'Lavori in corso' },
+    chiusa: { emoji: '⛔', label: 'Strada chiusa' },
+    ponte: { emoji: '🌉', label: 'Ponte interrotto' },
+    incidente: { emoji: '⚠️', label: 'Incidente' },
     mercato: { emoji: '🛒', label: 'Mercato settimanale' }
 };
 
