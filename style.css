@@ -26,12 +26,16 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     overflow: hidden; /* Prevent scrolling, map takes full screen */
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
 }
 
 /* Map Container */
 #map {
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     z-index: 1;
 }
 
@@ -238,7 +242,57 @@ h1 span {
 .modal-desc {
     font-size: 0.9rem;
     color: var(--text-muted);
-    margin-bottom: 24px;
+    margin-bottom: 16px;
+}
+
+/* Street Input in Modal */
+.street-field-group {
+    margin-bottom: 20px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.street-field-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.street-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.street-input-wrapper input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.street-input-wrapper input:focus {
+    border-color: var(--primary);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.street-status-badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    white-space: nowrap;
 }
 
 /* Options Grid */
@@ -494,6 +548,49 @@ h1 span {
     font-weight: bold;
 }
 
+/* Street Name Badges in Popup & Tooltip */
+.popup-street {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1e293b;
+    background: #f1f5f9;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+.tooltip-street {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #3b82f6;
+    margin-bottom: 2px;
+}
+
+/* Red Road Segments - Tracciato solido e netto senza sfumature */
+.road-segment-main {
+    stroke: #dc2626;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-opacity: 1;
+}
+
+.road-tooltip {
+    background: rgba(15, 23, 42, 0.9) !important;
+    color: #f8fafc !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3) !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+}
+.road-tooltip:before {
+    border-top-color: rgba(15, 23, 42, 0.9) !important;
+}
+
 /* Responsive Design per Dispositivi Mobili */
 @media (max-width: 768px) {
     .glass-header {
@@ -560,4 +657,137 @@ h1 span {
     .option-card span {
         font-size: 1rem; /* Testo più grande per leggibilità */
     }
+
+    .locate-btn {
+        bottom: 85px;
+        right: 12px;
+        width: 44px;
+        height: 44px;
+    }
 }
+
+/* ==========================================
+   PULSANTE E MARKER GEOLOCALIZZAZIONE GPS
+   ========================================== */
+
+.locate-btn {
+    position: fixed;
+    bottom: 95px;
+    right: 12px;
+    z-index: 1000;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #1e293b;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.locate-btn:hover {
+    background: #ffffff;
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.locate-btn:active {
+    transform: scale(0.95);
+}
+
+.locate-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary-hover);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+}
+
+.locate-btn.locating svg {
+    animation: spinLocate 1s linear infinite;
+    color: var(--primary);
+}
+
+@keyframes spinLocate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.locate-tooltip {
+    display: none;
+}
+
+/* Marker Posizione Utente Pulsante */
+.user-gps-container {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-gps-pulse {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.45);
+    animation: userGpsPulseAnimation 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.user-gps-dot {
+    position: relative;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #2563eb;
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.9), 0 2px 5px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+}
+
+@keyframes userGpsPulseAnimation {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.9;
+    }
+    70% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(2.4);
+        opacity: 0;
+    }
+}
+
+/* Popup Posizione Utente */
+.user-location-popup {
+    text-align: center;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.user-location-popup span {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: normal;
+    color: #64748b;
+    margin-top: 2px;
+}
+

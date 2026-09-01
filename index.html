@@ -37,6 +37,19 @@
 
     <div id="map"></div>
 
+    <!-- Floating Location / GPS Button -->
+    <button id="locate-btn" class="locate-btn" title="La mia posizione" aria-label="Centra sulla mia posizione">
+        <svg id="locate-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8"></circle>
+            <line x1="12" y1="2" x2="12" y2="4"></line>
+            <line x1="12" y1="20" x2="12" y2="22"></line>
+            <line x1="2" y1="12" x2="4" y2="12"></line>
+            <line x1="20" y1="12" x2="22" y2="12"></line>
+            <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+        </svg>
+        <span id="locate-text" class="locate-tooltip">Centra su di me</span>
+    </button>
+
     <!-- Modal for adding markers -->
     <div id="marker-modal" class="modal-overlay hidden">
         <div class="modal-content">
@@ -48,6 +61,14 @@
             </div>
             <p class="modal-desc">Seleziona il tipo di problema riscontrato nel punto indicato.</p>
             
+            <div class="street-field-group">
+                <label for="marker-street-input">📍 Via rilevata:</label>
+                <div class="street-input-wrapper">
+                    <input type="text" id="marker-street-input" placeholder="Rilevamento via in corso..." />
+                    <span id="street-detect-status" class="street-status-badge">🔍 Rilevamento...</span>
+                </div>
+            </div>
+
             <div class="options-grid">
                 <button class="option-card" data-type="lavori">
                     <div class="icon-wrapper works">🚧</div>
