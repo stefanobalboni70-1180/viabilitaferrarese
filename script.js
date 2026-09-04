@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.5';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -528,10 +528,13 @@ function saveToLocalStorage() {
     localStorage.setItem('ferrara_viabilita_markers', JSON.stringify(markersData));
 }
 
-// Carica marker: da Firebase se online, altrimenti da localStorage
+// Carica marker: da Firebase se online con aggiornamento in TEMPO REALE,
+// altrimenti fallback a localStorage
 function loadMarkers() {
     if (isFirebaseOnline && markersRef) {
-        markersRef.once('value', function (snapshot) {
+        // .on('value') rimane in ascolto continuo: ogni modifica su Firebase
+        // aggiorna automaticamente la mappa su tutti i dispositivi connessi
+        markersRef.on('value', function (snapshot) {
             markersData = [];
             for (let id in activeLayers) {
                 map.removeLayer(activeLayers[id]);
@@ -555,10 +558,10 @@ function loadMarkers() {
                     addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null);
                 });
                 saveToLocalStorage();
-                console.log(`📍 Caricati ${markersData.length} marker da Firebase`);
+                console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale da Firebase`);
             }
 
-            // Dopo aver caricato tutti i marker, disegna i tratti rossi
+            // Ridisegna i tratti stradali rossi dopo ogni aggiornamento
             updateRoadSegments();
 
         }, function (error) {
