@@ -1,3 +1,6 @@
+// Versione del software
+const APP_VERSION = '1.0';
+
 // Coordinate di Ferrara
 const FERRARA_COORDS = [44.8381, 11.6198];
 const MAP_ZOOM = 11;
@@ -76,6 +79,12 @@ function initMap() {
         pendingLatLng = e.latlng;
         openModal();
     });
+
+    const appVersionEl = document.getElementById('app-version');
+    if (appVersionEl) {
+        appVersionEl.textContent = `v${APP_VERSION}`;
+    }
+    console.log(`Viabilità Ferrara - Versione ${APP_VERSION}`);
 
     loadMarkers();
     updateUI();
