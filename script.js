@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.6';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -438,38 +438,121 @@ window.reportResolved = function (id) {
 }
 
 // -------------------------------------------------------
-// ROUTING SU STRADA tramite OSRM (Open Source Routing Machine)
-// Restituisce le coordinate reali della strada tra due punti
+// GEOMETRIA STRADALE da OpenStreetMap tramite Overpass API
+// Restituisce le coordinate esatte della strada per nome
+// (segue la strada, non calcola un percorso di navigazione)
 // -------------------------------------------------------
-async function getRouteGeometry(lat1, lng1, lat2, lng2) {
+
+// Collega segmenti OSM (ways) adiacenti in un unico percorso ordinato
+function connectWays(ways, nodeCoords) {
+    if (ways.length === 0) return [];
+    if (ways.length === 1) {
+        return ways[0].nodes.map(id => nodeCoords[id]).filter(Boolean);
+    }
+
+    // Concatena i segmenti abbinando gli endpoint
+    let chain = [...ways[0].nodes];
+    const remaining = [...ways.slice(1)];
+
+    while (remaining.length > 0) {
+        const tail = chain[chain.length - 1];
+        const head = chain[0];
+        let matched = false;
+
+        for (let i = 0; i < remaining.length; i++) {
+            const w = remaining[i];
+            const wHead = w.nodes[0];
+            const wTail = w.nodes[w.nodes.length - 1];
+
+            if (wHead === tail) {
+                chain = chain.concat(w.nodes.slice(1));
+            } else if (wTail === tail) {
+                chain = chain.concat([...w.nodes].reverse().slice(1));
+            } else if (wHead === head) {
+                chain = [...w.nodes].reverse().slice(0, -1).concat(chain);
+            } else if (wTail === head) {
+                chain = [...w.nodes].slice(0, -1).concat(chain);
+            } else {
+                continue;
+            }
+            remaining.splice(i, 1);
+            matched = true;
+            break;
+        }
+        if (!matched) break; // segmenti non connessi → interrompe
+    }
+
+    return chain.map(id => nodeCoords[id]).filter(Boolean);
+}
+
+// Recupera la geometria reale della strada tramite Overpass API
+// Fallback: OSRM routing se Overpass non risponde
+async function getStreetGeometry(streetName, markerCoords) {
     try {
-        // OSRM usa [lng, lat] (ordine invertito rispetto a Leaflet)
+        // Bounding box intorno ai marker con padding
+        const lats = markerCoords.map(c => c[0]);
+        const lngs = markerCoords.map(c => c[1]);
+        const pad = 0.02; // ~2km di margine attorno ai marker
+        const s = (Math.min(...lats) - pad).toFixed(6);
+        const w = (Math.min(...lngs) - pad).toFixed(6);
+        const n = (Math.max(...lats) + pad).toFixed(6);
+        const e = (Math.max(...lngs) + pad).toFixed(6);
+
+        const query = `[out:json][timeout:10];way["name"="${streetName}"](${s},${w},${n},${e});(._;>;);out body;`;
+        const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const data = await response.json();
+
+        // Mappa ID nodo → [lat, lon]
+        const nodeCoords = {};
+        data.elements.filter(el => el.type === 'node').forEach(n => {
+            nodeCoords[n.id] = [n.lat, n.lon];
+        });
+
+        const ways = data.elements.filter(el => el.type === 'way');
+        if (ways.length === 0) {
+            console.warn(`Nessuna via trovata su OSM per: "${streetName}" — uso OSRM come fallback`);
+            return null; // fallback a OSRM
+        }
+
+        const path = connectWays(ways, nodeCoords);
+        console.log(`🗺️ Geometria OSM ottenuta per "${streetName}": ${path.length} nodi`);
+        return path.length >= 2 ? path : null;
+
+    } catch (e) {
+        console.warn(`Overpass non disponibile per "${streetName}":`, e.message);
+        return null; // fallback a OSRM
+    }
+}
+
+// OSRM: usato solo come fallback se Overpass non risponde
+async function getRouteGeometryFallback(lat1, lng1, lat2, lng2) {
+    try {
         const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`;
         const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
         const data = await response.json();
         if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-            // Converti da [lng, lat] a [lat, lng] per Leaflet
             return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
         }
     } catch (e) {
-        console.warn('OSRM non raggiungibile, uso linea retta come fallback:', e.message);
+        console.warn('OSRM fallback non disponibile:', e.message);
     }
-    // Fallback: linea retta se OSRM non risponde
-    return [[lat1, lng1], [lat2, lng2]];
+    return [[lat1, lng1], [lat2, lng2]]; // linea retta come ultimo resort
 }
 
 // -------------------------------------------------------
-// TRATTI STRADALI ROSSI (con routing reale su strada)
-// Per ogni via con ≥2 marker, disegna il percorso reale
+// TRATTI STRADALI ROSSI (geometria reale da OSM)
+// Per ogni via con ≥2 marker, disegna il tracciato esatto
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Rimuovi tutte le vecchie polyline dalla mappa
+    // 1. Rimuovi le vecchie polyline dalla mappa
     for (let streetName in activeSegments) {
         map.removeLayer(activeSegments[streetName]);
     }
     activeSegments = {};
 
-    // 2. Raggruppa i marker per nome via (ignora quelli senza via)
+    // 2. Raggruppa i marker per nome via
     const groups = {};
     markersData.forEach(m => {
         if (!m.street || m.street.trim() === '') return;
@@ -480,36 +563,38 @@ async function updateRoadSegments() {
         groups[key].coords.push([m.lat, m.lng]);
     });
 
-    // 3. Per ogni gruppo con almeno 2 marker, calcola il percorso reale
+    // 3. Per ogni gruppo con ≥2 marker, ottieni il tracciato della strada
     for (let key in groups) {
         const group = groups[key];
         if (group.coords.length < 2) continue;
 
-        // Concatena i tratti tra punti consecutivi (A→B, B→C, ecc.)
-        let fullRoute = [];
-        for (let i = 0; i < group.coords.length - 1; i++) {
-            const [lat1, lng1] = group.coords[i];
-            const [lat2, lng2] = group.coords[i + 1];
-            const segment = await getRouteGeometry(lat1, lng1, lat2, lng2);
-            // Evita duplicazione del punto di congiunzione tra tratti
-            if (fullRoute.length > 0) {
-                fullRoute = fullRoute.concat(segment.slice(1));
-            } else {
-                fullRoute = segment;
+        // Prima prova: geometria esatta da OSM (Overpass)
+        let routeCoords = await getStreetGeometry(group.streetName, group.coords);
+
+        // Fallback: OSRM routing tra coppie consecutive
+        if (!routeCoords) {
+            let fullRoute = [];
+            for (let i = 0; i < group.coords.length - 1; i++) {
+                const [lat1, lng1] = group.coords[i];
+                const [lat2, lng2] = group.coords[i + 1];
+                const segment = await getRouteGeometryFallback(lat1, lng1, lat2, lng2);
+                fullRoute = fullRoute.length > 0
+                    ? fullRoute.concat(segment.slice(1))
+                    : segment;
             }
+            routeCoords = fullRoute;
         }
 
-        if (fullRoute.length < 2) continue;
+        if (!routeCoords || routeCoords.length < 2) continue;
 
-        const polyline = L.polyline(fullRoute, {
-            color: '#dc2626',   // rosso netto, senza sfumature
+        const polyline = L.polyline(routeCoords, {
+            color: '#dc2626',
             weight: 5,
             opacity: 1,
             lineJoin: 'round',
             lineCap: 'round'
         }).addTo(map);
 
-        // Tooltip sul tratto con il nome della via
         polyline.bindTooltip(`🔴 ${group.streetName}`, {
             permanent: false,
             direction: 'center',
@@ -517,10 +602,9 @@ async function updateRoadSegments() {
         });
 
         activeSegments[key] = polyline;
-        console.log(`🗺️ Tratto stradale reale ottenuto per: ${group.streetName}`);
     }
 
-    console.log(`🔴 Tratti stradali aggiornati: ${Object.keys(activeSegments).length} via/e con tratto rosso`);
+    console.log(`🔴 Tratti aggiornati: ${Object.keys(activeSegments).length} via/e`);
 }
 
 // Local Storage (cache locale / fallback offline)
