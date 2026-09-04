@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -55,6 +55,7 @@ const ICONS = {
 let map;
 let markersData = [];
 let activeLayers = {};
+let activeSegments = {}; // Polyline rosse tra marker della stessa via
 let pendingLatLng = null;
 let isAdmin = sessionStorage.getItem('ferrara_admin') === 'true';
 
@@ -99,8 +100,8 @@ function initMap() {
     initFirebase();
 
     map = L.map('map', {
-        zoomControl: false, // Spostiamo i controlli
-        doubleClickZoom: false // Disabilita lo zoom al doppio click per non disturbare l'inserimento
+        zoomControl: false,
+        doubleClickZoom: false
     }).setView(FERRARA_COORDS, MAP_ZOOM);
 
     // Aggiungi controlli zoom in basso a destra
@@ -108,7 +109,7 @@ function initMap() {
         position: 'bottomright'
     }).addTo(map);
 
-    // Layer mappa standard OpenStreetMap (totalmente gratuito e senza chiavi)
+    // Layer mappa standard OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
@@ -149,7 +150,6 @@ passwordInput.addEventListener('keypress', (e) => {
 });
 
 function attemptLogin() {
-    // Password hardcoded semplice per demo (in produzione servirebbe un backend!)
     if (passwordInput.value === 'admin') {
         isAdmin = true;
         sessionStorage.setItem('ferrara_admin', 'true');
@@ -180,7 +180,6 @@ async function performSearch() {
     searchBtn.disabled = true;
 
     try {
-        // Aggiunge Ferrara per contestualizzare la ricerca
         const searchQuery = encodeURIComponent(query + ', Ferrara');
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
         const data = await response.json();
@@ -188,7 +187,7 @@ async function performSearch() {
         if (data && data.length > 0) {
             const lat = parseFloat(data[0].lat);
             const lon = parseFloat(data[0].lon);
-            map.flyTo([lat, lon], 17); // Zoom livello 17
+            map.flyTo([lat, lon], 17);
         } else {
             alert("Nessuna via trovata con questo nome.");
         }
@@ -225,11 +224,20 @@ optionCards.forEach(card => {
         if (!pendingLatLng) return;
 
         const type = this.getAttribute('data-type');
+
+        // Chiede la nota (opzionale)
         let note = prompt("Inserisci una nota per questa segnalazione (opzionale):");
         if (!note || note.trim() === "") {
             note = null;
         }
-        addMarker(pendingLatLng.lat, pendingLatLng.lng, type, null, true, note);
+
+        // Chiede il nome della via (opzionale ma utile per il tratto rosso)
+        let street = prompt("Inserisci il nome della via (es. Via Roma) — serve per collegare i tratti chiusi:");
+        if (!street || street.trim() === "") {
+            street = null;
+        }
+
+        addMarker(pendingLatLng.lat, pendingLatLng.lng, type, null, true, note, null, street);
         closeModal();
     });
 });
@@ -247,10 +255,10 @@ function createCustomIcon(type) {
 }
 
 // Aggiungi un marker (e salvalo se nuovo)
-function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null) {
+// street: nome della via (opzionale), usato per disegnare i tratti rossi
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type];
-    // Usa timestamp se è una chiave Firebase (non numerica), altrimenti parseInt
     const ts = parseInt(markerId);
     const date = isNaN(ts) ? new Date().toLocaleString('it-IT') : new Date(ts).toLocaleString('it-IT');
 
@@ -265,11 +273,14 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
             <span class="popup-date">Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
     `;
 
+    if (street) {
+        popupContent += `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${street}</div>`;
+    }
+
     if (note) {
         popupContent += `<div class="user-note"><strong>Nota:</strong> ${note}</div>`;
     }
 
-    // Mostra il tasto elimina se admin, altrimenti opzioni per visualizzatori
     if (isAdmin) {
         popupContent += `<button class="delete-btn" onclick="removeMarker('${markerId}')">Risolto / Rimuovi</button>`;
     } else {
@@ -292,14 +303,15 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         }
     });
 
-    // Dettagli al passaggio del mouse (Tooltip)
+    // Tooltip al passaggio del mouse
     let tooltipContent = `
         <div class="tooltip-content">
             <strong>${config.label}</strong><br>
+            ${street ? `<span style="color:#3b82f6; font-weight:600;">📍 ${street}</span><br>` : ''}
             <span>Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
     `;
     if (note) {
-        tooltipContent += `<br><span class="note-badge">📝 Nota: ${note}</span>`;
+        tooltipContent += `<br><span class="note-badge">📝 ${note}</span>`;
     }
     tooltipContent += `</div>`;
 
@@ -308,10 +320,12 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
     activeLayers[markerId] = marker;
 
     if (save) {
-        const markerObj = { id: markerId, lat, lng, type, note: note, fbKey: fbKey };
+        const markerObj = { id: markerId, lat, lng, type, note: note, fbKey: fbKey, street: street };
         markersData.push(markerObj);
         saveMarkerToFirebase(markerObj);
         saveToLocalStorage();
+        // Aggiorna i tratti rossi dopo aver aggiunto
+        updateRoadSegments();
     }
 }
 
@@ -323,46 +337,43 @@ function saveMarkerToFirebase(markerObj) {
         lng: markerObj.lng,
         type: markerObj.type,
         timestamp: parseInt(markerObj.id),
-        note: markerObj.note || null
+        note: markerObj.note || null,
+        street: markerObj.street || null
     };
-    // Push genera una nuova chiave Firebase e aggiorna fbKey nell'oggetto locale
     const newRef = markersRef.push(payload);
     markerObj.fbKey = newRef.key;
-    saveToLocalStorage(); // Aggiorna localStorage con fbKey
+    saveToLocalStorage();
     console.log('✅ Marker salvato su Firebase:', newRef.key);
 }
 
 // Rimuovi marker (esposta globalmente per il bottone nel popup)
 window.removeMarker = function (id) {
-    // Trova fbKey prima di rimuovere dall'array
     const markerObj = markersData.find(m => m.id === id);
 
-    // Rimuovi dalla mappa
     if (activeLayers[id]) {
         map.removeLayer(activeLayers[id]);
         delete activeLayers[id];
     }
 
-    // Rimuovi da Firebase (se online e abbiamo la chiave)
     if (isFirebaseOnline && markersRef && markerObj && markerObj.fbKey) {
         markersRef.child(markerObj.fbKey).remove()
             .then(() => console.log('🗑️ Marker rimosso da Firebase:', markerObj.fbKey))
             .catch(e => console.warn('Errore rimozione Firebase:', e.message));
     }
 
-    // Rimuovi dallo store locale
     markersData = markersData.filter(m => m.id !== id);
     saveToLocalStorage();
+    // Aggiorna i tratti rossi dopo la rimozione
+    updateRoadSegments();
 }
 
-// Aggiungi Nota (esposta globalmente per il bottone nel popup del visualizzatore)
+// Aggiungi Nota
 window.addNote = function (id) {
     const note = prompt("Inserisci un dettaglio per l'amministratore (es. La strada è stata riaperta stamattina):");
     if (note && note.trim() !== "") {
         const index = markersData.findIndex(m => m.id === id);
         if (index !== -1) {
             markersData[index].note = note;
-            // Aggiorna anche su Firebase
             if (isFirebaseOnline && markersRef && markersData[index].fbKey) {
                 markersRef.child(markersData[index].fbKey).update({ note: note });
             }
@@ -382,7 +393,6 @@ window.reportResolved = function (id) {
                 ? existingNote + " | ✅ Segnalato come RISOLTO"
                 : "✅ Segnalato come RISOLTO";
             markersData[index].note = newNote;
-            // Aggiorna anche su Firebase
             if (isFirebaseOnline && markersRef && markersData[index].fbKey) {
                 markersRef.child(markersData[index].fbKey).update({ note: newNote });
             }
@@ -390,6 +400,54 @@ window.reportResolved = function (id) {
             refreshMarkers();
         }
     }
+}
+
+// -------------------------------------------------------
+// TRATTI STRADALI ROSSI
+// Disegna una polyline rossa tra tutti i marker della stessa via
+// -------------------------------------------------------
+function updateRoadSegments() {
+    // 1. Rimuovi tutte le vecchie polyline dalla mappa
+    for (let streetName in activeSegments) {
+        map.removeLayer(activeSegments[streetName]);
+    }
+    activeSegments = {};
+
+    // 2. Raggruppa i marker per nome via (ignora quelli senza via)
+    const groups = {};
+    markersData.forEach(m => {
+        if (!m.street || m.street.trim() === '') return;
+        const key = m.street.trim().toLowerCase();
+        if (!groups[key]) {
+            groups[key] = { streetName: m.street.trim(), coords: [] };
+        }
+        groups[key].coords.push([m.lat, m.lng]);
+    });
+
+    // 3. Per ogni gruppo con almeno 2 marker, disegna la polyline rossa
+    for (let key in groups) {
+        const group = groups[key];
+        if (group.coords.length < 2) continue;
+
+        const polyline = L.polyline(group.coords, {
+            color: '#dc2626',   // rosso netto
+            weight: 5,
+            opacity: 1,         // nessuna trasparenza
+            lineJoin: 'round',
+            lineCap: 'round'
+        }).addTo(map);
+
+        // Tooltip sul tratto con il nome della via
+        polyline.bindTooltip(`🔴 ${group.streetName}`, {
+            permanent: false,
+            direction: 'center',
+            className: 'road-segment-tooltip'
+        });
+
+        activeSegments[key] = polyline;
+    }
+
+    console.log(`🔴 Tratti stradali aggiornati: ${Object.keys(activeSegments).length} via/e con tratto rosso`);
 }
 
 // Local Storage (cache locale / fallback offline)
@@ -400,10 +458,8 @@ function saveToLocalStorage() {
 // Carica marker: da Firebase se online, altrimenti da localStorage
 function loadMarkers() {
     if (isFirebaseOnline && markersRef) {
-        // Legge una volta sola tutti i dati da Firebase
         markersRef.once('value', function (snapshot) {
             markersData = [];
-            // Pulisce eventuali marker residui dalla mappa
             for (let id in activeLayers) {
                 map.removeLayer(activeLayers[id]);
             }
@@ -412,7 +468,6 @@ function loadMarkers() {
             const data = snapshot.val();
             if (data) {
                 Object.entries(data).forEach(([fbKey, m]) => {
-                    // Usa il timestamp come id locale se disponibile
                     const localId = m.timestamp ? m.timestamp.toString() : fbKey;
                     const markerObj = {
                         id: localId,
@@ -420,33 +475,36 @@ function loadMarkers() {
                         lng: m.lng,
                         type: m.type,
                         note: m.note || null,
-                        fbKey: fbKey
+                        fbKey: fbKey,
+                        street: m.street || null
                     };
                     markersData.push(markerObj);
-                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null);
                 });
-                saveToLocalStorage(); // Aggiorna cache locale
+                saveToLocalStorage();
                 console.log(`📍 Caricati ${markersData.length} marker da Firebase`);
             }
+
+            // Dopo aver caricato tutti i marker, disegna i tratti rossi
+            updateRoadSegments();
+
         }, function (error) {
-            // In caso di errore (es. regole db), fallback a localStorage
             console.warn('Firebase read error, fallback locale:', error.message);
             loadFromLocalStorage();
         });
     } else {
-        // Modalità offline: usa localStorage
         loadFromLocalStorage();
     }
 }
 
-// Carica i marker dal localStorage (usato come fallback)
+// Carica i marker dal localStorage (fallback offline)
 function loadFromLocalStorage() {
     const saved = localStorage.getItem('ferrara_viabilita_markers');
     if (saved) {
         try {
             markersData = JSON.parse(saved);
             markersData.forEach(m => {
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null);
             });
             console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
@@ -454,20 +512,22 @@ function loadFromLocalStorage() {
             markersData = [];
         }
     }
+    updateRoadSegments();
 }
 
 // Ridisegna i marker (es. quando cambia lo stato admin)
 function refreshMarkers() {
-    // Rimuove tutti i marker dalla mappa
     for (let id in activeLayers) {
         map.removeLayer(activeLayers[id]);
     }
     activeLayers = {};
 
-    // Li ricarica
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null);
+        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null);
     });
+
+    // Ridisegna anche i tratti rossi
+    updateRoadSegments();
 }
 
 // Avvia tutto quando il DOM è pronto
