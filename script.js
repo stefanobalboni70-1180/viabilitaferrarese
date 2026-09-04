@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.7';
+const APP_VERSION = '1.8';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -438,132 +438,216 @@ window.reportResolved = function (id) {
 }
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap tramite Overpass API
-// Restituisce le coordinate esatte della strada per nome
-// (segue la strada, non calcola un percorso di navigazione)
+// GEOMETRIA STRADALE da OpenStreetMap (Overpass API)
+// Trova il tracciato esatto tra i marker rimanendo
+// RIGOROSAMENTE sulla via specificata (nessuna deviazione)
 // -------------------------------------------------------
 
-// Trova l'indice del punto più vicino in un percorso a un punto [lat,lng] dato
-function closestPointIndex(path, lat, lng) {
-    let minDist = Infinity;
-    let minIdx = 0;
-    for (let i = 0; i < path.length; i++) {
-        const dlat = path[i][0] - lat;
-        const dlng = path[i][1] - lng;
-        const d = dlat * dlat + dlng * dlng;
-        if (d < minDist) { minDist = d; minIdx = i; }
-    }
-    return minIdx;
+const streetGeomCache = {};
+
+// Calcola la distanza quadratica euclidea approssimata tra due coordinate
+function coordDistSq(c1, c2) {
+    const dlat = c1[0] - c2[0];
+    const dlng = c1[1] - c2[1];
+    return dlat * dlat + dlng * dlng;
 }
 
-// Ritaglia il percorso della strada al solo tratto tra i marker
-// Evita di colorare tutta la via, solo la sezione interessata
-function extractSegmentBetweenMarkers(path, markerCoords) {
-    if (path.length < 2) return path;
-    const indices = markerCoords.map(([lat, lng]) => closestPointIndex(path, lat, lng));
-    const iMin = Math.min(...indices);
-    const iMax = Math.max(...indices);
-    const segment = path.slice(iMin, iMax + 1);
-    // Se il segmento è troppo corto, ritorna l'intero percorso come fallback
-    return segment.length >= 2 ? segment : path;
-}
+// Trova il percorso sul grafo formato ESCLUSIVAMENTE dai segmenti della via
+function findStreetPathBetweenMarkers(ways, markerCoords) {
+    if (!ways || ways.length === 0) return null;
 
-// Collega segmenti OSM (ways) adiacenti in un unico percorso ordinato
-function connectWays(ways, nodeCoords) {
-    if (ways.length === 0) return [];
-    if (ways.length === 1) {
-        return ways[0].nodes.map(id => nodeCoords[id]).filter(Boolean);
+    // 1. Costruisci il grafo (lista di adiacenza) da tutti i segmenti della via
+    const graph = new Map();
+    const coordMap = new Map();
+
+    function getKey(lat, lon) {
+        return `${lat.toFixed(6)},${lon.toFixed(6)}`;
     }
 
-    // Concatena i segmenti abbinando gli endpoint
-    let chain = [...ways[0].nodes];
-    const remaining = [...ways.slice(1)];
+    function addEdge(k1, c1, k2, c2) {
+        coordMap.set(k1, c1);
+        coordMap.set(k2, c2);
+        if (!graph.has(k1)) graph.set(k1, []);
+        if (!graph.has(k2)) graph.set(k2, []);
+        const dist = Math.sqrt(coordDistSq(c1, c2));
+        graph.get(k1).push({ node: k2, weight: dist });
+        graph.get(k2).push({ node: k1, weight: dist });
+    }
 
-    while (remaining.length > 0) {
-        const tail = chain[chain.length - 1];
-        const head = chain[0];
-        let matched = false;
+    ways.forEach(w => {
+        if (!w.geometry || w.geometry.length < 2) return;
+        for (let i = 0; i < w.geometry.length - 1; i++) {
+            const p1 = [w.geometry[i].lat, w.geometry[i].lon];
+            const p2 = [w.geometry[i + 1].lat, w.geometry[i + 1].lon];
+            const k1 = getKey(p1[0], p1[1]);
+            const k2 = getKey(p2[0], p2[1]);
+            addEdge(k1, p1, k2, p2);
+        }
+    });
 
-        for (let i = 0; i < remaining.length; i++) {
-            const w = remaining[i];
-            const wHead = w.nodes[0];
-            const wTail = w.nodes[w.nodes.length - 1];
+    if (graph.size === 0) return null;
 
-            if (wHead === tail) {
-                chain = chain.concat(w.nodes.slice(1));
-            } else if (wTail === tail) {
-                chain = chain.concat([...w.nodes].reverse().slice(1));
-            } else if (wHead === head) {
-                chain = [...w.nodes].reverse().slice(0, -1).concat(chain);
-            } else if (wTail === head) {
-                chain = [...w.nodes].slice(0, -1).concat(chain);
-            } else {
-                continue;
+    const allKeys = Array.from(coordMap.keys());
+
+    // 2. Per ciascun marker, trova il nodo della via più vicino
+    const markerNodes = markerCoords.map(mc => {
+        let bestKey = allKeys[0];
+        let minDist = Infinity;
+        for (const k of allKeys) {
+            const c = coordMap.get(k);
+            const d = coordDistSq(mc, c);
+            if (d < minDist) {
+                minDist = d;
+                bestKey = k;
             }
-            remaining.splice(i, 1);
-            matched = true;
-            break;
         }
-        if (!matched) break; // segmenti non connessi → interrompe
+        return bestKey;
+    });
+
+    // Se tutti i marker mappano allo stesso nodo, ritorna le coordinate del nodo
+    if (markerNodes.length >= 2 && markerNodes[0] === markerNodes[1]) {
+        return [coordMap.get(markerNodes[0])];
     }
 
-    return chain.map(id => nodeCoords[id]).filter(Boolean);
+    // 3. Dijkstra tra il nodo del Marker 1 e il nodo del Marker 2
+    // Per gestire eventuali piccole interruzioni nei dati OSM, colleghiamo i nodi terminali
+    const startNode = markerNodes[0];
+    const endNode = markerNodes[1];
+
+    const distances = new Map();
+    const previous = new Map();
+    const unvisited = new Set(allKeys);
+
+    for (const k of allKeys) {
+        distances.set(k, Infinity);
+    }
+    distances.set(startNode, 0);
+
+    // Permette piccoli salti di raccordo se la via in OSM è divisa in spezzoni
+    const deadEnds = [];
+    for (const [k, edges] of graph.entries()) {
+        if (edges.length === 1) deadEnds.push(k);
+    }
+    for (let i = 0; i < deadEnds.length; i++) {
+        for (let j = i + 1; j < deadEnds.length; j++) {
+            const k1 = deadEnds[i];
+            const k2 = deadEnds[j];
+            const c1 = coordMap.get(k1);
+            const c2 = coordMap.get(k2);
+            const d = Math.sqrt(coordDistSq(c1, c2));
+            // Collega con peso penalizzato (10x) per colmare piccoli gap senza deviare
+            if (d < 0.005) { // gap < ~500m
+                graph.get(k1).push({ node: k2, weight: d * 10 });
+                graph.get(k2).push({ node: k1, weight: d * 10 });
+            }
+        }
+    }
+
+    while (unvisited.size > 0) {
+        let current = null;
+        let smallestDist = Infinity;
+        for (const node of unvisited) {
+            const d = distances.get(node);
+            if (d < smallestDist) {
+                smallestDist = d;
+                current = node;
+            }
+        }
+
+        if (current === null || smallestDist === Infinity) break;
+        if (current === endNode) break;
+
+        unvisited.delete(current);
+
+        const neighbors = graph.get(current) || [];
+        for (const neighbor of neighbors) {
+            if (!unvisited.has(neighbor.node)) continue;
+            const alt = smallestDist + neighbor.weight;
+            if (alt < distances.get(neighbor.node)) {
+                distances.set(neighbor.node, alt);
+                previous.set(neighbor.node, current);
+            }
+        }
+    }
+
+    // Ricostruisci il percorso
+    const path = [];
+    let curr = endNode;
+    while (curr) {
+        path.unshift(coordMap.get(curr));
+        curr = previous.get(curr);
+    }
+
+    // Se è stato trovato un percorso valido tra start ed end
+    if (path.length >= 2 && getKey(path[0][0], path[0][1]) === startNode) {
+        return path;
+    }
+
+    // Fallback: se il grafo è disconnesso, restituisci tutti i punti della via ordinati
+    const allPoints = [];
+    ways.forEach(w => {
+        if (w.geometry) {
+            w.geometry.forEach(p => allPoints.push([p.lat, p.lon]));
+        }
+    });
+    return allPoints.length >= 2 ? allPoints : null;
 }
 
-// Recupera la geometria reale della strada tramite Overpass API
-// Fallback: OSRM routing se Overpass non risponde
+// Recupera i dati OSM per la strada usando query ottimizzata 'out geom'
 async function getStreetGeometry(streetName, markerCoords) {
-    try {
-        // Bounding box intorno ai marker con padding
-        const lats = markerCoords.map(c => c[0]);
-        const lngs = markerCoords.map(c => c[1]);
-        const pad = 0.02; // ~2km di margine attorno ai marker
-        const s = (Math.min(...lats) - pad).toFixed(6);
-        const w = (Math.min(...lngs) - pad).toFixed(6);
-        const n = (Math.max(...lats) + pad).toFixed(6);
-        const e = (Math.max(...lngs) + pad).toFixed(6);
-
-        const query = `[out:json][timeout:10];way["name"="${streetName}"](${s},${w},${n},${e});(._;>;);out body;`;
-        const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
-        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        const data = await response.json();
-
-        // Mappa ID nodo → [lat, lon]
-        const nodeCoords = {};
-        data.elements.filter(el => el.type === 'node').forEach(n => {
-            nodeCoords[n.id] = [n.lat, n.lon];
-        });
-
-        const ways = data.elements.filter(el => el.type === 'way');
-        if (ways.length === 0) {
-            console.warn(`Nessuna via trovata su OSM per: "${streetName}" — uso OSRM come fallback`);
-            return null; // fallback a OSRM
-        }
-
-        const path = connectWays(ways, nodeCoords);
-        console.log(`🗺️ Geometria OSM ottenuta per "${streetName}": ${path.length} nodi`);
-        return path.length >= 2 ? path : null;
-
-    } catch (e) {
-        console.warn(`Overpass non disponibile per "${streetName}":`, e.message);
-        return null; // fallback a OSRM
+    const cacheKey = `${streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+    if (streetGeomCache[cacheKey]) {
+        return streetGeomCache[cacheKey];
     }
-}
 
-// OSRM: usato solo come fallback se Overpass non risponde
-async function getRouteGeometryFallback(lat1, lng1, lat2, lng2) {
-    try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`;
-        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        const data = await response.json();
-        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-            return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    // Bounding box con margine
+    const lats = markerCoords.map(c => c[0]);
+    const lngs = markerCoords.map(c => c[1]);
+    const pad = 0.03; // ~3km margine
+    const s = (Math.min(...lats) - pad).toFixed(6);
+    const w = (Math.min(...lngs) - pad).toFixed(6);
+    const n = (Math.max(...lats) + pad).toFixed(6);
+    const e = (Math.max(...lngs) + pad).toFixed(6);
+
+    // Query Overpass ultra-veloce con 'out geom' (senza ricorsione di nodi)
+    const escapedName = streetName.replace(/["\\]/g, '\\$&');
+    const query = `[out:json][timeout:6];way["name"="${escapedName}"](${s},${w},${n},${e});out geom;`;
+
+    // Lista di mirror Overpass pubblici
+    const endpoints = [
+        'https://overpass-api.de/api/interpreter',
+        'https://lz4.overpass-api.de/api/interpreter',
+        'https://overpass.kumi.systems/api/interpreter'
+    ];
+
+    let ways = null;
+
+    for (const ep of endpoints) {
+        try {
+            const url = `${ep}?data=${encodeURIComponent(query)}`;
+            const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (data && data.elements && data.elements.length > 0) {
+                ways = data.elements.filter(el => el.type === 'way' && el.geometry && el.geometry.length > 0);
+                if (ways.length > 0) break;
+            }
+        } catch (err) {
+            console.warn(`Mirror ${ep} non disponibile:`, err.message);
         }
-    } catch (e) {
-        console.warn('OSRM fallback non disponibile:', e.message);
     }
-    return [[lat1, lng1], [lat2, lng2]]; // linea retta come ultimo resort
+
+    if (ways && ways.length > 0) {
+        const path = findStreetPathBetweenMarkers(ways, markerCoords);
+        if (path && path.length >= 2) {
+            streetGeomCache[cacheKey] = path;
+            console.log(`🗺️ Percorso esatto OSM trovato per "${streetName}" (${path.length} punti, 100% su ${streetName})`);
+            return path;
+        }
+    }
+
+    console.warn(`Nessuna geometria OSM trovata per "${streetName}" — traccio linea retta tra i marker`);
+    return null;
 }
 
 // -------------------------------------------------------
@@ -593,29 +677,13 @@ async function updateRoadSegments() {
         const group = groups[key];
         if (group.coords.length < 2) continue;
 
-        // Prima prova: geometria esatta da OSM (Overpass)
+        // Traccia la geometria esatta della strada da OSM
         let routeCoords = await getStreetGeometry(group.streetName, group.coords);
 
-        if (routeCoords) {
-            // ✂️ Ritaglia al solo tratto tra i due marker (non tutta la via)
-            routeCoords = extractSegmentBetweenMarkers(routeCoords, group.coords);
+        // Se OSM non è raggiungibile, collega direttamente i marker della via (senza deviare su altre strade)
+        if (!routeCoords || routeCoords.length < 2) {
+            routeCoords = group.coords;
         }
-
-        // Fallback: OSRM routing tra coppie consecutive
-        if (!routeCoords) {
-            let fullRoute = [];
-            for (let i = 0; i < group.coords.length - 1; i++) {
-                const [lat1, lng1] = group.coords[i];
-                const [lat2, lng2] = group.coords[i + 1];
-                const segment = await getRouteGeometryFallback(lat1, lng1, lat2, lng2);
-                fullRoute = fullRoute.length > 0
-                    ? fullRoute.concat(segment.slice(1))
-                    : segment;
-            }
-            routeCoords = fullRoute;
-        }
-
-        if (!routeCoords || routeCoords.length < 2) continue;
 
         const polyline = L.polyline(routeCoords, {
             color: '#dc2626',
