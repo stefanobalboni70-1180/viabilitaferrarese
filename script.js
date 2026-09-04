@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -200,6 +200,27 @@ async function performSearch() {
     }
 }
 
+// Reverse Geocoding: rileva automaticamente il nome della via dalle coordinate
+async function reverseGeocode(lat, lng) {
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        );
+        const data = await response.json();
+        if (data && data.address) {
+            // Nominatim restituisce road, pedestrian, path, ecc.
+            return data.address.road ||
+                   data.address.pedestrian ||
+                   data.address.path ||
+                   data.address.footway ||
+                   null;
+        }
+    } catch (e) {
+        console.warn('Reverse geocoding non disponibile:', e.message);
+    }
+    return null;
+}
+
 // Gestione Modale Inserimento
 function openModal() {
     modalOverlay.classList.remove('hidden');
@@ -220,25 +241,39 @@ modalOverlay.addEventListener('click', function (e) {
 
 // Gestione Selezione Icona
 optionCards.forEach(card => {
-    card.addEventListener('click', function () {
+    card.addEventListener('click', async function () {
         if (!pendingLatLng) return;
 
         const type = this.getAttribute('data-type');
+        const lat = pendingLatLng.lat;
+        const lng = pendingLatLng.lng;
 
-        // Chiede la nota (opzionale)
+        // Chiede solo la nota (opzionale) — la via viene rilevata in automatico
         let note = prompt("Inserisci una nota per questa segnalazione (opzionale):");
         if (!note || note.trim() === "") {
             note = null;
         }
 
-        // Chiede il nome della via (opzionale ma utile per il tratto rosso)
-        let street = prompt("Inserisci il nome della via (es. Via Roma) — serve per collegare i tratti chiusi:");
-        if (!street || street.trim() === "") {
-            street = null;
-        }
-
-        addMarker(pendingLatLng.lat, pendingLatLng.lng, type, null, true, note, null, street);
+        // Aggiunge il marker subito (senza via, per non bloccare l'utente)
+        addMarker(lat, lng, type, null, true, note, null, null);
         closeModal();
+
+        // Rileva la via in background tramite reverse geocoding
+        const street = await reverseGeocode(lat, lng);
+        if (street) {
+            // Aggiorna l'ultimo marker inserito con il nome della via
+            const lastMarker = markersData[markersData.length - 1];
+            if (lastMarker) {
+                lastMarker.street = street;
+                // Aggiorna Firebase
+                if (isFirebaseOnline && markersRef && lastMarker.fbKey) {
+                    markersRef.child(lastMarker.fbKey).update({ street: street });
+                }
+                saveToLocalStorage();
+                updateRoadSegments();
+                console.log(`📍 Via rilevata automaticamente: ${street}`);
+            }
+        }
     });
 });
 
