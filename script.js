@@ -1,5 +1,43 @@
 // Versione del software
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
+
+// --- CONFIGURAZIONE FIREBASE ---
+const firebaseConfig = {
+    apiKey: "AIzaSyDRUq7PoqE2GxlZhui3Gm_305t5V-7ibpI",
+    authDomain: "viabilita-ferrarese-a7b75.firebaseapp.com",
+    databaseURL: "https://viabilita-ferrarese-a7b75-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "viabilita-ferrarese-a7b75",
+    storageBucket: "viabilita-ferrarese-a7b75.firebasestorage.app",
+    messagingSenderId: "470647422268",
+    appId: "1:470647422268:web:0d9286b851d14473007239"
+};
+
+// Variabili Firebase
+let db = null;
+let markersRef = null;
+let isFirebaseOnline = false;
+
+// Inizializza Firebase (con fallback silenzioso se non disponibile)
+function initFirebase() {
+    try {
+        if (typeof firebase !== 'undefined') {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.database();
+            markersRef = db.ref("markers");
+            isFirebaseOnline = true;
+            console.log('🔥 Firebase collegato — dati in tempo reale attivi');
+        } else {
+            console.warn('⚠️ Firebase SDK non disponibile — modalità locale');
+        }
+    } catch (e) {
+        console.warn('⚠️ Firebase non raggiungibile — modalità locale:', e.message);
+        db = null;
+        markersRef = null;
+        isFirebaseOnline = false;
+    }
+}
 
 // Coordinate di Ferrara
 const FERRARA_COORDS = [44.8381, 11.6198];
@@ -57,6 +95,9 @@ function updateUI() {
 
 // Inizializzazione Mappa
 function initMap() {
+    // Prima inizializza Firebase
+    initFirebase();
+
     map = L.map('map', {
         zoomControl: false, // Spostiamo i controlli
         doubleClickZoom: false // Disabilita lo zoom al doppio click per non disturbare l'inserimento
@@ -206,10 +247,12 @@ function createCustomIcon(type) {
 }
 
 // Aggiungi un marker (e salvalo se nuovo)
-function addMarker(lat, lng, type, id = null, save = true, note = null) {
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type];
-    const date = new Date(parseInt(markerId)).toLocaleString('it-IT');
+    // Usa timestamp se è una chiave Firebase (non numerica), altrimenti parseInt
+    const ts = parseInt(markerId);
+    const date = isNaN(ts) ? new Date().toLocaleString('it-IT') : new Date(ts).toLocaleString('it-IT');
 
     const marker = L.marker([lat, lng], {
         icon: createCustomIcon(type)
@@ -223,7 +266,7 @@ function addMarker(lat, lng, type, id = null, save = true, note = null) {
     `;
 
     if (note) {
-        popupContent += `<div class="user-note"><strong>Nota utente:</strong> ${note}</div>`;
+        popupContent += `<div class="user-note"><strong>Nota:</strong> ${note}</div>`;
     }
 
     // Mostra il tasto elimina se admin, altrimenti opzioni per visualizzatori
@@ -265,20 +308,49 @@ function addMarker(lat, lng, type, id = null, save = true, note = null) {
     activeLayers[markerId] = marker;
 
     if (save) {
-        markersData.push({ id: markerId, lat, lng, type, note: note });
+        const markerObj = { id: markerId, lat, lng, type, note: note, fbKey: fbKey };
+        markersData.push(markerObj);
+        saveMarkerToFirebase(markerObj);
         saveToLocalStorage();
     }
 }
 
+// Salva un singolo marker su Firebase (se online)
+function saveMarkerToFirebase(markerObj) {
+    if (!isFirebaseOnline || !markersRef) return;
+    const payload = {
+        lat: markerObj.lat,
+        lng: markerObj.lng,
+        type: markerObj.type,
+        timestamp: parseInt(markerObj.id),
+        note: markerObj.note || null
+    };
+    // Push genera una nuova chiave Firebase e aggiorna fbKey nell'oggetto locale
+    const newRef = markersRef.push(payload);
+    markerObj.fbKey = newRef.key;
+    saveToLocalStorage(); // Aggiorna localStorage con fbKey
+    console.log('✅ Marker salvato su Firebase:', newRef.key);
+}
+
 // Rimuovi marker (esposta globalmente per il bottone nel popup)
 window.removeMarker = function (id) {
+    // Trova fbKey prima di rimuovere dall'array
+    const markerObj = markersData.find(m => m.id === id);
+
     // Rimuovi dalla mappa
     if (activeLayers[id]) {
         map.removeLayer(activeLayers[id]);
         delete activeLayers[id];
     }
 
-    // Rimuovi dallo store
+    // Rimuovi da Firebase (se online e abbiamo la chiave)
+    if (isFirebaseOnline && markersRef && markerObj && markerObj.fbKey) {
+        markersRef.child(markerObj.fbKey).remove()
+            .then(() => console.log('🗑️ Marker rimosso da Firebase:', markerObj.fbKey))
+            .catch(e => console.warn('Errore rimozione Firebase:', e.message));
+    }
+
+    // Rimuovi dallo store locale
     markersData = markersData.filter(m => m.id !== id);
     saveToLocalStorage();
 }
@@ -290,6 +362,10 @@ window.addNote = function (id) {
         const index = markersData.findIndex(m => m.id === id);
         if (index !== -1) {
             markersData[index].note = note;
+            // Aggiorna anche su Firebase
+            if (isFirebaseOnline && markersRef && markersData[index].fbKey) {
+                markersRef.child(markersData[index].fbKey).update({ note: note });
+            }
             saveToLocalStorage();
             refreshMarkers();
         }
@@ -302,10 +378,13 @@ window.reportResolved = function (id) {
         const index = markersData.findIndex(m => m.id === id);
         if (index !== -1) {
             const existingNote = markersData[index].note;
-            if (existingNote) {
-                markersData[index].note = existingNote + " | ✅ Segnalato come RISOLTO";
-            } else {
-                markersData[index].note = "✅ Segnalato come RISOLTO";
+            const newNote = existingNote
+                ? existingNote + " | ✅ Segnalato come RISOLTO"
+                : "✅ Segnalato come RISOLTO";
+            markersData[index].note = newNote;
+            // Aggiorna anche su Firebase
+            if (isFirebaseOnline && markersRef && markersData[index].fbKey) {
+                markersRef.child(markersData[index].fbKey).update({ note: newNote });
             }
             saveToLocalStorage();
             refreshMarkers();
@@ -313,19 +392,63 @@ window.reportResolved = function (id) {
     }
 }
 
-// Local Storage
+// Local Storage (cache locale / fallback offline)
 function saveToLocalStorage() {
     localStorage.setItem('ferrara_viabilita_markers', JSON.stringify(markersData));
 }
 
+// Carica marker: da Firebase se online, altrimenti da localStorage
 function loadMarkers() {
+    if (isFirebaseOnline && markersRef) {
+        // Legge una volta sola tutti i dati da Firebase
+        markersRef.once('value', function (snapshot) {
+            markersData = [];
+            // Pulisce eventuali marker residui dalla mappa
+            for (let id in activeLayers) {
+                map.removeLayer(activeLayers[id]);
+            }
+            activeLayers = {};
+
+            const data = snapshot.val();
+            if (data) {
+                Object.entries(data).forEach(([fbKey, m]) => {
+                    // Usa il timestamp come id locale se disponibile
+                    const localId = m.timestamp ? m.timestamp.toString() : fbKey;
+                    const markerObj = {
+                        id: localId,
+                        lat: m.lat,
+                        lng: m.lng,
+                        type: m.type,
+                        note: m.note || null,
+                        fbKey: fbKey
+                    };
+                    markersData.push(markerObj);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey);
+                });
+                saveToLocalStorage(); // Aggiorna cache locale
+                console.log(`📍 Caricati ${markersData.length} marker da Firebase`);
+            }
+        }, function (error) {
+            // In caso di errore (es. regole db), fallback a localStorage
+            console.warn('Firebase read error, fallback locale:', error.message);
+            loadFromLocalStorage();
+        });
+    } else {
+        // Modalità offline: usa localStorage
+        loadFromLocalStorage();
+    }
+}
+
+// Carica i marker dal localStorage (usato come fallback)
+function loadFromLocalStorage() {
     const saved = localStorage.getItem('ferrara_viabilita_markers');
     if (saved) {
         try {
             markersData = JSON.parse(saved);
             markersData.forEach(m => {
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null);
             });
+            console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
             console.error("Errore nel caricamento dei marker", e);
             markersData = [];
@@ -343,7 +466,7 @@ function refreshMarkers() {
 
     // Li ricarica
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note);
+        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null);
     });
 }
 
