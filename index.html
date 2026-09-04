@@ -22,7 +22,6 @@
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
             <h1>Gestione Viabilità <span>Ferrara</span></h1>
-            <span id="sync-badge" class="sync-badge">☁️ Inizializzazione...</span>
             <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
             <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
         </div>
@@ -37,19 +36,6 @@
 
     <div id="map"></div>
 
-    <!-- Floating Location / GPS Button -->
-    <button id="locate-btn" class="locate-btn" title="La mia posizione" aria-label="Centra sulla mia posizione">
-        <svg id="locate-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="8"></circle>
-            <line x1="12" y1="2" x2="12" y2="4"></line>
-            <line x1="12" y1="20" x2="12" y2="22"></line>
-            <line x1="2" y1="12" x2="4" y2="12"></line>
-            <line x1="20" y1="12" x2="22" y2="12"></line>
-            <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
-        </svg>
-        <span id="locate-text" class="locate-tooltip">Centra su di me</span>
-    </button>
-
     <!-- Modal for adding markers -->
     <div id="marker-modal" class="modal-overlay hidden">
         <div class="modal-content">
@@ -61,14 +47,6 @@
             </div>
             <p class="modal-desc">Seleziona il tipo di problema riscontrato nel punto indicato.</p>
             
-            <div class="street-field-group">
-                <label for="marker-street-input">📍 Via rilevata:</label>
-                <div class="street-input-wrapper">
-                    <input type="text" id="marker-street-input" placeholder="Rilevamento via in corso..." />
-                    <span id="street-detect-status" class="street-status-badge">🔍 Rilevamento...</span>
-                </div>
-            </div>
-
             <div class="options-grid">
                 <button class="option-card" data-type="lavori">
                     <div class="icon-wrapper works">🚧</div>
@@ -85,15 +63,6 @@
                 <button class="option-card" data-type="incidente">
                     <div class="icon-wrapper accident">⚠️</div>
                     <span>Incidente</span>
-                                </button>
-                <button class="option-card" data-type="semaforo">
-                    <div class="icon-wrapper semaforo">🚦</div>
-                    <span>Senso unico alternato</span>
-                </button>
-                <button class="option-card" data-type="mercato">
-                
-                    <div class="icon-wrapper mercato">🛒</div>
-                    <span>Mercato settimanale</span>
                 </button>
             </div>
         </div>
@@ -119,11 +88,6 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <!-- Firebase SDK (CDN) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     
     <!-- Custom Script -->
     <script src="script.js"></script>
