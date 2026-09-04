@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -439,13 +439,26 @@ window.reportResolved = function (id) {
 
 // -------------------------------------------------------
 // GEOMETRIA STRADALE da OpenStreetMap (API Ufficiale + Overpass)
-// Trova il tracciato esatto tra i marker rimanendo
-// RIGOROSAMENTE sulla via specificata (nessuna deviazione)
+// - Cache persistente su localStorage (caricamento istantaneo 0ms)
+// - Rendering immediato iniziale con aggiornamento fluido in parallelo
 // -------------------------------------------------------
 
-const streetGeomCache = {};
+// Inizializza la cache delle geometrie da localStorage
+let streetGeomCache = {};
+try {
+    const cached = localStorage.getItem('ferrara_street_cache_v2');
+    if (cached) streetGeomCache = JSON.parse(cached);
+} catch (e) {
+    streetGeomCache = {};
+}
 
-// Normalizza il nome di una via per il matching (rimuove prefissi come Via/Viale/Corso)
+function saveStreetGeomCache() {
+    try {
+        localStorage.setItem('ferrara_street_cache_v2', JSON.stringify(streetGeomCache));
+    } catch (e) { }
+}
+
+// Normalizza il nome di una via per il matching
 function normalizeStreetName(str) {
     return (str || '')
         .toLowerCase()
@@ -599,7 +612,6 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
             const projB = ((b[0] - m1[0]) * vx + (b[1] - m1[1]) * vy) / vLenSq;
             return projA - projB;
         });
-        // Filtra ai punti compresi tra i due marker (con piccolo margine)
         const inBetween = uniquePoints.filter(p => {
             const proj = ((p[0] - m1[0]) * vx + (p[1] - m1[1]) * vy) / vLenSq;
             return proj >= -0.05 && proj <= 1.05;
@@ -610,7 +622,7 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
     return uniquePoints.length >= 2 ? uniquePoints : null;
 }
 
-// Recupera i dati OSM per la strada usando l'API OpenStreetMap ufficiale (veloce e diretta)
+// Recupera i dati OSM per la strada in modo ultra-rapido (con cache locale)
 async function getStreetGeometry(streetName, markerCoords) {
     const cacheKey = `${streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
     if (streetGeomCache[cacheKey]) {
@@ -628,104 +640,86 @@ async function getStreetGeometry(streetName, markerCoords) {
     const normTarget = normalizeStreetName(streetName);
     let ways = [];
 
-    // Metodo 1: OpenStreetMap Direct API (istantanea, globale)
-    try {
-        const osmMapUrl = `https://api.openstreetmap.org/api/0.6/map?bbox=${w},${s},${e},${n}`;
-        const res = await fetch(osmMapUrl, { signal: AbortSignal.timeout(4000) });
-        if (res.ok) {
-            const text = await res.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(text, 'text/xml');
+    // Query Overpass ultra-mirata solo per strade ("highway") con nome corrispondente
+    const escapedName = streetName.replace(/["\\]/g, '\\$&');
+    const query = `[out:json][timeout:4];way["highway"]["name"~"${normTarget}",i](${s},${w},${n},${e});out geom;`;
+    const mirrors = [
+        'https://lz4.overpass-api.de/api/interpreter',
+        'https://overpass-api.de/api/interpreter'
+    ];
 
-            const nodeMap = new Map();
-            xmlDoc.querySelectorAll('node').forEach(nd => {
-                const id = nd.getAttribute('id');
-                const lat = parseFloat(nd.getAttribute('lat'));
-                const lon = parseFloat(nd.getAttribute('lon'));
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    nodeMap.set(id, { lat, lon });
+    for (const ep of mirrors) {
+        try {
+            const url = `${ep}?data=${encodeURIComponent(query)}`;
+            const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (data && data.elements && data.elements.length > 0) {
+                const found = data.elements.filter(el => el.type === 'way' && el.geometry && el.geometry.length > 0);
+                if (found.length > 0) {
+                    ways = found;
+                    break;
                 }
-            });
-
-            xmlDoc.querySelectorAll('way').forEach(wEl => {
-                let name = '';
-                wEl.querySelectorAll('tag').forEach(t => {
-                    const k = t.getAttribute('k');
-                    if (k === 'name' || k === 'name:it' || k === 'alt_name') {
-                        name = t.getAttribute('v');
-                    }
-                });
-
-                if (name && normalizeStreetName(name).includes(normTarget)) {
-                    const geom = [];
-                    wEl.querySelectorAll('nd').forEach(ndEl => {
-                        const ref = ndEl.getAttribute('ref');
-                        const coord = nodeMap.get(ref);
-                        if (coord) geom.push(coord);
-                    });
-                    if (geom.length >= 2) {
-                        ways.push({ geometry: geom });
-                    }
-                }
-            });
-        }
-    } catch (err) {
-        console.warn('OSM API map fetch fallback:', err.message);
+            }
+        } catch (e) { }
     }
 
-    // Metodo 2: Overpass API (fallback con out geom)
+    // Fallback: OSM Map XML se Overpass è offline
     if (ways.length === 0) {
-        const escapedName = streetName.replace(/["\\]/g, '\\$&');
-        const query = `[out:json][timeout:5];way["name"~"${normTarget}",i](${s},${w},${n},${e});out geom;`;
-        const mirrors = [
-            'https://overpass-api.de/api/interpreter',
-            'https://lz4.overpass-api.de/api/interpreter'
-        ];
+        try {
+            const osmMapUrl = `https://api.openstreetmap.org/api/0.6/map?bbox=${w},${s},${e},${n}`;
+            const res = await fetch(osmMapUrl, { signal: AbortSignal.timeout(3000) });
+            if (res.ok) {
+                const text = await res.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(text, 'text/xml');
 
-        for (const ep of mirrors) {
-            try {
-                const url = `${ep}?data=${encodeURIComponent(query)}`;
-                const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
-                if (!response.ok) continue;
-                const data = await response.json();
-                if (data && data.elements && data.elements.length > 0) {
-                    const found = data.elements.filter(el => el.type === 'way' && el.geometry && el.geometry.length > 0);
-                    if (found.length > 0) {
-                        ways = found;
-                        break;
+                const nodeMap = new Map();
+                xmlDoc.querySelectorAll('node').forEach(nd => {
+                    const id = nd.getAttribute('id');
+                    const lat = parseFloat(nd.getAttribute('lat'));
+                    const lon = parseFloat(nd.getAttribute('lon'));
+                    if (!isNaN(lat) && !isNaN(lon)) nodeMap.set(id, { lat, lon });
+                });
+
+                xmlDoc.querySelectorAll('way').forEach(wEl => {
+                    let name = '';
+                    wEl.querySelectorAll('tag').forEach(t => {
+                        const k = t.getAttribute('k');
+                        if (k === 'name' || k === 'name:it' || k === 'alt_name') name = t.getAttribute('v');
+                    });
+
+                    if (name && normalizeStreetName(name).includes(normTarget)) {
+                        const geom = [];
+                        wEl.querySelectorAll('nd').forEach(ndEl => {
+                            const coord = nodeMap.get(ndEl.getAttribute('ref'));
+                            if (coord) geom.push(coord);
+                        });
+                        if (geom.length >= 2) ways.push({ geometry: geom });
                     }
-                }
-            } catch (e) {
-                console.warn(`Mirror ${ep} fallback:`, e.message);
+                });
             }
-        }
+        } catch (err) { }
     }
 
     if (ways.length > 0) {
         const path = findStreetPathBetweenMarkers(ways, markerCoords);
         if (path && path.length >= 2) {
             streetGeomCache[cacheKey] = path;
-            console.log(`🗺️ Geometria OSM calcolata per "${streetName}" (${path.length} punti, 100% sulla via)`);
+            saveStreetGeomCache();
             return path;
         }
     }
 
-    console.log(`ℹ️ Tracciamento diretto per "${streetName}"`);
     return markerCoords;
 }
 
 // -------------------------------------------------------
-// TRATTI STRADALI ROSSI (geometria reale da OSM)
-// Per ogni via con ≥2 marker, disegna il tracciato esatto
+// TRATTI STRADALI ROSSI
+// Rendering istantaneo con aggiornamento parallelo fluido
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Rimuovi le vecchie polyline dalla mappa
-    for (let streetName in activeSegments) {
-        map.removeLayer(activeSegments[streetName]);
-    }
-    activeSegments = {};
-
-    // 2. Raggruppa i marker per nome via
+    // 1. Raggruppa i marker per nome via
     const groups = {};
     markersData.forEach(m => {
         if (!m.street || m.street.trim() === '') return;
@@ -736,37 +730,52 @@ async function updateRoadSegments() {
         groups[key].coords.push([m.lat, m.lng]);
     });
 
-    // 3. Per ogni gruppo con ≥2 marker, ottieni il tracciato della strada
-    for (let key in groups) {
-        const group = groups[key];
-        if (group.coords.length < 2) continue;
-
-        // Traccia la geometria esatta della strada da OSM
-        let routeCoords = await getStreetGeometry(group.streetName, group.coords);
-
-        // Se OSM non è raggiungibile, collega direttamente i marker della via (senza deviare su altre strade)
-        if (!routeCoords || routeCoords.length < 2) {
-            routeCoords = group.coords;
+    // 2. Rimuovi le polyline non più presenti
+    for (let key in activeSegments) {
+        if (!groups[key] || groups[key].coords.length < 2) {
+            map.removeLayer(activeSegments[key]);
+            delete activeSegments[key];
         }
-
-        const polyline = L.polyline(routeCoords, {
-            color: '#dc2626',
-            weight: 5,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round'
-        }).addTo(map);
-
-        polyline.bindTooltip(`🔴 ${group.streetName}`, {
-            permanent: false,
-            direction: 'center',
-            className: 'road-segment-tooltip'
-        });
-
-        activeSegments[key] = polyline;
     }
 
-    console.log(`🔴 Tratti aggiornati: ${Object.keys(activeSegments).length} via/e`);
+    // 3. Disegna o aggiorna tutte le vie IN PARALLELO
+    const groupKeys = Object.keys(groups).filter(k => groups[k].coords.length >= 2);
+
+    // Passo immediato: crea subito le linee sulla mappa (cache o coordinate dirette)
+    groupKeys.forEach(key => {
+        const group = groups[key];
+        const cacheKey = `${group.streetName.toLowerCase()}_${group.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        const initialCoords = streetGeomCache[cacheKey] || group.coords;
+
+        if (!activeSegments[key]) {
+            const polyline = L.polyline(initialCoords, {
+                color: '#dc2626',
+                weight: 5,
+                opacity: 1,
+                lineJoin: 'round',
+                lineCap: 'round'
+            }).addTo(map);
+
+            polyline.bindTooltip(`🔴 ${group.streetName}`, {
+                permanent: false,
+                direction: 'center',
+                className: 'road-segment-tooltip'
+            });
+
+            activeSegments[key] = polyline;
+        } else {
+            activeSegments[key].setLatLngs(initialCoords);
+        }
+    });
+
+    // Passo asincrono parallelo: affina il tracciato con le curve reali OSM
+    await Promise.all(groupKeys.map(async (key) => {
+        const group = groups[key];
+        const routeCoords = await getStreetGeometry(group.streetName, group.coords);
+        if (routeCoords && routeCoords.length >= 2 && activeSegments[key]) {
+            activeSegments[key].setLatLngs(routeCoords);
+        }
+    }));
 }
 
 // Local Storage (cache locale / fallback offline)
