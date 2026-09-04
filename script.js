@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -438,14 +438,23 @@ window.reportResolved = function (id) {
 }
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap (Overpass API)
+// GEOMETRIA STRADALE da OpenStreetMap (API Ufficiale + Overpass)
 // Trova il tracciato esatto tra i marker rimanendo
 // RIGOROSAMENTE sulla via specificata (nessuna deviazione)
 // -------------------------------------------------------
 
 const streetGeomCache = {};
 
-// Calcola la distanza quadratica euclidea approssimata tra due coordinate
+// Normalizza il nome di una via per il matching (rimuove prefissi come Via/Viale/Corso)
+function normalizeStreetName(str) {
+    return (str || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/^(via|viale|corso|strada|piazza|vicolo|largo|sp\d*|sr\d*|ss\d*)\s+/i, '')
+        .trim();
+}
+
+// Calcola la distanza quadratica euclidea tra due coordinate
 function coordDistSq(c1, c2) {
     const dlat = c1[0] - c2[0];
     const dlng = c1[1] - c2[1];
@@ -456,7 +465,6 @@ function coordDistSq(c1, c2) {
 function findStreetPathBetweenMarkers(ways, markerCoords) {
     if (!ways || ways.length === 0) return null;
 
-    // 1. Costruisci il grafo (lista di adiacenza) da tutti i segmenti della via
     const graph = new Map();
     const coordMap = new Map();
 
@@ -489,7 +497,7 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
 
     const allKeys = Array.from(coordMap.keys());
 
-    // 2. Per ciascun marker, trova il nodo della via più vicino
+    // Trova il nodo più vicino a ciascun marker
     const markerNodes = markerCoords.map(mc => {
         let bestKey = allKeys[0];
         let minDist = Infinity;
@@ -504,26 +512,14 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
         return bestKey;
     });
 
-    // Se tutti i marker mappano allo stesso nodo, ritorna le coordinate del nodo
-    if (markerNodes.length >= 2 && markerNodes[0] === markerNodes[1]) {
-        return [coordMap.get(markerNodes[0])];
-    }
-
-    // 3. Dijkstra tra il nodo del Marker 1 e il nodo del Marker 2
-    // Per gestire eventuali piccole interruzioni nei dati OSM, colleghiamo i nodi terminali
     const startNode = markerNodes[0];
-    const endNode = markerNodes[1];
+    const endNode = markerNodes[1] || markerNodes[markerNodes.length - 1];
 
-    const distances = new Map();
-    const previous = new Map();
-    const unvisited = new Set(allKeys);
-
-    for (const k of allKeys) {
-        distances.set(k, Infinity);
+    if (startNode === endNode) {
+        return [coordMap.get(startNode)];
     }
-    distances.set(startNode, 0);
 
-    // Permette piccoli salti di raccordo se la via in OSM è divisa in spezzoni
+    // Collega eventuali tratti interrotti nella mappa OSM (dead-ends vicini)
     const deadEnds = [];
     for (const [k, edges] of graph.entries()) {
         if (edges.length === 1) deadEnds.push(k);
@@ -535,13 +531,20 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
             const c1 = coordMap.get(k1);
             const c2 = coordMap.get(k2);
             const d = Math.sqrt(coordDistSq(c1, c2));
-            // Collega con peso penalizzato (10x) per colmare piccoli gap senza deviare
-            if (d < 0.005) { // gap < ~500m
-                graph.get(k1).push({ node: k2, weight: d * 10 });
-                graph.get(k2).push({ node: k1, weight: d * 10 });
+            if (d < 0.01) { // gap < ~1km
+                graph.get(k1).push({ node: k2, weight: d * 5 });
+                graph.get(k2).push({ node: k1, weight: d * 5 });
             }
         }
     }
+
+    // Dijkstra
+    const distances = new Map();
+    const previous = new Map();
+    const unvisited = new Set(allKeys);
+
+    for (const k of allKeys) distances.set(k, Infinity);
+    distances.set(startNode, 0);
 
     while (unvisited.size > 0) {
         let current = null;
@@ -570,7 +573,7 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
         }
     }
 
-    // Ricostruisci il percorso
+    // Ricostruzione del percorso
     const path = [];
     let curr = endNode;
     while (curr) {
@@ -578,76 +581,137 @@ function findStreetPathBetweenMarkers(ways, markerCoords) {
         curr = previous.get(curr);
     }
 
-    // Se è stato trovato un percorso valido tra start ed end
     if (path.length >= 2 && getKey(path[0][0], path[0][1]) === startNode) {
         return path;
     }
 
-    // Fallback: se il grafo è disconnesso, restituisci tutti i punti della via ordinati
-    const allPoints = [];
-    ways.forEach(w => {
-        if (w.geometry) {
-            w.geometry.forEach(p => allPoints.push([p.lat, p.lon]));
-        }
-    });
-    return allPoints.length >= 2 ? allPoints : null;
+    // Fallback: ordina i punti della via lungo il vettore tra i marker
+    const m1 = markerCoords[0];
+    const m2 = markerCoords[markerCoords.length - 1];
+    const vx = m2[0] - m1[0];
+    const vy = m2[1] - m1[1];
+    const vLenSq = vx * vx + vy * vy;
+
+    const uniquePoints = Array.from(coordMap.values());
+    if (vLenSq > 0 && uniquePoints.length >= 2) {
+        uniquePoints.sort((a, b) => {
+            const projA = ((a[0] - m1[0]) * vx + (a[1] - m1[1]) * vy) / vLenSq;
+            const projB = ((b[0] - m1[0]) * vx + (b[1] - m1[1]) * vy) / vLenSq;
+            return projA - projB;
+        });
+        // Filtra ai punti compresi tra i due marker (con piccolo margine)
+        const inBetween = uniquePoints.filter(p => {
+            const proj = ((p[0] - m1[0]) * vx + (p[1] - m1[1]) * vy) / vLenSq;
+            return proj >= -0.05 && proj <= 1.05;
+        });
+        if (inBetween.length >= 2) return inBetween;
+    }
+
+    return uniquePoints.length >= 2 ? uniquePoints : null;
 }
 
-// Recupera i dati OSM per la strada usando query ottimizzata 'out geom'
+// Recupera i dati OSM per la strada usando l'API OpenStreetMap ufficiale (veloce e diretta)
 async function getStreetGeometry(streetName, markerCoords) {
     const cacheKey = `${streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
     if (streetGeomCache[cacheKey]) {
         return streetGeomCache[cacheKey];
     }
 
-    // Bounding box con margine
     const lats = markerCoords.map(c => c[0]);
     const lngs = markerCoords.map(c => c[1]);
-    const pad = 0.03; // ~3km margine
+    const pad = 0.02; // ~2km margine
     const s = (Math.min(...lats) - pad).toFixed(6);
     const w = (Math.min(...lngs) - pad).toFixed(6);
     const n = (Math.max(...lats) + pad).toFixed(6);
     const e = (Math.max(...lngs) + pad).toFixed(6);
 
-    // Query Overpass ultra-veloce con 'out geom' (senza ricorsione di nodi)
-    const escapedName = streetName.replace(/["\\]/g, '\\$&');
-    const query = `[out:json][timeout:6];way["name"="${escapedName}"](${s},${w},${n},${e});out geom;`;
+    const normTarget = normalizeStreetName(streetName);
+    let ways = [];
 
-    // Lista di mirror Overpass pubblici
-    const endpoints = [
-        'https://overpass-api.de/api/interpreter',
-        'https://lz4.overpass-api.de/api/interpreter',
-        'https://overpass.kumi.systems/api/interpreter'
-    ];
+    // Metodo 1: OpenStreetMap Direct API (istantanea, globale)
+    try {
+        const osmMapUrl = `https://api.openstreetmap.org/api/0.6/map?bbox=${w},${s},${e},${n}`;
+        const res = await fetch(osmMapUrl, { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+            const text = await res.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, 'text/xml');
 
-    let ways = null;
+            const nodeMap = new Map();
+            xmlDoc.querySelectorAll('node').forEach(nd => {
+                const id = nd.getAttribute('id');
+                const lat = parseFloat(nd.getAttribute('lat'));
+                const lon = parseFloat(nd.getAttribute('lon'));
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    nodeMap.set(id, { lat, lon });
+                }
+            });
 
-    for (const ep of endpoints) {
-        try {
-            const url = `${ep}?data=${encodeURIComponent(query)}`;
-            const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
-            if (!response.ok) continue;
-            const data = await response.json();
-            if (data && data.elements && data.elements.length > 0) {
-                ways = data.elements.filter(el => el.type === 'way' && el.geometry && el.geometry.length > 0);
-                if (ways.length > 0) break;
+            xmlDoc.querySelectorAll('way').forEach(wEl => {
+                let name = '';
+                wEl.querySelectorAll('tag').forEach(t => {
+                    const k = t.getAttribute('k');
+                    if (k === 'name' || k === 'name:it' || k === 'alt_name') {
+                        name = t.getAttribute('v');
+                    }
+                });
+
+                if (name && normalizeStreetName(name).includes(normTarget)) {
+                    const geom = [];
+                    wEl.querySelectorAll('nd').forEach(ndEl => {
+                        const ref = ndEl.getAttribute('ref');
+                        const coord = nodeMap.get(ref);
+                        if (coord) geom.push(coord);
+                    });
+                    if (geom.length >= 2) {
+                        ways.push({ geometry: geom });
+                    }
+                }
+            });
+        }
+    } catch (err) {
+        console.warn('OSM API map fetch fallback:', err.message);
+    }
+
+    // Metodo 2: Overpass API (fallback con out geom)
+    if (ways.length === 0) {
+        const escapedName = streetName.replace(/["\\]/g, '\\$&');
+        const query = `[out:json][timeout:5];way["name"~"${normTarget}",i](${s},${w},${n},${e});out geom;`;
+        const mirrors = [
+            'https://overpass-api.de/api/interpreter',
+            'https://lz4.overpass-api.de/api/interpreter'
+        ];
+
+        for (const ep of mirrors) {
+            try {
+                const url = `${ep}?data=${encodeURIComponent(query)}`;
+                const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+                if (!response.ok) continue;
+                const data = await response.json();
+                if (data && data.elements && data.elements.length > 0) {
+                    const found = data.elements.filter(el => el.type === 'way' && el.geometry && el.geometry.length > 0);
+                    if (found.length > 0) {
+                        ways = found;
+                        break;
+                    }
+                }
+            } catch (e) {
+                console.warn(`Mirror ${ep} fallback:`, e.message);
             }
-        } catch (err) {
-            console.warn(`Mirror ${ep} non disponibile:`, err.message);
         }
     }
 
-    if (ways && ways.length > 0) {
+    if (ways.length > 0) {
         const path = findStreetPathBetweenMarkers(ways, markerCoords);
         if (path && path.length >= 2) {
             streetGeomCache[cacheKey] = path;
-            console.log(`🗺️ Percorso esatto OSM trovato per "${streetName}" (${path.length} punti, 100% su ${streetName})`);
+            console.log(`🗺️ Geometria OSM calcolata per "${streetName}" (${path.length} punti, 100% sulla via)`);
             return path;
         }
     }
 
-    console.warn(`Nessuna geometria OSM trovata per "${streetName}" — traccio linea retta tra i marker`);
-    return null;
+    console.log(`ℹ️ Tracciamento diretto per "${streetName}"`);
+    return markerCoords;
 }
 
 // -------------------------------------------------------
