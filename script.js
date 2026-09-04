@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -438,10 +438,31 @@ window.reportResolved = function (id) {
 }
 
 // -------------------------------------------------------
-// TRATTI STRADALI ROSSI
-// Disegna una polyline rossa tra tutti i marker della stessa via
+// ROUTING SU STRADA tramite OSRM (Open Source Routing Machine)
+// Restituisce le coordinate reali della strada tra due punti
 // -------------------------------------------------------
-function updateRoadSegments() {
+async function getRouteGeometry(lat1, lng1, lat2, lng2) {
+    try {
+        // OSRM usa [lng, lat] (ordine invertito rispetto a Leaflet)
+        const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+            // Converti da [lng, lat] a [lat, lng] per Leaflet
+            return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        }
+    } catch (e) {
+        console.warn('OSRM non raggiungibile, uso linea retta come fallback:', e.message);
+    }
+    // Fallback: linea retta se OSRM non risponde
+    return [[lat1, lng1], [lat2, lng2]];
+}
+
+// -------------------------------------------------------
+// TRATTI STRADALI ROSSI (con routing reale su strada)
+// Per ogni via con ≥2 marker, disegna il percorso reale
+// -------------------------------------------------------
+async function updateRoadSegments() {
     // 1. Rimuovi tutte le vecchie polyline dalla mappa
     for (let streetName in activeSegments) {
         map.removeLayer(activeSegments[streetName]);
@@ -459,15 +480,31 @@ function updateRoadSegments() {
         groups[key].coords.push([m.lat, m.lng]);
     });
 
-    // 3. Per ogni gruppo con almeno 2 marker, disegna la polyline rossa
+    // 3. Per ogni gruppo con almeno 2 marker, calcola il percorso reale
     for (let key in groups) {
         const group = groups[key];
         if (group.coords.length < 2) continue;
 
-        const polyline = L.polyline(group.coords, {
-            color: '#dc2626',   // rosso netto
+        // Concatena i tratti tra punti consecutivi (A→B, B→C, ecc.)
+        let fullRoute = [];
+        for (let i = 0; i < group.coords.length - 1; i++) {
+            const [lat1, lng1] = group.coords[i];
+            const [lat2, lng2] = group.coords[i + 1];
+            const segment = await getRouteGeometry(lat1, lng1, lat2, lng2);
+            // Evita duplicazione del punto di congiunzione tra tratti
+            if (fullRoute.length > 0) {
+                fullRoute = fullRoute.concat(segment.slice(1));
+            } else {
+                fullRoute = segment;
+            }
+        }
+
+        if (fullRoute.length < 2) continue;
+
+        const polyline = L.polyline(fullRoute, {
+            color: '#dc2626',   // rosso netto, senza sfumature
             weight: 5,
-            opacity: 1,         // nessuna trasparenza
+            opacity: 1,
             lineJoin: 'round',
             lineCap: 'round'
         }).addTo(map);
@@ -480,6 +517,7 @@ function updateRoadSegments() {
         });
 
         activeSegments[key] = polyline;
+        console.log(`🗺️ Tratto stradale reale ottenuto per: ${group.streetName}`);
     }
 
     console.log(`🔴 Tratti stradali aggiornati: ${Object.keys(activeSegments).length} via/e con tratto rosso`);
