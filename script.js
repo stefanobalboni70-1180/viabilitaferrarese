@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -443,6 +443,31 @@ window.reportResolved = function (id) {
 // (segue la strada, non calcola un percorso di navigazione)
 // -------------------------------------------------------
 
+// Trova l'indice del punto più vicino in un percorso a un punto [lat,lng] dato
+function closestPointIndex(path, lat, lng) {
+    let minDist = Infinity;
+    let minIdx = 0;
+    for (let i = 0; i < path.length; i++) {
+        const dlat = path[i][0] - lat;
+        const dlng = path[i][1] - lng;
+        const d = dlat * dlat + dlng * dlng;
+        if (d < minDist) { minDist = d; minIdx = i; }
+    }
+    return minIdx;
+}
+
+// Ritaglia il percorso della strada al solo tratto tra i marker
+// Evita di colorare tutta la via, solo la sezione interessata
+function extractSegmentBetweenMarkers(path, markerCoords) {
+    if (path.length < 2) return path;
+    const indices = markerCoords.map(([lat, lng]) => closestPointIndex(path, lat, lng));
+    const iMin = Math.min(...indices);
+    const iMax = Math.max(...indices);
+    const segment = path.slice(iMin, iMax + 1);
+    // Se il segmento è troppo corto, ritorna l'intero percorso come fallback
+    return segment.length >= 2 ? segment : path;
+}
+
 // Collega segmenti OSM (ways) adiacenti in un unico percorso ordinato
 function connectWays(ways, nodeCoords) {
     if (ways.length === 0) return [];
@@ -570,6 +595,11 @@ async function updateRoadSegments() {
 
         // Prima prova: geometria esatta da OSM (Overpass)
         let routeCoords = await getStreetGeometry(group.streetName, group.coords);
+
+        if (routeCoords) {
+            // ✂️ Ritaglia al solo tratto tra i due marker (non tutta la via)
+            routeCoords = extractSegmentBetweenMarkers(routeCoords, group.coords);
+        }
 
         // Fallback: OSRM routing tra coppie consecutive
         if (!routeCoords) {
