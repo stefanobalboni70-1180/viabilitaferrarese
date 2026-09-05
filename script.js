@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -174,9 +174,9 @@ function locateUser(showErrorAlert = true, initialLoad = false) {
             const { latitude, longitude, accuracy } = position.coords;
 
             if (initialLoad) {
-                // Vista panoramica: calcola i bounds per un raggio di 10km (diametro 20km)
+                // Vista panoramica zoomata (+50%): calcola i bounds per un raggio di 5km (diametro 10km)
                 // 1° lat ≈ 111 km; 1° lng ≈ 111 * cos(lat) km
-                const RADIUS_KM = 10;
+                const RADIUS_KM = 5;
                 const latDelta = RADIUS_KM / 111;
                 const lngDelta = RADIUS_KM / (111 * Math.cos(latitude * Math.PI / 180));
                 const bounds = [
