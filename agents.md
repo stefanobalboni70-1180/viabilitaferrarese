@@ -1,0 +1,1 @@
+﻿# Regole Agente - Viabilita Ferrara
