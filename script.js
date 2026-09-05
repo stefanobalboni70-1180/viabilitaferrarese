@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -170,7 +170,7 @@ function locateUser(showErrorAlert = true) {
             const { latitude, longitude, accuracy } = position.coords;
 
             // Centra la mappa con zoom adeguato
-            map.flyTo([latitude, longitude], 16, { animate: true, duration: 1.2 });
+            map.flyTo([latitude, longitude], 15, { animate: true, duration: 1.2 });
 
             // Aggiorna o crea il marker posizione
             if (userLocationMarker) {
