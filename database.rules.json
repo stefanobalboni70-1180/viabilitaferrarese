@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "markers": {
+      ".read": true,
+      ".write": "auth != null",
+      "$markerId": {
+        "note": {
+          ".write": "newData.isString() && newData.val().length < 500"
+        }
+      }
+    }
+  }
+}

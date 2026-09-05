@@ -1,5 +1,16 @@
 // Versione del software
-const APP_VERSION = '2.8';
+const APP_VERSION = '3.0';
+
+// Funzione di sanificazione per prevenire attacchi XSS
+function escapeHtml(unsafe) {
+    if (!unsafe || typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -14,10 +25,11 @@ const firebaseConfig = {
 
 // Variabili Firebase
 let db = null;
+let auth = null;
 let markersRef = null;
 let isFirebaseOnline = false;
 
-// Inizializza Firebase (con fallback silenzioso se non disponibile)
+// Inizializza Firebase (Database + Auth)
 function initFirebase() {
     try {
         if (typeof firebase !== 'undefined') {
@@ -25,15 +37,24 @@ function initFirebase() {
                 firebase.initializeApp(firebaseConfig);
             }
             db = firebase.database();
+            auth = firebase.auth();
             markersRef = db.ref("markers");
             isFirebaseOnline = true;
-            console.log('🔥 Firebase collegato — dati in tempo reale attivi');
+            console.log('🔥 Firebase collegato — database e auth attivi');
+
+            // Ascolto dello stato di autenticazione dell'amministratore
+            auth.onAuthStateChanged((user) => {
+                isAdmin = !!user;
+                console.log(`🔐 Stato Auth: ${isAdmin ? 'Amministratore (' + user.email + ')' : 'Utente pubblico'}`);
+                updateUI();
+            });
         } else {
             console.warn('⚠️ Firebase SDK non disponibile — modalità locale');
         }
     } catch (e) {
         console.warn('⚠️ Firebase non raggiungibile — modalità locale:', e.message);
         db = null;
+        auth = null;
         markersRef = null;
         isFirebaseOnline = false;
     }
@@ -60,7 +81,7 @@ let markersData = [];
 let activeLayers = {};
 let activeSegments = {}; // Polyline rosse tra marker della stessa via
 let pendingLatLng = null;
-let isAdmin = sessionStorage.getItem('ferrara_admin') === 'true';
+let isAdmin = false;
 let userLocationMarker = null; // Marker posizione GPS dell'utente
 
 // Elementi DOM
@@ -243,11 +264,14 @@ function initGeolocation() {
 document.getElementById('locate-btn').addEventListener('click', () => locateUser(true, false));
 
 
+// Email di sistema usata per l'autenticazione amministratore
+const ADMIN_EMAIL = 'admin@viabilitaferrara.it';
+
 loginBtn.addEventListener('click', () => {
     loginModal.classList.remove('hidden');
-    passwordInput.value = '';
+    if (passwordInput) passwordInput.value = '';
     loginError.classList.add('hidden');
-    passwordInput.focus();
+    if (passwordInput) passwordInput.focus();
 });
 
 closeLoginBtn.addEventListener('click', () => {
@@ -255,24 +279,65 @@ closeLoginBtn.addEventListener('click', () => {
 });
 
 submitLoginBtn.addEventListener('click', attemptLogin);
-passwordInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') attemptLogin();
-});
+if (passwordInput) {
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') attemptLogin();
+    });
+}
 
-function attemptLogin() {
-    if (passwordInput.value === 'admin') {
-        isAdmin = true;
-        sessionStorage.setItem('ferrara_admin', 'true');
-        loginModal.classList.add('hidden');
-        updateUI();
-    } else {
+async function attemptLogin() {
+    const password = passwordInput ? passwordInput.value : '';
+
+    if (!password) {
+        loginError.textContent = 'Inserisci la password.';
         loginError.classList.remove('hidden');
+        return;
+    }
+
+    if (!auth) {
+        loginError.textContent = 'Firebase Auth non disponibile al momento.';
+        loginError.classList.remove('hidden');
+        return;
+    }
+
+    submitLoginBtn.disabled = true;
+    submitLoginBtn.textContent = 'Verifica in corso...';
+    loginError.classList.add('hidden');
+
+    try {
+        await auth.signInWithEmailAndPassword(ADMIN_EMAIL, password);
+        loginModal.classList.add('hidden');
+        if (passwordInput) passwordInput.value = '';
+    } catch (error) {
+        console.error('Errore autenticazione:', error.code, error.message);
+        let errorMsg = 'Password errata!';
+        if (error.code === 'auth/user-not-found') {
+            errorMsg = `Utente ${ADMIN_EMAIL} non ancora registrato su Firebase. Crealo nella console Firebase con password adminviabilita118.`;
+        } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            errorMsg = 'Password errata!';
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMsg = 'Troppi tentativi falliti. Riprova più tardi.';
+        } else if (error.code === 'auth/network-request-failed') {
+            errorMsg = 'Errore di connessione di rete.';
+        }
+        loginError.textContent = errorMsg;
+        loginError.classList.remove('hidden');
+    } finally {
+        submitLoginBtn.disabled = false;
+        submitLoginBtn.textContent = 'Accedi';
     }
 }
 
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', async () => {
+    if (auth) {
+        try {
+            await auth.signOut();
+            console.log('Disconnessione completata');
+        } catch (e) {
+            console.warn('Errore durante il logout:', e.message);
+        }
+    }
     isAdmin = false;
-    sessionStorage.removeItem('ferrara_admin');
     updateUI();
 });
 
@@ -403,7 +468,7 @@ function createCustomIcon(type) {
 // street: nome della via (opzionale), usato per disegnare i tratti rossi
 function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null) {
     const markerId = id || Date.now().toString();
-    const config = ICONS[type];
+    const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const ts = parseInt(markerId);
     const date = isNaN(ts) ? new Date().toLocaleString('it-IT') : new Date(ts).toLocaleString('it-IT');
 
@@ -411,29 +476,34 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         icon: createCustomIcon(type)
     }).addTo(map);
 
+    const safeLabel = escapeHtml(config.label);
+    const safeStreet = escapeHtml(street);
+    const safeNote = escapeHtml(note);
+    const safeId = escapeHtml(markerId);
+
     // Contenuto Popup
     let popupContent = `
         <div class="popup-content">
-            <h3>${config.label}</h3>
+            <h3>${safeLabel}</h3>
             <span class="popup-date">Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
     `;
 
-    if (street) {
-        popupContent += `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${street}</div>`;
+    if (safeStreet) {
+        popupContent += `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${safeStreet}</div>`;
     }
 
-    if (note) {
-        popupContent += `<div class="user-note"><strong>Nota:</strong> ${note}</div>`;
+    if (safeNote) {
+        popupContent += `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>`;
     }
 
     if (isAdmin) {
-        popupContent += `<button class="delete-btn" onclick="removeMarker('${markerId}')">Risolto / Rimuovi</button>`;
+        popupContent += `<button class="delete-btn" onclick="removeMarker('${safeId}')">Risolto / Rimuovi</button>`;
     } else {
         if (!note || !note.includes("RISOLTO")) {
-            popupContent += `<button class="note-btn" onclick="reportResolved('${markerId}')" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3); margin-bottom: 8px;">Segnala come risolto</button>`;
+            popupContent += `<button class="note-btn" onclick="reportResolved('${safeId}')" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3); margin-bottom: 8px;">Segnala come risolto</button>`;
         }
         if (!note) {
-            popupContent += `<button class="note-btn" onclick="addNote('${markerId}')">Segnala variazione</button>`;
+            popupContent += `<button class="note-btn" onclick="addNote('${safeId}')">Segnala variazione</button>`;
         }
     }
 
@@ -451,12 +521,12 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
     // Tooltip al passaggio del mouse
     let tooltipContent = `
         <div class="tooltip-content">
-            <strong>${config.label}</strong><br>
-            ${street ? `<span style="color:#3b82f6; font-weight:600;">📍 ${street}</span><br>` : ''}
+            <strong>${safeLabel}</strong><br>
+            ${safeStreet ? `<span style="color:#3b82f6; font-weight:600;">📍 ${safeStreet}</span><br>` : ''}
             <span>Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
     `;
-    if (note) {
-        tooltipContent += `<br><span class="note-badge">📝 ${note}</span>`;
+    if (safeNote) {
+        tooltipContent += `<br><span class="note-badge">📝 ${safeNote}</span>`;
     }
     tooltipContent += `</div>`;
 
@@ -493,59 +563,76 @@ function saveMarkerToFirebase(markerObj) {
 
 // Rimuovi marker (esposta globalmente per il bottone nel popup)
 window.removeMarker = function (id) {
-    const markerObj = markersData.find(m => m.id === id);
+    const markerObj = markersData.find(m => String(m.id) === String(id) || String(m.fbKey) === String(id));
+    const fbKeyToDelete = (markerObj && markerObj.fbKey) ? markerObj.fbKey : id;
 
+    // Rimuovi visivamente subito dalla mappa
     if (activeLayers[id]) {
         map.removeLayer(activeLayers[id]);
         delete activeLayers[id];
     }
-
-    if (isFirebaseOnline && markersRef && markerObj && markerObj.fbKey) {
-        markersRef.child(markerObj.fbKey).remove()
-            .then(() => console.log('🗑️ Marker rimosso da Firebase:', markerObj.fbKey))
-            .catch(e => console.warn('Errore rimozione Firebase:', e.message));
+    if (markerObj && markerObj.id && activeLayers[markerObj.id]) {
+        map.removeLayer(activeLayers[markerObj.id]);
+        delete activeLayers[markerObj.id];
     }
 
-    markersData = markersData.filter(m => m.id !== id);
+    if (isFirebaseOnline && markersRef && fbKeyToDelete) {
+        markersRef.child(fbKeyToDelete).remove()
+            .then(() => {
+                console.log('🗑️ Marker rimosso da Firebase:', fbKeyToDelete);
+            })
+            .catch(e => {
+                console.error('Errore rimozione Firebase:', e);
+                alert('Impossibile eliminare da Firebase: ' + e.message + '\n\nAssicurati di aver pubblicato le regole aggiornate sulla console Firebase.');
+            });
+    }
+
+    markersData = markersData.filter(m => String(m.id) !== String(id) && String(m.fbKey) !== String(id));
     saveToLocalStorage();
     // Aggiorna i tratti rossi dopo la rimozione
     updateRoadSegments();
-}
+};
 
 // Aggiungi Nota
 window.addNote = function (id) {
-    const note = prompt("Inserisci un dettaglio per l'amministratore (es. La strada è stata riaperta stamattina):");
+    let note = prompt("Inserisci un dettaglio per l'amministratore (es. La strada è stata riaperta stamattina):");
     if (note && note.trim() !== "") {
-        const index = markersData.findIndex(m => m.id === id);
+        note = note.trim().slice(0, 500);
+        const index = markersData.findIndex(m => String(m.id) === String(id) || String(m.fbKey) === String(id));
         if (index !== -1) {
             markersData[index].note = note;
-            if (isFirebaseOnline && markersRef && markersData[index].fbKey) {
-                markersRef.child(markersData[index].fbKey).update({ note: note });
+            const fbKey = markersData[index].fbKey || id;
+            if (isFirebaseOnline && markersRef && fbKey) {
+                markersRef.child(fbKey).update({ note: note })
+                    .catch(e => console.warn('Errore aggiornamento nota Firebase:', e.message));
             }
             saveToLocalStorage();
             refreshMarkers();
         }
     }
-}
+};
 
 // Segnala come Risolto
 window.reportResolved = function (id) {
     if (confirm("Vuoi segnalare che questo problema è stato risolto e la strada è libera?")) {
-        const index = markersData.findIndex(m => m.id === id);
+        const index = markersData.findIndex(m => String(m.id) === String(id) || String(m.fbKey) === String(id));
         if (index !== -1) {
-            const existingNote = markersData[index].note;
-            const newNote = existingNote
+            const existingNote = markersData[index].note || '';
+            let newNote = existingNote
                 ? existingNote + " | ✅ Segnalato come RISOLTO"
                 : "✅ Segnalato come RISOLTO";
+            newNote = newNote.slice(0, 500);
             markersData[index].note = newNote;
-            if (isFirebaseOnline && markersRef && markersData[index].fbKey) {
-                markersRef.child(markersData[index].fbKey).update({ note: newNote });
+            const fbKey = markersData[index].fbKey || id;
+            if (isFirebaseOnline && markersRef && fbKey) {
+                markersRef.child(fbKey).update({ note: newNote })
+                    .catch(e => console.warn('Errore aggiornamento stato Firebase:', e.message));
             }
             saveToLocalStorage();
             refreshMarkers();
         }
     }
-}
+};
 
 // -------------------------------------------------------
 // GEOMETRIA STRADALE da OpenStreetMap
@@ -666,7 +753,7 @@ async function updateRoadSegments() {
                 lineCap: 'round'
             }).addTo(map);
 
-            polyline.bindTooltip(`🔴 ${group.streetName}`, {
+            polyline.bindTooltip(`🔴 ${escapeHtml(group.streetName)}`, {
                 permanent: false,
                 direction: 'center',
                 className: 'road-segment-tooltip'

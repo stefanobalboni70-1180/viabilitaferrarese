@@ -31,7 +31,7 @@
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v2.8</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.0</span></h1>
             <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
             <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
         </div>
@@ -108,9 +108,9 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
-            <p class="modal-desc">Inserisci la password per aggiungere o rimuovere segnalazioni.</p>
+            <p class="modal-desc">Inserisci la password di amministrazione.</p>
             <div class="login-form">
-                <input type="password" id="admin-password" placeholder="Password (es. admin)" />
+                <input type="password" id="admin-password" placeholder="Password amministratore" autocomplete="current-password" />
                 <p id="login-error" class="error-msg hidden">Password errata!</p>
                 <button id="submit-login" class="primary-btn">Accedi</button>
             </div>
@@ -122,6 +122,7 @@
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
