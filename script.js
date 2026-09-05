@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -48,7 +48,8 @@ const ICONS = {
     lavori: { emoji: '🚧', label: 'Lavori in corso' },
     chiusa: { emoji: '⛔', label: 'Strada chiusa' },
     ponte: { emoji: '🌉', label: 'Ponte interrotto' },
-    incidente: { emoji: '⚠️', label: 'Incidente' }
+    incidente: { emoji: '⚠️', label: 'Incidente' },
+    mercato: { emoji: '🛒', label: 'Mercato settimanale' }
 };
 
 // Stato dell'applicazione
@@ -58,6 +59,7 @@ let activeLayers = {};
 let activeSegments = {}; // Polyline rosse tra marker della stessa via
 let pendingLatLng = null;
 let isAdmin = sessionStorage.getItem('ferrara_admin') === 'true';
+let userLocationMarker = null; // Marker posizione GPS dell'utente
 
 // Elementi DOM
 const modalOverlay = document.getElementById('marker-modal');
@@ -130,9 +132,100 @@ function initMap() {
 
     loadMarkers();
     updateUI();
+    initGeolocation();
 }
 
-// --- LOGICA ADMIN ---
+// --- GEOLOCALIZZAZIONE ---
+
+// Rileva se il dispositivo è mobile/touch
+function isMobileDevice() {
+    return ('ontouchstart' in window) || window.matchMedia('(max-width: 768px)').matches;
+}
+
+// Icona "punto blu" pulsante per la posizione utente
+function createUserLocationIcon() {
+    return L.divIcon({
+        className: '',
+        html: '<div class="user-location-dot"><div class="user-location-pulse"></div></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
+}
+
+// Centra la mappa sulla posizione GPS
+function locateUser(showErrorAlert = true) {
+    if (!navigator.geolocation) {
+        if (showErrorAlert) alert('Il tuo browser non supporta la geolocalizzazione.');
+        return;
+    }
+
+    const locateBtn = document.getElementById('locate-btn');
+    if (locateBtn) {
+        locateBtn.classList.add('locating');
+        locateBtn.title = 'Ricerca in corso...';
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude, accuracy } = position.coords;
+
+            // Centra la mappa con zoom adeguato
+            map.flyTo([latitude, longitude], 16, { animate: true, duration: 1.2 });
+
+            // Aggiorna o crea il marker posizione
+            if (userLocationMarker) {
+                userLocationMarker.setLatLng([latitude, longitude]);
+            } else {
+                userLocationMarker = L.marker([latitude, longitude], {
+                    icon: createUserLocationIcon(),
+                    zIndexOffset: 1000
+                }).addTo(map)
+                .bindPopup(`
+                    <div class="popup-content">
+                        <h3>📍 La tua posizione</h3>
+                        <span class="popup-date">Precisione: ±${Math.round(accuracy)} m</span>
+                    </div>
+                `);
+            }
+
+            if (locateBtn) {
+                locateBtn.classList.remove('locating');
+                locateBtn.classList.add('located');
+                locateBtn.title = 'Posizione trovata';
+            }
+        },
+        (error) => {
+            if (locateBtn) {
+                locateBtn.classList.remove('locating', 'located');
+                locateBtn.title = 'Vai alla mia posizione';
+            }
+            if (showErrorAlert) {
+                const msg = {
+                    1: 'Permesso di geolocalizzazione negato.',
+                    2: 'Impossibile determinare la posizione.',
+                    3: 'Timeout nella richiesta di posizione.'
+                };
+                alert(msg[error.code] || 'Errore di geolocalizzazione.');
+            }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+}
+
+// Inizializza la geolocalizzazione all'avvio
+function initGeolocation() {
+    if (!navigator.geolocation) return;
+
+    // Su mobile: centra automaticamente sulla posizione senza alert in caso di rifiuto
+    if (isMobileDevice()) {
+        locateUser(false);
+    }
+}
+
+// Listener pulsante "Vai alla mia posizione"
+document.getElementById('locate-btn').addEventListener('click', () => locateUser(true));
+
+
 loginBtn.addEventListener('click', () => {
     loginModal.classList.remove('hidden');
     passwordInput.value = '';

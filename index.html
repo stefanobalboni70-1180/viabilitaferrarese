@@ -36,6 +36,15 @@
 
     <div id="map"></div>
 
+    <!-- Pulsante Vai alla mia posizione -->
+    <button id="locate-btn" class="locate-btn" title="Vai alla mia posizione">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+            <circle cx="12" cy="12" r="9" opacity="0.3"/>
+        </svg>
+    </button>
+
     <!-- Modal for adding markers -->
     <div id="marker-modal" class="modal-overlay hidden">
         <div class="modal-content">
@@ -63,6 +72,10 @@
                 <button class="option-card" data-type="incidente">
                     <div class="icon-wrapper accident">⚠️</div>
                     <span>Incidente</span>
+                </button>
+                <button class="option-card" data-type="mercato">
+                    <div class="icon-wrapper market">🛒</div>
+                    <span>Mercato settimanale</span>
                 </button>
             </div>
         </div>
