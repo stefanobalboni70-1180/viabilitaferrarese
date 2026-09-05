@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -49,7 +49,8 @@ const ICONS = {
     chiusa: { emoji: '⛔', label: 'Strada chiusa' },
     ponte: { emoji: '🌉', label: 'Ponte interrotto' },
     incidente: { emoji: '⚠️', label: 'Incidente' },
-    mercato: { emoji: '🛒', label: 'Mercato settimanale' }
+    mercato: { emoji: '🛒', label: 'Mercato settimanale' },
+    semaforo: { emoji: '🚦', label: 'Semaforo' }
 };
 
 // Stato dell'applicazione
