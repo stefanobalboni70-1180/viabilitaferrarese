@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '2.5';
+const APP_VERSION = '2.7';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -50,7 +50,8 @@ const ICONS = {
     ponte: { emoji: '🌉', label: 'Ponte interrotto' },
     incidente: { emoji: '⚠️', label: 'Incidente' },
     mercato: { emoji: '🛒', label: 'Mercato settimanale' },
-    semaforo: { emoji: '🚦', label: 'Semaforo' }
+    semaforo: { emoji: '🚦', label: 'Semaforo' },
+    sagra: { emoji: '🎪', label: 'Sagra / Manifestazione' }
 };
 
 // Stato dell'applicazione
@@ -173,9 +174,9 @@ function locateUser(showErrorAlert = true, initialLoad = false) {
             const { latitude, longitude, accuracy } = position.coords;
 
             if (initialLoad) {
-                // Vista panoramica: calcola i bounds per un raggio di 30km
+                // Vista panoramica: calcola i bounds per un raggio di 10km (diametro 20km)
                 // 1° lat ≈ 111 km; 1° lng ≈ 111 * cos(lat) km
-                const RADIUS_KM = 30;
+                const RADIUS_KM = 10;
                 const latDelta = RADIUS_KM / 111;
                 const lngDelta = RADIUS_KM / (111 * Math.cos(latitude * Math.PI / 180));
                 const bounds = [
