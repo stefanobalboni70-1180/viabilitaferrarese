@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 
 // --- CONFIGURAZIONE FIREBASE ---
 const firebaseConfig = {
@@ -153,7 +153,9 @@ function createUserLocationIcon() {
 }
 
 // Centra la mappa sulla posizione GPS
-function locateUser(showErrorAlert = true) {
+// initialLoad = true  → vista panoramica 30km di raggio (all'apertura su mobile)
+// initialLoad = false → zoom ravvicinato 15 (pulsante manuale)
+function locateUser(showErrorAlert = true, initialLoad = false) {
     if (!navigator.geolocation) {
         if (showErrorAlert) alert('Il tuo browser non supporta la geolocalizzazione.');
         return;
@@ -169,8 +171,21 @@ function locateUser(showErrorAlert = true) {
         (position) => {
             const { latitude, longitude, accuracy } = position.coords;
 
-            // Centra la mappa con zoom adeguato
-            map.flyTo([latitude, longitude], 15, { animate: true, duration: 1.2 });
+            if (initialLoad) {
+                // Vista panoramica: calcola i bounds per un raggio di 30km
+                // 1° lat ≈ 111 km; 1° lng ≈ 111 * cos(lat) km
+                const RADIUS_KM = 30;
+                const latDelta = RADIUS_KM / 111;
+                const lngDelta = RADIUS_KM / (111 * Math.cos(latitude * Math.PI / 180));
+                const bounds = [
+                    [latitude - latDelta, longitude - lngDelta],
+                    [latitude + latDelta, longitude + lngDelta]
+                ];
+                map.fitBounds(bounds, { animate: true, duration: 1.5, padding: [20, 20] });
+            } else {
+                // Zoom ravvicinato per il pulsante manuale
+                map.flyTo([latitude, longitude], 15, { animate: true, duration: 1.2 });
+            }
 
             // Aggiorna o crea il marker posizione
             if (userLocationMarker) {
@@ -216,14 +231,14 @@ function locateUser(showErrorAlert = true) {
 function initGeolocation() {
     if (!navigator.geolocation) return;
 
-    // Su mobile: centra automaticamente sulla posizione senza alert in caso di rifiuto
+    // Su mobile: vista panoramica 30km di raggio, senza alert se rifiutato
     if (isMobileDevice()) {
-        locateUser(false);
+        locateUser(false, true);
     }
 }
 
-// Listener pulsante "Vai alla mia posizione"
-document.getElementById('locate-btn').addEventListener('click', () => locateUser(true));
+// Listener pulsante "Vai alla mia posizione" → zoom ravvicinato 15
+document.getElementById('locate-btn').addEventListener('click', () => locateUser(true, false));
 
 
 loginBtn.addEventListener('click', () => {
