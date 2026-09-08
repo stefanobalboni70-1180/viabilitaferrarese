@@ -1,7 +1,7 @@
-﻿{
-    "name": "Viabilita Ferrara 118",
-    "short_name": "Viabilita 118",
-    "description": "Gestione viabilita e segnalazioni stradali per il 118 di Ferrara",
+{
+    "name": "Viabilità Ferrara 118 v3.2",
+    "short_name": "Viabilità 118 v3.2",
+    "description": "Gestione viabilità e segnalazioni stradali per il 118 di Ferrara (v3.2)",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#0f172a",

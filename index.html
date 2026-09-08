@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara - Segnalazioni</title>
+    <title>Viabilità Ferrara v3.2 - Segnalazioni</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.2">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -31,7 +31,7 @@
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.0</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.2</span></h1>
             <div class="header-actions">
                 <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
                 <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
@@ -87,7 +87,9 @@
                     <span>Lavori in corso</span>
                 </button>
                 <button class="option-card" data-type="chiusa">
-                    <div class="icon-wrapper closed">⛔</div>
+                    <div class="icon-wrapper closed">
+                        <svg class="sign-hand-barred" viewBox="0 0 32 32" width="28" height="28" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>
+                    </div>
                     <span>Strada chiusa</span>
                 </button>
                 <button class="option-card" data-type="ponte">
@@ -104,10 +106,10 @@
                 </button>
                 <button class="option-card" data-type="semaforo">
                     <div class="icon-wrapper traffic">🚦</div>
-                    <span>Semaforo</span>
+                    <span>Senso unico alternato</span>
                 </button>
                 <button class="option-card" data-type="sagra">
-                    <div class="icon-wrapper sagra">🎪</div>
+                    <div class="icon-wrapper sagra">🎉</div>
                     <span>Sagra / Manifestazione</span>
                 </button>
             </div>
@@ -156,12 +158,12 @@
                 <label class="section-label">2. Tipo di problema</label>
                 <div class="report-types-grid" id="user-report-types">
                     <button type="button" class="type-pill" data-type="lavori">🚧 Lavori</button>
-                    <button type="button" class="type-pill" data-type="chiusa">⛔ Chiusa</button>
+                    <button type="button" class="type-pill" data-type="chiusa"><svg class="sign-hand-barred" viewBox="0 0 32 32" width="16" height="16" style="vertical-align:middle; margin-right:3px;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg> Chiusa</button>
                     <button type="button" class="type-pill" data-type="ponte">🌉 Ponte</button>
                     <button type="button" class="type-pill" data-type="incidente">⚠️ Incidente</button>
                     <button type="button" class="type-pill" data-type="mercato">🛒 Mercato</button>
-                    <button type="button" class="type-pill" data-type="semaforo">🚦 Semaforo</button>
-                    <button type="button" class="type-pill" data-type="sagra">🎪 Sagra</button>
+                    <button type="button" class="type-pill" data-type="semaforo">🚦 Senso unico alternato</button>
+                    <button type="button" class="type-pill" data-type="sagra">🎉 Sagra</button>
                 </div>
             </div>
 

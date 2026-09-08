@@ -298,7 +298,17 @@ h1 span.city-name {
 }
 
 .custom-marker.works { background-color: var(--color-works); }
-.custom-marker.closed { background-color: var(--color-closed); }
+.custom-marker.closed { 
+    background-color: #ffffff; 
+    border: 2px solid #ef4444; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.custom-marker.closed svg {
+    width: 24px;
+    height: 24px;
+}
 .custom-marker.bridge { background-color: var(--color-bridge); }
 .custom-marker.accident { background-color: var(--color-accident); }
 .custom-marker.mercato { background-color: var(--color-market); }
