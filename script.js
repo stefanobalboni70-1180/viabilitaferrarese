@@ -277,7 +277,7 @@ function initMap() {
 
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) {
-        appVersionEl.textContent = `v${APP_VERSION}`;
+        appVersionEl.textContent = `Versione ${APP_VERSION}`;
     }
     console.log(`Viabilità Ferrara - Versione ${APP_VERSION}`);
 
