@@ -8,6 +8,13 @@
           ".write": "newData.isString() && newData.val().length < 500"
         }
       }
+    },
+    "user_reports": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$reportId": {
+        ".write": "!data.exists() && newData.exists() && newData.hasChildren(['lat', 'lng', 'type', 'timestamp'])"
+      }
     }
   }
 }

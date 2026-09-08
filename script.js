@@ -27,6 +27,7 @@ const firebaseConfig = {
 let db = null;
 let auth = null;
 let markersRef = null;
+let reportsRef = null;
 let isFirebaseOnline = false;
 
 // Inizializza Firebase (Database + Auth)
@@ -39,6 +40,7 @@ function initFirebase() {
             db = firebase.database();
             auth = firebase.auth();
             markersRef = db.ref("markers");
+            reportsRef = db.ref("user_reports");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
 
@@ -46,6 +48,11 @@ function initFirebase() {
             auth.onAuthStateChanged((user) => {
                 isAdmin = !!user;
                 console.log(`🔐 Stato Auth: ${isAdmin ? 'Amministratore (' + user.email + ')' : 'Utente pubblico'}`);
+                if (isAdmin) {
+                    initAdminReportsListener();
+                } else {
+                    stopAdminReportsListener();
+                }
                 updateUI();
             });
         } else {
@@ -56,6 +63,7 @@ function initFirebase() {
         db = null;
         auth = null;
         markersRef = null;
+        reportsRef = null;
         isFirebaseOnline = false;
     }
 }
@@ -78,17 +86,25 @@ const ICONS = {
 // Stato dell'applicazione
 let map;
 let markersData = [];
+let userReportsData = []; // Segnalazioni ricevute dagli utenti (admin)
 let activeLayers = {};
 let activeSegments = {}; // Polyline rosse tra marker della stessa via
 let pendingLatLng = null;
 let isAdmin = false;
 let userLocationMarker = null; // Marker posizione GPS dell'utente
+let previewReportMarker = null; // Marker di anteprima per le segnalazioni admin
 
-// Elementi DOM
+// Stato invio segnalazione utente
+let isPickingPointOnMap = false;
+let userReportSelectedLocation = null; // { lat, lng, street }
+let userReportSelectedType = null;
+
+// Elementi DOM (Admin Markers)
 const modalOverlay = document.getElementById('marker-modal');
 const closeModalBtn = document.getElementById('close-modal');
 const optionCards = document.querySelectorAll('.option-card');
 
+// Elementi DOM (Admin Auth)
 const loginModal = document.getElementById('login-modal');
 const loginBtn = document.getElementById('admin-login-btn');
 const logoutBtn = document.getElementById('admin-logout-btn');
@@ -98,9 +114,49 @@ const passwordInput = document.getElementById('admin-password');
 const loginError = document.getElementById('login-error');
 const headerSubtitle = document.getElementById('header-subtitle');
 
+// Elementi DOM (Admin Ricerca)
 const searchContainer = document.getElementById('admin-search-container');
 const searchInput = document.getElementById('admin-search-input');
 const searchBtn = document.getElementById('admin-search-btn');
+
+// Elementi DOM (Segnalazioni Utente)
+const userReportBtn = document.getElementById('user-report-btn');
+const userReportModal = document.getElementById('user-report-modal');
+const closeUserReportModalBtn = document.getElementById('close-user-report-modal');
+const reportLocGpsBtn = document.getElementById('report-loc-gps-btn');
+const reportLocMapBtn = document.getElementById('report-loc-map-btn');
+const reportStreetSearchInput = document.getElementById('report-street-search-input');
+const reportStreetSearchBtn = document.getElementById('report-street-search-btn');
+const reportSelectedLocationBox = document.getElementById('report-selected-location');
+const reportLocName = document.getElementById('report-loc-name');
+const reportLocCoords = document.getElementById('report-loc-coords');
+const reportTypePills = document.querySelectorAll('#user-report-types .type-pill');
+const reportNoteInput = document.getElementById('report-note-input');
+const reportAuthorInput = document.getElementById('report-author-input');
+const userReportError = document.getElementById('user-report-error');
+const submitUserReportBtn = document.getElementById('submit-user-report-btn');
+const pickerBanner = document.getElementById('picker-banner');
+const cancelPickerBtn = document.getElementById('cancel-picker-btn');
+
+// Elementi DOM (Pannello Notifiche Admin)
+const adminReportsBtn = document.getElementById('admin-reports-btn');
+const adminReportsModal = document.getElementById('admin-reports-modal');
+const closeAdminReportsModalBtn = document.getElementById('close-admin-reports-modal');
+const adminReportsList = document.getElementById('admin-reports-list');
+const reportsBadge = document.getElementById('reports-badge');
+const adminReportsCount = document.getElementById('admin-reports-count');
+
+// Mostra un messaggio Toast
+function showToast(message, type = 'normal', duration = 3500) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = `toast-box toast-${type}`;
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, duration);
+}
 
 // Aggiorna UI in base allo stato
 function updateUI() {
@@ -108,11 +164,13 @@ function updateUI() {
         loginBtn.classList.add('hidden');
         logoutBtn.classList.remove('hidden');
         searchContainer.classList.remove('hidden');
+        if (adminReportsBtn) adminReportsBtn.classList.remove('hidden');
         headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere una segnalazione";
     } else {
         loginBtn.classList.remove('hidden');
         logoutBtn.classList.add('hidden');
         searchContainer.classList.add('hidden');
+        if (adminReportsBtn) adminReportsBtn.classList.add('hidden');
         headerSubtitle.textContent = "Modalità Visualizzazione: clicca sui marker per i dettagli";
     }
     // Ridisegna i marker per mostrare/nascondere il tasto elimina
@@ -145,6 +203,30 @@ function initMap() {
         if (!isAdmin) return;
         pendingLatLng = e.latlng;
         openModal();
+    });
+
+    // Evento click sulla mappa (per selezione punto da parte dell'utente)
+    map.on('click', async function (e) {
+        if (isPickingPointOnMap) {
+            isPickingPointOnMap = false;
+            if (pickerBanner) pickerBanner.classList.add('hidden');
+
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            userReportSelectedLocation = { lat, lng, street: null };
+
+            openUserReportModal();
+            updateSelectedLocationUI(lat, lng, "Rilevamento via in corso...");
+
+            // Reverse geocoding automatico
+            const street = await reverseGeocode(lat, lng);
+            if (street) {
+                userReportSelectedLocation.street = street;
+                updateSelectedLocationUI(lat, lng, street);
+            } else {
+                updateSelectedLocationUI(lat, lng, "Punto selezionato su mappa");
+            }
+        }
     });
 
     const appVersionEl = document.getElementById('app-version');
@@ -858,5 +940,473 @@ function refreshMarkers() {
     updateRoadSegments();
 }
 
+// -------------------------------------------------------
+// GESTIONE SEGNALAZIONI UTENTE (Invio Notifiche)
+// -------------------------------------------------------
+
+function openUserReportModal() {
+    if (userReportModal) {
+        userReportModal.classList.remove('hidden');
+    }
+}
+
+function closeUserReportModal() {
+    if (userReportModal) {
+        userReportModal.classList.add('hidden');
+    }
+}
+
+function resetUserReportForm() {
+    userReportSelectedLocation = null;
+    userReportSelectedType = null;
+    if (reportSelectedLocationBox) reportSelectedLocationBox.classList.add('hidden');
+    if (reportStreetSearchInput) reportStreetSearchInput.value = '';
+    if (reportNoteInput) reportNoteInput.value = '';
+    if (reportAuthorInput) reportAuthorInput.value = '';
+    if (userReportError) userReportError.classList.add('hidden');
+    
+    reportTypePills.forEach(pill => pill.classList.remove('selected'));
+    if (reportLocGpsBtn) reportLocGpsBtn.classList.remove('active');
+    if (reportLocMapBtn) reportLocMapBtn.classList.remove('active');
+}
+
+function updateSelectedLocationUI(lat, lng, streetName) {
+    if (!reportSelectedLocationBox) return;
+    reportSelectedLocationBox.classList.remove('hidden');
+    if (reportLocName) {
+        reportLocName.textContent = streetName ? `📍 ${streetName}` : '📍 Posizione selezionata';
+    }
+    if (reportLocCoords) {
+        reportLocCoords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+}
+
+// Apertura modale segnalazione da parte dell'utente
+if (userReportBtn) {
+    userReportBtn.addEventListener('click', () => {
+        resetUserReportForm();
+        openUserReportModal();
+    });
+}
+
+// Chiusura modale segnalazione
+if (closeUserReportModalBtn) {
+    closeUserReportModalBtn.addEventListener('click', () => {
+        closeUserReportModal();
+    });
+}
+
+if (userReportModal) {
+    userReportModal.addEventListener('click', (e) => {
+        if (e.target === userReportModal) {
+            closeUserReportModal();
+        }
+    });
+}
+
+// Selezione Posizione con GPS
+if (reportLocGpsBtn) {
+    reportLocGpsBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+            alert('Geolocalizzazione non supportata dal tuo browser.');
+            return;
+        }
+
+        reportLocGpsBtn.textContent = '📍 Ricerca GPS in corso...';
+        reportLocGpsBtn.disabled = true;
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                userReportSelectedLocation = { lat: latitude, lng: longitude, street: null };
+                
+                reportLocGpsBtn.textContent = '📍 Posizione attuale (GPS)';
+                reportLocGpsBtn.disabled = false;
+                reportLocGpsBtn.classList.add('active');
+                if (reportLocMapBtn) reportLocMapBtn.classList.remove('active');
+
+                updateSelectedLocationUI(latitude, longitude, "Rilevamento via in corso...");
+
+                const street = await reverseGeocode(latitude, longitude);
+                if (street) {
+                    userReportSelectedLocation.street = street;
+                    updateSelectedLocationUI(latitude, longitude, street);
+                } else {
+                    updateSelectedLocationUI(latitude, longitude, "La tua posizione attuale");
+                }
+            },
+            (error) => {
+                reportLocGpsBtn.textContent = '📍 Posizione attuale (GPS)';
+                reportLocGpsBtn.disabled = false;
+                alert('Impossibile ottenere la posizione GPS: ' + error.message);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+    });
+}
+
+// Selezione Posizione cliccando sulla mappa
+if (reportLocMapBtn) {
+    reportLocMapBtn.addEventListener('click', () => {
+        closeUserReportModal();
+        isPickingPointOnMap = true;
+        if (pickerBanner) pickerBanner.classList.remove('hidden');
+    });
+}
+
+// Annulla selezione su mappa
+if (cancelPickerBtn) {
+    cancelPickerBtn.addEventListener('click', () => {
+        isPickingPointOnMap = false;
+        if (pickerBanner) pickerBanner.classList.add('hidden');
+        openUserReportModal();
+    });
+}
+
+// Cerca via nella modale segnalazione
+if (reportStreetSearchBtn && reportStreetSearchInput) {
+    const handleStreetSearch = async () => {
+        const query = reportStreetSearchInput.value.trim();
+        if (!query) return;
+
+        reportStreetSearchBtn.disabled = true;
+        reportStreetSearchBtn.textContent = '...';
+
+        try {
+            const searchQuery = encodeURIComponent(query + ', Ferrara');
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
+            const data = await res.json();
+
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lon = parseFloat(data[0].lon);
+                const displayName = data[0].display_name.split(',')[0];
+
+                userReportSelectedLocation = { lat, lng: lon, street: displayName };
+                updateSelectedLocationUI(lat, lon, displayName);
+                if (reportLocGpsBtn) reportLocGpsBtn.classList.remove('active');
+                if (reportLocMapBtn) reportLocMapBtn.classList.remove('active');
+            } else {
+                alert("Nessuna via trovata a Ferrara con questo nome.");
+            }
+        } catch (e) {
+            console.error("Errore ricerca via:", e);
+            alert("Errore durante la ricerca della via.");
+        } finally {
+            reportStreetSearchBtn.disabled = false;
+            reportStreetSearchBtn.textContent = 'Cerca';
+        }
+    };
+
+    reportStreetSearchBtn.addEventListener('click', handleStreetSearch);
+    reportStreetSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleStreetSearch();
+        }
+    });
+}
+
+// Selezione del tipo di problema
+reportTypePills.forEach(pill => {
+    pill.addEventListener('click', function () {
+        reportTypePills.forEach(p => p.classList.remove('selected'));
+        this.classList.add('selected');
+        userReportSelectedType = this.getAttribute('data-type');
+        if (userReportError) userReportError.classList.add('hidden');
+    });
+});
+
+// Invio effettivo della segnalazione
+if (submitUserReportBtn) {
+    submitUserReportBtn.addEventListener('click', async () => {
+        if (!userReportSelectedLocation) {
+            if (userReportError) {
+                userReportError.textContent = "Seleziona prima la posizione (GPS, mappa o ricerca via).";
+                userReportError.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (!userReportSelectedType) {
+            if (userReportError) {
+                userReportError.textContent = "Seleziona il tipo di problema riscontrato.";
+                userReportError.classList.remove('hidden');
+            }
+            return;
+        }
+
+        const note = reportNoteInput ? reportNoteInput.value.trim().slice(0, 500) : null;
+        const author = reportAuthorInput ? reportAuthorInput.value.trim().slice(0, 100) : null;
+
+        submitUserReportBtn.disabled = true;
+        submitUserReportBtn.textContent = "Invio in corso...";
+
+        const reportData = {
+            lat: userReportSelectedLocation.lat,
+            lng: userReportSelectedLocation.lng,
+            street: userReportSelectedLocation.street || null,
+            type: userReportSelectedType,
+            note: note || null,
+            author: author || null,
+            timestamp: Date.now(),
+            status: 'pending'
+        };
+
+        try {
+            if (isFirebaseOnline && reportsRef) {
+                await reportsRef.push(reportData);
+                console.log("📢 Segnalazione inviata con successo a Firebase!");
+            } else {
+                // Fallback locale in caso di assenza temporanea di rete
+                let offlineReports = [];
+                try {
+                    const cached = localStorage.getItem('ferrara_user_reports_offline');
+                    if (cached) offlineReports = JSON.parse(cached);
+                } catch (e) { }
+                offlineReports.push({ ...reportData, id: 'local_' + Date.now() });
+                localStorage.setItem('ferrara_user_reports_offline', JSON.stringify(offlineReports));
+                console.log("📢 Segnalazione salvata in cache locale.");
+            }
+
+            closeUserReportModal();
+            resetUserReportForm();
+            showToast("📢 Segnalazione inviata con successo! Sarà revisionata dall'amministratore.", "success", 4500);
+
+        } catch (error) {
+            console.error("Errore durante l'invio della segnalazione:", error);
+            if (userReportError) {
+                userReportError.textContent = "Errore durante l'invio: " + error.message;
+                userReportError.classList.remove('hidden');
+            }
+        } finally {
+            submitUserReportBtn.disabled = false;
+            submitUserReportBtn.textContent = "Invia Segnalazione";
+        }
+    });
+}
+
+// -------------------------------------------------------
+// GESTIONE NOTIFICHE AMMINISTRATORE
+// -------------------------------------------------------
+
+let reportsListenerActive = false;
+
+function initAdminReportsListener() {
+    if (!isFirebaseOnline || !reportsRef || reportsListenerActive) return;
+
+    reportsListenerActive = true;
+    reportsRef.on('value', (snapshot) => {
+        userReportsData = [];
+        const data = snapshot.val();
+
+        if (data) {
+            Object.entries(data).forEach(([key, val]) => {
+                userReportsData.push({
+                    id: key,
+                    ...val
+                });
+            });
+            // Ordina dalla più recente alla meno recente
+            userReportsData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        }
+
+        updateReportsBadge();
+        renderAdminReportsList();
+    }, (err) => {
+        console.warn("Errore lettura notifiche admin:", err.message);
+    });
+}
+
+function stopAdminReportsListener() {
+    if (reportsRef && reportsListenerActive) {
+        reportsRef.off();
+        reportsListenerActive = false;
+    }
+    userReportsData = [];
+    updateReportsBadge();
+}
+
+function updateReportsBadge() {
+    const count = userReportsData.length;
+    if (reportsBadge) {
+        reportsBadge.textContent = count;
+        reportsBadge.classList.toggle('pulse', count > 0);
+    }
+    if (adminReportsCount) {
+        adminReportsCount.textContent = count === 1 ? '1 nuova' : `${count} nuove`;
+    }
+}
+
+function renderAdminReportsList() {
+    if (!adminReportsList) return;
+
+    if (userReportsData.length === 0) {
+        adminReportsList.innerHTML = `
+            <div class="empty-reports-msg">
+                <span>🎉</span>
+                <p>Nessuna nuova segnalazione ricevuta dagli utenti.</p>
+            </div>
+        `;
+        return;
+    }
+
+    adminReportsList.innerHTML = userReportsData.map(r => {
+        const config = ICONS[r.type] || { emoji: '📍', label: 'Segnalazione' };
+        const safeType = escapeHtml(config.label);
+        const safeEmoji = config.emoji;
+        const safeStreet = escapeHtml(r.street);
+        const safeNote = escapeHtml(r.note);
+        const safeAuthor = escapeHtml(r.author);
+        const dateStr = r.timestamp ? new Date(r.timestamp).toLocaleString('it-IT') : 'Data non specificata';
+        const safeId = escapeHtml(r.id);
+
+        return `
+            <div class="report-card" id="card-${safeId}">
+                <div class="report-card-header">
+                    <div class="report-card-type">
+                        <span>${safeEmoji}</span>
+                        <strong>${safeType}</strong>
+                    </div>
+                    <span class="report-card-time">🕒 ${dateStr}</span>
+                </div>
+
+                ${safeStreet ? `<span class="report-card-street">📍 ${safeStreet}</span>` : `<span class="report-card-street">📍 Lat: ${r.lat.toFixed(4)}, Lng: ${r.lng.toFixed(4)}</span>`}
+
+                ${safeNote ? `<div class="report-card-note"><strong>Dettagli:</strong> ${safeNote}</div>` : ''}
+                ${safeAuthor ? `<div class="report-card-author">Inviato da: ${safeAuthor}</div>` : ''}
+
+                <div class="report-card-actions">
+                    <button class="btn-card-view" onclick="previewReportOnMap('${safeId}')">👁️ Mostra su Mappa</button>
+                    <button class="btn-card-approve" onclick="approveReport('${safeId}')">✅ Inserisci nella Mappa</button>
+                    <button class="btn-card-reject" onclick="rejectReport('${safeId}')">🗑️ Scarta</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Mostra la modale notifiche admin
+if (adminReportsBtn) {
+    adminReportsBtn.addEventListener('click', () => {
+        if (adminReportsModal) {
+            renderAdminReportsList();
+            adminReportsModal.classList.remove('hidden');
+        }
+    });
+}
+
+// Chiudi modale notifiche admin
+if (closeAdminReportsModalBtn) {
+    closeAdminReportsModalBtn.addEventListener('click', () => {
+        if (adminReportsModal) adminReportsModal.classList.add('hidden');
+    });
+}
+
+if (adminReportsModal) {
+    adminReportsModal.addEventListener('click', (e) => {
+        if (e.target === adminReportsModal) {
+            adminReportsModal.classList.add('hidden');
+        }
+    });
+}
+
+// Mostra anteprima segnalazione su mappa
+window.previewReportOnMap = function (reportId) {
+    const report = userReportsData.find(r => r.id === reportId);
+    if (!report) return;
+
+    if (adminReportsModal) {
+        adminReportsModal.classList.add('hidden');
+    }
+
+    if (previewReportMarker) {
+        map.removeLayer(previewReportMarker);
+    }
+
+    map.flyTo([report.lat, report.lng], 17, { animate: true, duration: 1.2 });
+
+    const config = ICONS[report.type] || { emoji: '📍', label: 'Segnalazione' };
+    const safeType = escapeHtml(config.label);
+    const safeStreet = escapeHtml(report.street);
+    const safeNote = escapeHtml(report.note);
+    const safeId = escapeHtml(report.id);
+
+    previewReportMarker = L.marker([report.lat, report.lng], {
+        icon: createCustomIcon(report.type)
+    }).addTo(map);
+
+    let popupContent = `
+        <div class="popup-content">
+            <span style="background:#f59e0b; color:white; font-size:0.75rem; font-weight:bold; padding:2px 8px; border-radius:999px;">🔔 SEGNALAZIONE DA REVISIONARE</span>
+            <h3>${config.emoji} ${safeType}</h3>
+            ${safeStreet ? `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${safeStreet}</div>` : ''}
+            ${safeNote ? `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>` : ''}
+            <div style="display:flex; gap:6px; width:100%; margin-top:4px;">
+                <button class="primary-btn" style="flex:1; padding:6px; font-size:0.8rem; background:#10b981;" onclick="approveReport('${safeId}')">✅ Inserisci</button>
+                <button class="delete-btn" style="flex:1; padding:6px; font-size:0.8rem;" onclick="rejectReport('${safeId}')">🗑️ Scarta</button>
+            </div>
+        </div>
+    `;
+
+    previewReportMarker.bindPopup(popupContent).openPopup();
+};
+
+// Approva segnalazione utente e inserisci nella mappa come marker ufficiale
+window.approveReport = function (reportId) {
+    const report = userReportsData.find(r => r.id === reportId);
+    if (!report) return;
+
+    if (previewReportMarker) {
+        map.removeLayer(previewReportMarker);
+        previewReportMarker = null;
+    }
+
+    // Aggiungi subito come marker ufficiale
+    addMarker(report.lat, report.lng, report.type, null, true, report.note, null, report.street);
+
+    // Rimuovi da user_reports su Firebase
+    if (isFirebaseOnline && reportsRef) {
+        reportsRef.child(reportId).remove()
+            .then(() => {
+                console.log("✅ Segnalazione approvata e rimossa dalla coda pendenti:", reportId);
+            })
+            .catch(e => {
+                console.warn("Errore rimozione segnalazione approvata:", e.message);
+            });
+    }
+
+    userReportsData = userReportsData.filter(r => r.id !== reportId);
+    updateReportsBadge();
+    renderAdminReportsList();
+    showToast("✅ Segnalazione approvata e inserita nella mappa!", "success", 4000);
+};
+
+// Scarta / Elimina segnalazione
+window.rejectReport = function (reportId) {
+    if (!confirm("Vuoi scartare ed eliminare questa segnalazione?")) return;
+
+    if (previewReportMarker) {
+        map.removeLayer(previewReportMarker);
+        previewReportMarker = null;
+    }
+
+    if (isFirebaseOnline && reportsRef) {
+        reportsRef.child(reportId).remove()
+            .then(() => {
+                console.log("🗑️ Segnalazione eliminata:", reportId);
+            })
+            .catch(e => {
+                console.warn("Errore eliminazione segnalazione:", e.message);
+            });
+    }
+
+    userReportsData = userReportsData.filter(r => r.id !== reportId);
+    updateReportsBadge();
+    renderAdminReportsList();
+    showToast("Segnalazione scartata.", "normal", 3000);
+};
+
 // Avvia tutto quando il DOM è pronto
 document.addEventListener('DOMContentLoaded', initMap);
+

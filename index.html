@@ -32,8 +32,14 @@
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
             <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.0</span></h1>
-            <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
-            <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
+            <div class="header-actions">
+                <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
+                <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
+                    🔔 Segnalazioni <span id="reports-badge" class="badge">0</span>
+                </button>
+                <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
+                <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
+            </div>
         </div>
         <p class="subtitle" id="header-subtitle">Modalità Visualizzazione: clicca sui marker per i dettagli</p>
     </header>
@@ -42,6 +48,15 @@
     <div id="admin-search-container" class="search-container hidden">
         <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
         <button id="admin-search-btn">Cerca</button>
+    </div>
+
+    <!-- Banner selezione punto mappa per utente -->
+    <div id="picker-banner" class="picker-banner hidden">
+        <div class="picker-banner-content">
+            <span class="picker-banner-icon">📍</span>
+            <span class="picker-banner-text">Tocca o clicca sulla mappa per indicare il punto del problema</span>
+            <button id="cancel-picker-btn" class="picker-cancel-btn">Annulla</button>
+        </div>
     </div>
 
     <div id="map"></div>
@@ -55,11 +70,11 @@
         </svg>
     </button>
 
-    <!-- Modal for adding markers -->
+    <!-- Modal for adding markers (Admin) -->
     <div id="marker-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Nuova Segnalazione</h2>
+                <h2>Nuova Segnalazione (Admin)</h2>
                 <button id="close-modal" class="close-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
@@ -99,6 +114,95 @@
         </div>
     </div>
 
+    <!-- Modal for User Report Submission -->
+    <div id="user-report-modal" class="modal-overlay hidden">
+        <div class="modal-content report-modal-content">
+            <div class="modal-header">
+                <h2>📢 Invia Segnalazione Viabilità</h2>
+                <button id="close-user-report-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">Segnala un'interruzione, cantiere o problema stradale per la verifica dell'amministratore.</p>
+            
+            <!-- Posizione -->
+            <div class="report-section">
+                <label class="section-label">1. Punto o Via interessata</label>
+                <div class="loc-buttons-grid">
+                    <button type="button" id="report-loc-gps-btn" class="loc-action-btn">
+                        📍 Posizione attuale (GPS)
+                    </button>
+                    <button type="button" id="report-loc-map-btn" class="loc-action-btn">
+                        🗺️ Scegli sulla mappa
+                    </button>
+                </div>
+                
+                <div class="search-street-row">
+                    <input type="text" id="report-street-search-input" placeholder="Oppure cerca una via (es. Via Garibaldi)..." />
+                    <button type="button" id="report-street-search-btn" class="small-btn">Cerca</button>
+                </div>
+
+                <div id="report-selected-location" class="selected-location-box hidden">
+                    <span class="loc-pin">📍</span>
+                    <div class="loc-info">
+                        <strong id="report-loc-name">Punto selezionato</strong>
+                        <small id="report-loc-coords">44.8381, 11.6198</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tipo Problema -->
+            <div class="report-section">
+                <label class="section-label">2. Tipo di problema</label>
+                <div class="report-types-grid" id="user-report-types">
+                    <button type="button" class="type-pill" data-type="lavori">🚧 Lavori</button>
+                    <button type="button" class="type-pill" data-type="chiusa">⛔ Chiusa</button>
+                    <button type="button" class="type-pill" data-type="ponte">🌉 Ponte</button>
+                    <button type="button" class="type-pill" data-type="incidente">⚠️ Incidente</button>
+                    <button type="button" class="type-pill" data-type="mercato">🛒 Mercato</button>
+                    <button type="button" class="type-pill" data-type="semaforo">🚦 Semaforo</button>
+                    <button type="button" class="type-pill" data-type="sagra">🎪 Sagra</button>
+                </div>
+            </div>
+
+            <!-- Note / Dettagli -->
+            <div class="report-section">
+                <label class="section-label" for="report-note-input">3. Dettagli o note aggiuntive (opzionale)</label>
+                <textarea id="report-note-input" rows="2" placeholder="Es. Senso unico alternato, strada bloccata per allagamento fino a domani..."></textarea>
+            </div>
+
+            <!-- Segnalatore -->
+            <div class="report-section">
+                <label class="section-label" for="report-author-input">Segnalato da (opzionale)</label>
+                <input type="text" id="report-author-input" placeholder="Es. Autista 118, Cittadino..." />
+            </div>
+
+            <p id="user-report-error" class="error-msg hidden"></p>
+
+            <button id="submit-user-report-btn" class="primary-btn submit-report-btn">Invia Segnalazione</button>
+        </div>
+    </div>
+
+    <!-- Modal for Admin Reports List / Notifications -->
+    <div id="admin-reports-modal" class="modal-overlay hidden">
+        <div class="modal-content admin-reports-content">
+            <div class="modal-header">
+                <div class="admin-reports-title-wrapper">
+                    <h2>🔔 Segnalazioni Ricevute</h2>
+                    <span id="admin-reports-count" class="reports-count-tag">0 nuove</span>
+                </div>
+                <button id="close-admin-reports-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">Revisiona le notifiche inviate dagli utenti. Puoi visualizzarle sulla mappa, inserirle come marker ufficiali o scartarle.</p>
+
+            <div id="admin-reports-list" class="reports-list-container">
+                <!-- Verrà popolato dinamicamente da JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Modal for Admin Login -->
     <div id="login-modal" class="modal-overlay hidden">
         <div class="modal-content login-content">
@@ -116,6 +220,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="toast-box hidden"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
