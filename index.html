@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara v3.3 - Segnalazioni</title>
+    <title>Viabilità Ferrara v3.4 - Segnalazioni a Tempo</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.3">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.4">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -24,14 +24,14 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.3">
+    <link rel="stylesheet" href="style.css?v=3.4">
 </head>
 <body>
     
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.3</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.4</span></h1>
             <div class="header-actions">
                 <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
                 <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
@@ -44,10 +44,19 @@
         <p class="subtitle" id="header-subtitle">Modalità Visualizzazione: clicca sui marker per i dettagli</p>
     </header>
 
-    <!-- Admin Search Box -->
+    <!-- Admin Search Box & Status Filter -->
     <div id="admin-search-container" class="search-container hidden">
-        <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
-        <button id="admin-search-btn">Cerca</button>
+        <div class="admin-top-row">
+            <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
+            <button id="admin-search-btn">Cerca</button>
+        </div>
+        <div class="admin-filter-bar">
+            <span class="filter-label">Filtro:</span>
+            <button class="filter-pill active" data-filter="active">🟢 Attivi (<span id="filter-count-active">0</span>)</button>
+            <button class="filter-pill" data-filter="upcoming">⏳ Programmati (<span id="filter-count-upcoming">0</span>)</button>
+            <button class="filter-pill" data-filter="expired">⚪ Scaduti (<span id="filter-count-expired">0</span>)</button>
+            <button class="filter-pill" data-filter="all">Tutti (<span id="filter-count-all">0</span>)</button>
+        </div>
     </div>
 
     <!-- Banner selezione punto mappa per utente -->
@@ -70,50 +79,120 @@
         </svg>
     </button>
 
-    <!-- Modal for adding markers (Admin) -->
+    <!-- Modal for adding / editing markers (Admin) with Scheduling -->
     <div id="marker-modal" class="modal-overlay hidden">
-        <div class="modal-content">
+        <div class="modal-content marker-form-content">
             <div class="modal-header">
-                <h2>Nuova Segnalazione (Admin)</h2>
+                <h2 id="marker-modal-title">Nuova Segnalazione (Admin)</h2>
                 <button id="close-modal" class="close-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
-            <p class="modal-desc">Seleziona il tipo di problema riscontrato nel punto indicato.</p>
             
-            <div class="options-grid">
-                <button class="option-card" data-type="lavori">
-                    <div class="icon-wrapper works">🚧</div>
-                    <span>Lavori in corso</span>
-                </button>
-                <button class="option-card" data-type="chiusa">
-                    <div class="icon-wrapper closed">
-                        <svg class="sign-hand-barred" viewBox="0 0 32 32" width="28" height="28" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>
+            <div class="modal-body-scroll">
+                <!-- Sezione 1: Tipo Problema -->
+                <label class="section-label">1. Tipo di problema</label>
+                <div class="options-grid" id="admin-options-grid">
+                    <button type="button" class="option-card" data-type="lavori">
+                        <div class="icon-wrapper works">🚧</div>
+                        <span>Lavori in corso</span>
+                    </button>
+                    <button type="button" class="option-card" data-type="chiusa">
+                        <div class="icon-wrapper closed">
+                            <svg class="sign-hand-barred" viewBox="0 0 32 32" width="28" height="28" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>
+                        </div>
+                        <span>Strada chiusa</span>
+                    </button>
+                    <button type="button" class="option-card" data-type="ponte">
+                        <div class="icon-wrapper bridge">🌉</div>
+                        <span>Ponte interrotto</span>
+                    </button>
+                    <button type="button" class="option-card" data-type="incidente">
+                        <div class="icon-wrapper accident">⚠️</div>
+                        <span>Incidente</span>
+                    </button>
+                    <button type="button" class="option-card" data-type="mercato">
+                        <div class="icon-wrapper market">🛒</div>
+                        <span>Mercato settimanale</span>
+                    </button>
+                    <button type="button" class="option-card" data-type="semaforo">
+                        <div class="icon-wrapper traffic">🚦</div>
+                        <span>Senso unico alternato</span>
+                    </button>
+                    <button type="button" class="option-card" data-type="sagra">
+                        <div class="icon-wrapper sagra">
+                            <img src="icon-sagra.png" alt="Sagra / Manifestazione" style="width:30px; height:30px; object-fit:contain;" />
+                        </div>
+                        <span>Sagra / Manifestazione</span>
+                    </button>
+                </div>
+
+                <!-- Sezione 2: Note / Dettagli -->
+                <div class="form-section-item">
+                    <label class="section-label" for="admin-marker-note">2. Dettagli o note (opzionale)</label>
+                    <textarea id="admin-marker-note" rows="2" placeholder="Es. Chiusura per asfaltatura, passaggio consentito solo a residenti..."></textarea>
+                </div>
+
+                <!-- Sezione 3: Programmazione a tempo -->
+                <div class="form-section-item schedule-box">
+                    <div class="schedule-box-header">
+                        <label class="section-label" style="margin-bottom:0;">⏱️ Programmazione Temporale (Apparizione / Scomparsa)</label>
                     </div>
-                    <span>Strada chiusa</span>
-                </button>
-                <button class="option-card" data-type="ponte">
-                    <div class="icon-wrapper bridge">🌉</div>
-                    <span>Ponte interrotto</span>
-                </button>
-                <button class="option-card" data-type="incidente">
-                    <div class="icon-wrapper accident">⚠️</div>
-                    <span>Incidente</span>
-                </button>
-                <button class="option-card" data-type="mercato">
-                    <div class="icon-wrapper market">🛒</div>
-                    <span>Mercato settimanale</span>
-                </button>
-                <button class="option-card" data-type="semaforo">
-                    <div class="icon-wrapper traffic">🚦</div>
-                    <span>Senso unico alternato</span>
-                </button>
-                <button class="option-card" data-type="sagra">
-                    <div class="icon-wrapper sagra">
-                        <img src="icon-sagra.png" alt="Sagra / Manifestazione" style="width:32px; height:32px; object-fit:contain;" />
+                    <p class="schedule-help">Definisci quando l'icona deve apparire e scomparire automaticamente sulla mappa.</p>
+                    
+                    <div class="schedule-type-selector">
+                        <button type="button" class="sched-type-btn active" data-mode="always">🟢 Sempre Attivo</button>
+                        <button type="button" class="sched-type-btn" data-mode="window">⏱️ Finestra Temporale</button>
+                        <button type="button" class="sched-type-btn" data-mode="recurring">🔁 Ricorrente</button>
                     </div>
-                    <span>Sagra / Manifestazione</span>
-                </button>
+
+                    <!-- Blocco Finestra Temporale (Da data/ora a data/ora) -->
+                    <div id="sched-window-block" class="sched-detail-block hidden">
+                        <div class="sched-grid">
+                            <div class="sched-field">
+                                <label for="admin-sched-start">📅 Inizio (Appare alle):</label>
+                                <input type="datetime-local" id="admin-sched-start" />
+                            </div>
+                            <div class="sched-field">
+                                <label for="admin-sched-end">🏁 Fine (Scompare alle):</label>
+                                <input type="datetime-local" id="admin-sched-end" />
+                            </div>
+                        </div>
+                        <span class="sched-hint">💡 L'icona sarà visibile sulla mappa solo tra la data/ora di inizio e di fine inserita.</span>
+                    </div>
+
+                    <!-- Blocco Ricorrente (Giorni della settimana + orari) -->
+                    <div id="sched-recurring-block" class="sched-detail-block hidden">
+                        <label class="sub-label">Giorni attivi:</label>
+                        <div class="days-picker" id="sched-days-picker">
+                            <button type="button" class="day-btn" data-day="1">Lun</button>
+                            <button type="button" class="day-btn" data-day="2">Mar</button>
+                            <button type="button" class="day-btn" data-day="3">Mer</button>
+                            <button type="button" class="day-btn" data-day="4">Gio</button>
+                            <button type="button" class="day-btn" data-day="5">Ven</button>
+                            <button type="button" class="day-btn" data-day="6">Sab</button>
+                            <button type="button" class="day-btn" data-day="0">Dom</button>
+                        </div>
+                        <div class="sched-grid" style="margin-top:8px;">
+                            <div class="sched-field">
+                                <label for="admin-sched-time-start">🕒 Dalle ore:</label>
+                                <input type="time" id="admin-sched-time-start" value="06:00" />
+                            </div>
+                            <div class="sched-field">
+                                <label for="admin-sched-time-end">🕒 Alle ore:</label>
+                                <input type="time" id="admin-sched-time-end" value="14:00" />
+                            </div>
+                        </div>
+                        <span class="sched-hint">💡 Ideale per mercati rionali o chiusure notturne periodiche.</span>
+                    </div>
+                </div>
+            </div>
+
+            <p id="admin-marker-error" class="error-msg hidden"></p>
+
+            <div class="modal-footer-actions">
+                <button type="button" id="admin-cancel-marker-btn" class="btn-cancel">Annulla</button>
+                <button type="button" id="admin-save-marker-btn" class="primary-btn">Salva Segnalazione</button>
             </div>
         </div>
     </div>
@@ -237,6 +316,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.3"></script>
+    <script src="script.js?v=3.4"></script>
 </body>
 </html>

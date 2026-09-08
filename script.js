@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -121,10 +121,30 @@ let isPickingPointOnMap = false;
 let userReportSelectedLocation = null; // { lat, lng, street }
 let userReportSelectedType = null;
 
-// Elementi DOM (Admin Markers)
+// Stato Form Admin & Programmazione Temporale
+let adminFilter = 'active'; // 'active' | 'upcoming' | 'expired' | 'all'
+let editingMarkerId = null; // ID del marker in fase di modifica
+let selectedAdminType = 'lavori';
+let selectedScheduleMode = 'always'; // 'always' | 'window' | 'recurring'
+let selectedRecurringDays = [1, 2, 3, 4, 5]; // Default: Lun-Ven
+
+// Elementi DOM (Admin Markers Modal & Form)
 const modalOverlay = document.getElementById('marker-modal');
 const closeModalBtn = document.getElementById('close-modal');
-const optionCards = document.querySelectorAll('.option-card');
+const markerModalTitle = document.getElementById('marker-modal-title');
+const adminOptionCards = document.querySelectorAll('#admin-options-grid .option-card');
+const adminMarkerNote = document.getElementById('admin-marker-note');
+const schedTypeBtns = document.querySelectorAll('.sched-type-btn');
+const schedWindowBlock = document.getElementById('sched-window-block');
+const schedRecurringBlock = document.getElementById('sched-recurring-block');
+const adminSchedStart = document.getElementById('admin-sched-start');
+const adminSchedEnd = document.getElementById('admin-sched-end');
+const adminSchedTimeStart = document.getElementById('admin-sched-time-start');
+const adminSchedTimeEnd = document.getElementById('admin-sched-time-end');
+const schedDaysPicker = document.getElementById('sched-days-picker');
+const adminMarkerError = document.getElementById('admin-marker-error');
+const adminSaveMarkerBtn = document.getElementById('admin-save-marker-btn');
+const adminCancelMarkerBtn = document.getElementById('admin-cancel-marker-btn');
 
 // Elementi DOM (Admin Auth)
 const loginModal = document.getElementById('login-modal');
@@ -136,10 +156,15 @@ const passwordInput = document.getElementById('admin-password');
 const loginError = document.getElementById('login-error');
 const headerSubtitle = document.getElementById('header-subtitle');
 
-// Elementi DOM (Admin Ricerca)
+// Elementi DOM (Admin Ricerca & Filtri)
 const searchContainer = document.getElementById('admin-search-container');
 const searchInput = document.getElementById('admin-search-input');
 const searchBtn = document.getElementById('admin-search-btn');
+const filterPills = document.querySelectorAll('.filter-pill');
+const filterCountActive = document.getElementById('filter-count-active');
+const filterCountUpcoming = document.getElementById('filter-count-upcoming');
+const filterCountExpired = document.getElementById('filter-count-expired');
+const filterCountAll = document.getElementById('filter-count-all');
 
 // Elementi DOM (Segnalazioni Utente)
 const userReportBtn = document.getElementById('user-report-btn');
@@ -187,7 +212,7 @@ function updateUI() {
         logoutBtn.classList.remove('hidden');
         searchContainer.classList.remove('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.remove('hidden');
-        headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere una segnalazione";
+        headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
     } else {
         loginBtn.classList.remove('hidden');
         logoutBtn.classList.add('hidden');
@@ -195,7 +220,7 @@ function updateUI() {
         if (adminReportsBtn) adminReportsBtn.classList.add('hidden');
         headerSubtitle.textContent = "Modalità Visualizzazione: clicca sui marker per i dettagli";
     }
-    // Ridisegna i marker per mostrare/nascondere il tasto elimina
+    // Ridisegna i marker
     refreshMarkers();
 }
 
@@ -223,8 +248,7 @@ function initMap() {
     // Evento doppio click sulla mappa (solo admin)
     map.on('dblclick', function (e) {
         if (!isAdmin) return;
-        pendingLatLng = e.latlng;
-        openModal();
+        openMarkerModal(e.latlng);
     });
 
     // Evento click sulla mappa (per selezione punto da parte dell'utente)
@@ -500,153 +524,463 @@ async function reverseGeocode(lat, lng) {
     return null;
 }
 
-// Gestione Modale Inserimento
-function openModal() {
-    modalOverlay.classList.remove('hidden');
-}
+// -------------------------------------------------------
+// LOGICA PROGRAMMAZIONE TEMPORALE & VISIBILITÀ MARKER
+// -------------------------------------------------------
 
-function closeModal() {
-    modalOverlay.classList.add('hidden');
-    pendingLatLng = null;
-}
-
-closeModalBtn.addEventListener('click', closeModal);
-
-modalOverlay.addEventListener('click', function (e) {
-    if (e.target === modalOverlay) {
-        closeModal();
+// Calcola lo stato temporale del marker: 'active' | 'upcoming' | 'expired'
+function getMarkerScheduleStatus(m, now = new Date()) {
+    if (!m || !m.schedule || m.schedule.mode === 'always' || !m.schedule.mode) {
+        return 'active';
     }
-});
 
-// Gestione Selezione Icona
-optionCards.forEach(card => {
-    card.addEventListener('click', async function () {
-        if (!pendingLatLng) return;
+    if (m.schedule.mode === 'window') {
+        const start = m.schedule.start ? new Date(m.schedule.start) : null;
+        const end = m.schedule.end ? new Date(m.schedule.end) : null;
 
-        const type = this.getAttribute('data-type');
-        const lat = pendingLatLng.lat;
-        const lng = pendingLatLng.lng;
+        if (start && now < start) return 'upcoming';
+        if (end && now > end) return 'expired';
+        return 'active';
+    }
 
-        // Chiede solo la nota (opzionale) — la via viene rilevata in automatico
-        let note = prompt("Inserisci una nota per questa segnalazione (opzionale):");
-        if (!note || note.trim() === "") {
-            note = null;
+    if (m.schedule.mode === 'recurring') {
+        const currentDay = now.getDay(); // 0 = Domenica, 1 = Lunedì, ...
+        const days = (m.schedule.days || []).map(Number);
+        if (days.length > 0 && !days.includes(currentDay)) {
+            return 'upcoming';
         }
 
-        // Aggiunge il marker subito (senza via, per non bloccare l'utente)
-        addMarker(lat, lng, type, null, true, note, null, null);
-        closeModal();
-
-        // Rileva la via in background tramite reverse geocoding
-        const street = await reverseGeocode(lat, lng);
-        if (street) {
-            // Aggiorna l'ultimo marker inserito con il nome della via
-            const lastMarker = markersData[markersData.length - 1];
-            if (lastMarker) {
-                lastMarker.street = street;
-                // Aggiorna Firebase
-                if (isFirebaseOnline && markersRef && lastMarker.fbKey) {
-                    markersRef.child(lastMarker.fbKey).update({ street: street });
-                }
-                saveToLocalStorage();
-                updateRoadSegments();
-                console.log(`📍 Via rilevata automaticamente: ${street}`);
-            }
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        let startMinutes = 0;
+        if (m.schedule.timeStart) {
+            const parts = m.schedule.timeStart.split(':').map(Number);
+            startMinutes = parts[0] * 60 + (parts[1] || 0);
         }
+        let endMinutes = 24 * 60 - 1;
+        if (m.schedule.timeEnd) {
+            const parts = m.schedule.timeEnd.split(':').map(Number);
+            endMinutes = parts[0] * 60 + (parts[1] || 0);
+        }
+
+        if (currentMinutes < startMinutes) return 'upcoming';
+        if (currentMinutes > endMinutes) return 'expired';
+        return 'active';
+    }
+
+    return 'active';
+}
+
+// Determina se un marker deve essere mostrato sulla mappa
+function isMarkerVisible(m, now = new Date()) {
+    const status = getMarkerScheduleStatus(m, now);
+    if (!isAdmin) {
+        // Gli utenti normali / autisti vedono ESCLUSIVAMENTE gli eventi attivi adesso
+        return status === 'active';
+    }
+    // Per l'amministratore, rispetta il filtro selezionato
+    if (adminFilter === 'all') return true;
+    if (adminFilter === 'active') return status === 'active';
+    if (adminFilter === 'upcoming') return status === 'upcoming';
+    if (adminFilter === 'expired') return status === 'expired';
+    return status === 'active';
+}
+
+// Genera una descrizione leggibile della programmazione temporale
+function formatScheduleDescription(schedule) {
+    if (!schedule || schedule.mode === 'always' || !schedule.mode) {
+        return null;
+    }
+    if (schedule.mode === 'window') {
+        const fmt = (val) => {
+            if (!val) return '';
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return val;
+            return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        };
+        const startStr = fmt(schedule.start);
+        const endStr = fmt(schedule.end);
+        if (startStr && endStr) return `Dal ${startStr} al ${endStr}`;
+        if (startStr) return `A partire dal ${startStr}`;
+        if (endStr) return `Fino al ${endStr}`;
+    }
+    if (schedule.mode === 'recurring') {
+        const dayNames = { 1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Gio', 5: 'Ven', 6: 'Sab', 0: 'Dom' };
+        const days = (schedule.days || []).map(d => dayNames[d] || d).join(', ');
+        const timeStr = `${schedule.timeStart || '00:00'} - ${schedule.timeEnd || '23:59'}`;
+        return `Ricorrente (${days || 'Tutti i giorni'}): ore ${timeStr}`;
+    }
+    return null;
+}
+
+// Badge HTML di stato temporale per Popup
+function formatScheduleBadge(status) {
+    if (status === 'active') {
+        return `<span class="popup-schedule-badge active">🟢 Attivo adesso</span>`;
+    } else if (status === 'upcoming') {
+        return `<span class="popup-schedule-badge upcoming">⏳ In programma</span>`;
+    } else if (status === 'expired') {
+        return `<span class="popup-schedule-badge expired">⚪ Scaduto / Concluso</span>`;
+    }
+    return '';
+}
+
+// Aggiorna i conteggi dei filtri nell'interfaccia Admin
+function updateFilterCounts() {
+    const now = new Date();
+    let countActive = 0;
+    let countUpcoming = 0;
+    let countExpired = 0;
+
+    markersData.forEach(m => {
+        const s = getMarkerScheduleStatus(m, now);
+        if (s === 'active') countActive++;
+        else if (s === 'upcoming') countUpcoming++;
+        else if (s === 'expired') countExpired++;
+    });
+
+    if (filterCountActive) filterCountActive.textContent = countActive;
+    if (filterCountUpcoming) filterCountUpcoming.textContent = countUpcoming;
+    if (filterCountExpired) filterCountExpired.textContent = countExpired;
+    if (filterCountAll) filterCountAll.textContent = markersData.length;
+}
+
+// Gestione click sui filtri Admin
+filterPills.forEach(pill => {
+    pill.addEventListener('click', function () {
+        filterPills.forEach(p => p.classList.remove('active'));
+        this.classList.add('active');
+        adminFilter = this.getAttribute('data-filter') || 'active';
+        refreshMarkers();
     });
 });
 
-// Crea l'icona custom per Leaflet
-function createCustomIcon(type) {
-    const config = ICONS[type];
+// -------------------------------------------------------
+// GESTIONE MODALE INSERIMENTO & MODIFICA (ADMIN)
+// -------------------------------------------------------
+
+function openMarkerModal(latlng = null, markerToEdit = null) {
+    pendingLatLng = latlng;
+    editingMarkerId = markerToEdit ? (markerToEdit.id || markerToEdit.fbKey) : null;
+
+    if (adminMarkerError) adminMarkerError.classList.add('hidden');
+
+    if (markerToEdit) {
+        if (markerModalTitle) markerModalTitle.textContent = "✏️ Modifica Segnalazione (Admin)";
+        if (adminSaveMarkerBtn) adminSaveMarkerBtn.textContent = "Salva Modifiche";
+        selectedAdminType = markerToEdit.type || 'lavori';
+        if (adminMarkerNote) adminMarkerNote.value = markerToEdit.note || '';
+
+        const sched = markerToEdit.schedule || { mode: 'always' };
+        selectedScheduleMode = sched.mode || 'always';
+        if (adminSchedStart) adminSchedStart.value = sched.start || '';
+        if (adminSchedEnd) adminSchedEnd.value = sched.end || '';
+        if (adminSchedTimeStart) adminSchedTimeStart.value = sched.timeStart || '06:00';
+        if (adminSchedTimeEnd) adminSchedTimeEnd.value = sched.timeEnd || '14:00';
+        selectedRecurringDays = sched.days ? sched.days.map(Number) : [1, 2, 3, 4, 5];
+    } else {
+        if (markerModalTitle) markerModalTitle.textContent = "Nuova Segnalazione (Admin)";
+        if (adminSaveMarkerBtn) adminSaveMarkerBtn.textContent = "Salva Segnalazione";
+        selectedAdminType = 'lavori';
+        if (adminMarkerNote) adminMarkerNote.value = '';
+        selectedScheduleMode = 'always';
+        if (adminSchedStart) adminSchedStart.value = '';
+        if (adminSchedEnd) adminSchedEnd.value = '';
+        if (adminSchedTimeStart) adminSchedTimeStart.value = '06:00';
+        if (adminSchedTimeEnd) adminSchedTimeEnd.value = '14:00';
+        selectedRecurringDays = [1, 2, 3, 4, 5];
+    }
+
+    // Aggiorna selezione tipo
+    adminOptionCards.forEach(card => {
+        card.classList.toggle('selected', card.getAttribute('data-type') === selectedAdminType);
+    });
+
+    // Aggiorna modalità programmazione
+    schedTypeBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === selectedScheduleMode);
+    });
+    if (schedWindowBlock) schedWindowBlock.classList.toggle('hidden', selectedScheduleMode !== 'window');
+    if (schedRecurringBlock) schedRecurringBlock.classList.toggle('hidden', selectedScheduleMode !== 'recurring');
+
+    // Aggiorna giorni ricorrenti
+    if (schedDaysPicker) {
+        const dayBtns = schedDaysPicker.querySelectorAll('.day-btn');
+        dayBtns.forEach(btn => {
+            const dayNum = parseInt(btn.getAttribute('data-day'));
+            btn.classList.toggle('selected', selectedRecurringDays.includes(dayNum));
+        });
+    }
+
+    if (modalOverlay) modalOverlay.classList.remove('hidden');
+}
+
+function closeMarkerModal() {
+    if (modalOverlay) modalOverlay.classList.add('hidden');
+    pendingLatLng = null;
+    editingMarkerId = null;
+}
+
+if (closeModalBtn) closeModalBtn.addEventListener('click', closeMarkerModal);
+if (adminCancelMarkerBtn) adminCancelMarkerBtn.addEventListener('click', closeMarkerModal);
+
+if (modalOverlay) {
+    modalOverlay.addEventListener('click', function (e) {
+        if (e.target === modalOverlay) {
+            closeMarkerModal();
+        }
+    });
+}
+
+// Selezione del Tipo di Problema
+adminOptionCards.forEach(card => {
+    card.addEventListener('click', function () {
+        adminOptionCards.forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedAdminType = this.getAttribute('data-type');
+    });
+});
+
+// Selezione del Tipo di Programmazione
+schedTypeBtns.forEach(btn => {
+    btn.addEventListener('click', function () {
+        schedTypeBtns.forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        selectedScheduleMode = this.getAttribute('data-mode');
+
+        if (schedWindowBlock) schedWindowBlock.classList.toggle('hidden', selectedScheduleMode !== 'window');
+        if (schedRecurringBlock) schedRecurringBlock.classList.toggle('hidden', selectedScheduleMode !== 'recurring');
+    });
+});
+
+// Selezione Giorni Ricorrenti
+if (schedDaysPicker) {
+    const dayBtns = schedDaysPicker.querySelectorAll('.day-btn');
+    dayBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            const dayNum = parseInt(this.getAttribute('data-day'));
+            if (selectedRecurringDays.includes(dayNum)) {
+                selectedRecurringDays = selectedRecurringDays.filter(d => d !== dayNum);
+                this.classList.remove('selected');
+            } else {
+                selectedRecurringDays.push(dayNum);
+                this.classList.add('selected');
+            }
+        });
+    });
+}
+
+// Salvataggio Segnalazione Admin
+if (adminSaveMarkerBtn) {
+    adminSaveMarkerBtn.addEventListener('click', async () => {
+        if (!selectedAdminType) {
+            if (adminMarkerError) {
+                adminMarkerError.textContent = "Seleziona il tipo di problema.";
+                adminMarkerError.classList.remove('hidden');
+            }
+            return;
+        }
+
+        let scheduleObj = { mode: selectedScheduleMode };
+
+        if (selectedScheduleMode === 'window') {
+            const startVal = adminSchedStart ? adminSchedStart.value : null;
+            const endVal = adminSchedEnd ? adminSchedEnd.value : null;
+
+            if (startVal && endVal && new Date(startVal) > new Date(endVal)) {
+                if (adminMarkerError) {
+                    adminMarkerError.textContent = "La data di fine deve essere successiva alla data di inizio.";
+                    adminMarkerError.classList.remove('hidden');
+                }
+                return;
+            }
+
+            scheduleObj.start = startVal || null;
+            scheduleObj.end = endVal || null;
+        } else if (selectedScheduleMode === 'recurring') {
+            scheduleObj.days = selectedRecurringDays;
+            scheduleObj.timeStart = adminSchedTimeStart ? adminSchedTimeStart.value : '06:00';
+            scheduleObj.timeEnd = adminSchedTimeEnd ? adminSchedTimeEnd.value : '14:00';
+        }
+
+        const note = adminMarkerNote ? adminMarkerNote.value.trim().slice(0, 500) : null;
+
+        if (editingMarkerId) {
+            // Modifica marker esistente
+            const markerIdx = markersData.findIndex(m => String(m.id) === String(editingMarkerId) || String(m.fbKey) === String(editingMarkerId));
+            if (markerIdx !== -1) {
+                const currentMarker = markersData[markerIdx];
+                currentMarker.type = selectedAdminType;
+                currentMarker.note = note || null;
+                currentMarker.schedule = scheduleObj;
+
+                if (isFirebaseOnline && markersRef && currentMarker.fbKey) {
+                    markersRef.child(currentMarker.fbKey).update({
+                        type: selectedAdminType,
+                        note: note || null,
+                        schedule: scheduleObj
+                    }).catch(e => console.warn('Errore aggiornamento Firebase:', e.message));
+                }
+
+                saveToLocalStorage();
+                closeMarkerModal();
+                refreshMarkers();
+                showToast("✅ Segnalazione modificata con successo!", "success");
+            }
+        } else {
+            // Creazione nuovo marker
+            if (!pendingLatLng) {
+                closeMarkerModal();
+                return;
+            }
+            const lat = pendingLatLng.lat;
+            const lng = pendingLatLng.lng;
+
+            addMarker(lat, lng, selectedAdminType, null, true, note || null, null, null, scheduleObj);
+            closeMarkerModal();
+            showToast("✅ Segnalazione inserita!", "success");
+
+            // Rileva la via in background tramite reverse geocoding
+            const street = await reverseGeocode(lat, lng);
+            if (street) {
+                const lastMarker = markersData[markersData.length - 1];
+                if (lastMarker) {
+                    lastMarker.street = street;
+                    if (isFirebaseOnline && markersRef && lastMarker.fbKey) {
+                        markersRef.child(lastMarker.fbKey).update({ street: street });
+                    }
+                    saveToLocalStorage();
+                    updateRoadSegments();
+                    console.log(`📍 Via rilevata automaticamente: ${street}`);
+                }
+            }
+        }
+    });
+}
+
+// Crea l'icona custom per Leaflet con supporto visivo a stati temporali in Admin
+function createCustomIcon(type, status = 'active') {
+    const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
+    const statusClass = (isAdmin && status !== 'active') ? status : '';
     return L.divIcon({
         className: 'custom-icon-wrapper',
-        html: `<div class="custom-marker ${type}">${config.emoji}</div>`,
+        html: `<div class="custom-marker ${type} ${statusClass}">${config.emoji}</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
         popupAnchor: [0, -18]
     });
 }
 
-// Aggiungi un marker (e salvalo se nuovo)
-// street: nome della via (opzionale), usato per disegnare i tratti rossi
-function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null) {
+// Aggiungi un marker alla mappa
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const ts = parseInt(markerId);
     const date = isNaN(ts) ? new Date().toLocaleString('it-IT') : new Date(ts).toLocaleString('it-IT');
 
-    const marker = L.marker([lat, lng], {
-        icon: createCustomIcon(type)
-    }).addTo(map);
+    const markerObj = {
+        id: markerId,
+        lat,
+        lng,
+        type,
+        note: note || null,
+        fbKey: fbKey || null,
+        street: street || null,
+        schedule: schedule || null
+    };
 
-    const safeLabel = escapeHtml(config.label);
-    const safeStreet = escapeHtml(street);
-    const safeNote = escapeHtml(note);
-    const safeId = escapeHtml(markerId);
+    const status = getMarkerScheduleStatus(markerObj);
+    const visible = isMarkerVisible(markerObj);
 
-    // Contenuto Popup
-    let popupContent = `
-        <div class="popup-content">
-            <h3>${safeLabel}</h3>
-            <span class="popup-date">Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
-    `;
+    if (visible) {
+        const marker = L.marker([lat, lng], {
+            icon: createCustomIcon(type, status)
+        }).addTo(map);
 
-    if (safeStreet) {
-        popupContent += `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${safeStreet}</div>`;
-    }
+        const safeLabel = escapeHtml(config.label);
+        const safeStreet = escapeHtml(street);
+        const safeNote = escapeHtml(note);
+        const safeId = escapeHtml(markerId);
+        const scheduleDesc = formatScheduleDescription(schedule);
 
-    if (safeNote) {
-        popupContent += `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>`;
-    }
+        // Contenuto Popup
+        let popupContent = `
+            <div class="popup-content">
+                ${isAdmin ? formatScheduleBadge(status) : ''}
+                <h3>${safeLabel}</h3>
+                <span class="popup-date">Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
+        `;
 
-    if (isAdmin) {
-        popupContent += `<button class="delete-btn" onclick="removeMarker('${safeId}')">Risolto / Rimuovi</button>`;
-    } else {
-        if (!note || !note.includes("RISOLTO")) {
-            popupContent += `<button class="note-btn" onclick="reportResolved('${safeId}')" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3); margin-bottom: 8px;">Segnala come risolto</button>`;
+        if (scheduleDesc) {
+            popupContent += `<div class="user-note" style="background:#f8fafc; border-color:#94a3b8;"><strong>⏱️ Orario:</strong> ${escapeHtml(scheduleDesc)}</div>`;
         }
-        if (!note) {
-            popupContent += `<button class="note-btn" onclick="addNote('${safeId}')">Segnala variazione</button>`;
+
+        if (safeStreet) {
+            popupContent += `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${safeStreet}</div>`;
         }
-    }
 
-    popupContent += `</div>`;
-
-    marker.bindPopup(popupContent);
-
-    // Zoom al doppio click sull'icona
-    marker.on('dblclick', function () {
-        if (!isAdmin) {
-            map.flyTo([lat, lng], 17);
+        if (safeNote) {
+            popupContent += `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>`;
         }
-    });
 
-    // Tooltip al passaggio del mouse
-    let tooltipContent = `
-        <div class="tooltip-content">
-            <strong>${safeLabel}</strong><br>
-            ${safeStreet ? `<span style="color:#3b82f6; font-weight:600;">📍 ${safeStreet}</span><br>` : ''}
-            <span>Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
-    `;
-    if (safeNote) {
-        tooltipContent += `<br><span class="note-badge">📝 ${safeNote}</span>`;
+        if (isAdmin) {
+            popupContent += `
+                <button class="edit-btn" onclick="editMarker('${safeId}')">✏️ Modifica / Programma</button>
+                <button class="delete-btn" onclick="removeMarker('${safeId}')">Risolto / Rimuovi</button>
+            `;
+        } else {
+            if (!note || !note.includes("RISOLTO")) {
+                popupContent += `<button class="note-btn" onclick="reportResolved('${safeId}')" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3); margin-bottom: 8px;">Segnala come risolto</button>`;
+            }
+            if (!note) {
+                popupContent += `<button class="note-btn" onclick="addNote('${safeId}')">Segnala variazione</button>`;
+            }
+        }
+
+        popupContent += `</div>`;
+
+        marker.bindPopup(popupContent);
+
+        // Zoom al doppio click sull'icona
+        marker.on('dblclick', function () {
+            if (!isAdmin) {
+                map.flyTo([lat, lng], 17);
+            }
+        });
+
+        // Tooltip al passaggio del mouse
+        let tooltipContent = `
+            <div class="tooltip-content">
+                <strong>${safeLabel}</strong><br>
+                ${safeStreet ? `<span style="color:#3b82f6; font-weight:600;">📍 ${safeStreet}</span><br>` : ''}
+                ${scheduleDesc ? `<span style="color:#64748b;">⏱️ ${escapeHtml(scheduleDesc)}</span><br>` : ''}
+                <span>Segnalato il: ${id ? date : new Date().toLocaleString('it-IT')}</span>
+        `;
+        if (safeNote) {
+            tooltipContent += `<br><span class="note-badge">📝 ${safeNote}</span>`;
+        }
+        tooltipContent += `</div>`;
+
+        marker.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -20] });
+
+        activeLayers[markerId] = marker;
     }
-    tooltipContent += `</div>`;
-
-    marker.bindTooltip(tooltipContent, { direction: 'top', offset: [0, -20] });
-
-    activeLayers[markerId] = marker;
 
     if (save) {
-        const markerObj = { id: markerId, lat, lng, type, note: note, fbKey: fbKey, street: street };
         markersData.push(markerObj);
         saveMarkerToFirebase(markerObj);
         saveToLocalStorage();
-        // Aggiorna i tratti rossi dopo aver aggiunto
+        updateFilterCounts();
         updateRoadSegments();
     }
 }
+
+// Modifica marker (esposta globalmente per il bottone nel popup)
+window.editMarker = function (id) {
+    const markerObj = markersData.find(m => String(m.id) === String(id) || String(m.fbKey) === String(id));
+    if (markerObj) {
+        openMarkerModal({ lat: markerObj.lat, lng: markerObj.lng }, markerObj);
+    }
+};
 
 // Salva un singolo marker su Firebase (se online)
 function saveMarkerToFirebase(markerObj) {
@@ -655,9 +989,10 @@ function saveMarkerToFirebase(markerObj) {
         lat: markerObj.lat,
         lng: markerObj.lng,
         type: markerObj.type,
-        timestamp: parseInt(markerObj.id),
+        timestamp: parseInt(markerObj.id) || Date.now(),
         note: markerObj.note || null,
-        street: markerObj.street || null
+        street: markerObj.street || null,
+        schedule: markerObj.schedule || null
     };
     const newRef = markersRef.push(payload);
     markerObj.fbKey = newRef.key;
@@ -693,7 +1028,7 @@ window.removeMarker = function (id) {
 
     markersData = markersData.filter(m => String(m.id) !== String(id) && String(m.fbKey) !== String(id));
     saveToLocalStorage();
-    // Aggiorna i tratti rossi dopo la rimozione
+    updateFilterCounts();
     updateRoadSegments();
 };
 
@@ -818,12 +1153,16 @@ async function getStreetGeometry(streetName, markerCoords) {
 // -------------------------------------------------------
 // TRATTI STRADALI ROSSI
 // Rendering istantaneo con aggiornamento parallelo fluido
+// Include solo marker visibili e attivi
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Raggruppa i marker per nome via
+    // 1. Raggruppa i marker per nome via (solo quelli visibili e attivi adesso)
     const groups = {};
     markersData.forEach(m => {
         if (!m.street || m.street.trim() === '') return;
+        if (!isMarkerVisible(m)) return;
+        if (getMarkerScheduleStatus(m) !== 'active') return;
+
         const key = m.street.trim().toLowerCase();
         if (!groups[key]) {
             groups[key] = { streetName: m.street.trim(), coords: [] };
@@ -908,16 +1247,17 @@ function loadMarkers() {
                         type: m.type,
                         note: m.note || null,
                         fbKey: fbKey,
-                        street: m.street || null
+                        street: m.street || null,
+                        schedule: m.schedule || null
                     };
                     markersData.push(markerObj);
-                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null);
                 });
                 saveToLocalStorage();
                 console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale da Firebase`);
             }
 
-            // Ridisegna i tratti stradali rossi dopo ogni aggiornamento
+            updateFilterCounts();
             updateRoadSegments();
 
         }, function (error) {
@@ -936,7 +1276,7 @@ function loadFromLocalStorage() {
         try {
             markersData = JSON.parse(saved);
             markersData.forEach(m => {
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
             });
             console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
@@ -944,10 +1284,11 @@ function loadFromLocalStorage() {
             markersData = [];
         }
     }
+    updateFilterCounts();
     updateRoadSegments();
 }
 
-// Ridisegna i marker (es. quando cambia lo stato admin)
+// Ridisegna i marker (es. quando cambia lo stato admin o filtro o timer)
 function refreshMarkers() {
     for (let id in activeLayers) {
         map.removeLayer(activeLayers[id]);
@@ -955,10 +1296,10 @@ function refreshMarkers() {
     activeLayers = {};
 
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null);
+        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
     });
 
-    // Ridisegna anche i tratti rossi
+    updateFilterCounts();
     updateRoadSegments();
 }
 
@@ -1490,7 +1831,7 @@ window.approveReport = function (reportId) {
     }
 
     // Aggiungi subito come marker ufficiale
-    addMarker(report.lat, report.lng, report.type, null, true, report.note, null, report.street);
+    addMarker(report.lat, report.lng, report.type, null, true, report.note, null, report.street, report.schedule || null);
 
     // Rimuovi da user_reports su Firebase
     if (isFirebaseOnline && reportsRef) {
@@ -1533,6 +1874,11 @@ window.rejectReport = function (reportId) {
     renderAdminReportsList();
     showToast("Segnalazione scartata.", "normal", 3000);
 };
+
+// Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone
+setInterval(() => {
+    refreshMarkers();
+}, 30000);
 
 // Avvia tutto quando il DOM è pronto
 document.addEventListener('DOMContentLoaded', initMap);

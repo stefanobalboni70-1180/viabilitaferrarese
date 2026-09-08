@@ -372,6 +372,51 @@ h1 span.city-name {
     color: white;
 }
 
+.edit-btn {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    margin-bottom: 6px;
+}
+.edit-btn:hover {
+    background: #3b82f6;
+    color: white;
+}
+
+.popup-schedule-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-top: 4px;
+    margin-bottom: 6px;
+}
+.popup-schedule-badge.active {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.popup-schedule-badge.upcoming {
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.popup-schedule-badge.expired {
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748b;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
 
 
 /* Admin Styles */
@@ -1100,6 +1145,311 @@ h1 span.city-name {
     background: #7f1d1d;
 }
 
+/* =======================================================
+   STILI PROGRAMMAZIONE TEMPORALE & NUOVO FORM SEGNALAZIONI
+   ======================================================= */
+
+.marker-form-content {
+    max-width: 500px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.modal-body-scroll {
+    overflow-y: auto;
+    max-height: calc(90vh - 130px);
+    padding-right: 6px;
+    margin-top: 8px;
+    margin-bottom: 12px;
+}
+
+/* Scrollbar personalizzata per il modal */
+.modal-body-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+.modal-body-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+.modal-body-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+.modal-body-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.option-card.selected {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+}
+
+.form-section-item {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-section-item textarea {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    color: var(--text-color);
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.form-section-item textarea:focus {
+    border-color: var(--primary);
+    background: rgba(0, 0, 0, 0.45);
+}
+
+/* Blocco Programmazione Temporale */
+.schedule-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 14px;
+    padding: 14px;
+    margin-top: 18px;
+}
+
+.schedule-help {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    margin-top: 2px;
+}
+
+.schedule-type-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.sched-type-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    padding: 8px 4px;
+    border-radius: 8px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.sched-type-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
+}
+
+.sched-type-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.sched-detail-block {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
+    padding: 12px;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.sched-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.sched-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sched-field label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.sched-field input[type="datetime-local"],
+.sched-field input[type="time"] {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    outline: none;
+    color-scheme: dark;
+}
+
+.sched-field input[type="datetime-local"]:focus,
+.sched-field input[type="time"]:focus {
+    border-color: var(--primary);
+}
+
+.sched-hint {
+    display: block;
+    font-size: 0.74rem;
+    color: #94a3b8;
+    margin-top: 8px;
+    line-height: 1.3;
+}
+
+.sub-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.days-picker {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.day-btn {
+    flex: 1;
+    min-width: 32px;
+    padding: 6px 2px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.day-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
+.day-btn.selected {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.modal-footer-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.btn-cancel {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 1;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-color);
+}
+
+.modal-footer-actions .primary-btn {
+    flex: 2;
+}
+
+/* =======================================================
+   ADMIN SEARCH BAR & FILTER BAR
+   ======================================================= */
+
+.search-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: auto;
+    max-width: 500px;
+}
+
+.admin-top-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.admin-top-row input {
+    flex-grow: 1;
+}
+
+.admin-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.filter-label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.filter-pill {
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    color: #334155;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-pill:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.filter-pill.active {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+    font-weight: 600;
+}
+
+/* Visualizzazione Marker Admin Inattivi (In programma o Scaduti) */
+.custom-marker.upcoming {
+    opacity: 0.65;
+    outline: 2px dashed #f59e0b;
+    outline-offset: 2px;
+}
+
+.custom-marker.expired {
+    opacity: 0.4;
+    filter: grayscale(80%);
+    outline: 2px dashed #94a3b8;
+    outline-offset: 2px;
+}
+
 /* Responsive Design per Dispositivi Mobili */
 @media (max-width: 768px) {
     .glass-header {
@@ -1144,7 +1494,7 @@ h1 span.city-name {
         padding: 8px;
     }
     
-    .search-container input {
+    .admin-top-row input {
         width: 100%;
         flex-grow: 1;
     }
@@ -1155,25 +1505,31 @@ h1 span.city-name {
     }
     
     .options-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
     }
     
     .option-card {
-        flex-direction: row;
-        justify-content: flex-start;
-        padding: 12px;
-        gap: 16px;
+        padding: 10px 8px;
+        gap: 6px;
     }
     
     .icon-wrapper {
-        width: 40px;
-        height: 40px;
+        width: 38px;
+        height: 38px;
         font-size: 1.2rem;
     }
     
     .option-card span {
-        font-size: 1rem;
+        font-size: 0.78rem;
+    }
+
+    .sched-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .schedule-type-selector {
+        grid-template-columns: 1fr;
     }
 
     .report-card-actions {
