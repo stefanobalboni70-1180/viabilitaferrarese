@@ -313,7 +313,18 @@ h1 span.city-name {
 .custom-marker.accident { background-color: var(--color-accident); }
 .custom-marker.mercato { background-color: var(--color-market); }
 .custom-marker.semaforo { background-color: var(--color-traffic); }
-.custom-marker.sagra { background-color: var(--color-sagra); }
+.custom-marker.sagra { 
+    background-color: #ffffff; 
+    border: 2px solid #ec4899; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.custom-marker.sagra img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
 
 /* Popup Styling */
 .leaflet-popup-content-wrapper {
