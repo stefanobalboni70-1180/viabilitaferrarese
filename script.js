@@ -180,6 +180,7 @@ const reportLocCoords = document.getElementById('report-loc-coords');
 const reportTypePills = document.querySelectorAll('#user-report-types .type-pill');
 const reportNoteInput = document.getElementById('report-note-input');
 const reportAuthorInput = document.getElementById('report-author-input');
+const reportPhoneInput = document.getElementById('report-phone-input');
 const userReportError = document.getElementById('user-report-error');
 const submitUserReportBtn = document.getElementById('submit-user-report-btn');
 const pickerBanner = document.getElementById('picker-banner');
@@ -1326,6 +1327,7 @@ function resetUserReportForm() {
     if (reportStreetSearchInput) reportStreetSearchInput.value = '';
     if (reportNoteInput) reportNoteInput.value = '';
     if (reportAuthorInput) reportAuthorInput.value = '';
+    if (reportPhoneInput) reportPhoneInput.value = '';
     if (userReportError) userReportError.classList.add('hidden');
     
     reportTypePills.forEach(pill => pill.classList.remove('selected'));
@@ -1499,8 +1501,18 @@ if (submitUserReportBtn) {
             return;
         }
 
+        const author = reportAuthorInput ? reportAuthorInput.value.trim().slice(0, 100) : '';
+        if (!author) {
+            if (userReportError) {
+                userReportError.textContent = "Inserisci il tuo Nome e Cognome (campo obbligatorio).";
+                userReportError.classList.remove('hidden');
+            }
+            if (reportAuthorInput) reportAuthorInput.focus();
+            return;
+        }
+
+        const phone = reportPhoneInput ? reportPhoneInput.value.trim().slice(0, 30) : null;
         const note = reportNoteInput ? reportNoteInput.value.trim().slice(0, 500) : null;
-        const author = reportAuthorInput ? reportAuthorInput.value.trim().slice(0, 100) : null;
 
         submitUserReportBtn.disabled = true;
         submitUserReportBtn.textContent = "Invio in corso...";
@@ -1511,7 +1523,8 @@ if (submitUserReportBtn) {
             street: userReportSelectedLocation.street || null,
             type: userReportSelectedType,
             note: note || null,
-            author: author || null,
+            author: author,
+            phone: phone || null,
             timestamp: Date.now(),
             status: 'pending'
         };
@@ -1575,6 +1588,7 @@ async function sendEmailNotification(reportData) {
             "Coordinate GPS": `${reportData.lat.toFixed(5)}, ${reportData.lng.toFixed(5)}`,
             "Dettagli / Note": reportData.note || "Nessuna nota aggiuntiva",
             "Segnalato da": reportData.author || "Utente (non specificato)",
+            "Telefono / Contatto": reportData.phone || "Non fornito",
             "Data e Ora": dateStr,
             "Mappa Google": gmapsLink
         };
@@ -1621,6 +1635,7 @@ async function sendTelegramNotification(reportData) {
         const safeStreet = escapeTelegramHtml(reportData.street) || 'Posizione indicata su mappa';
         const safeNote = escapeTelegramHtml(reportData.note) || 'Nessuna nota aggiuntiva';
         const safeAuthor = escapeTelegramHtml(reportData.author) || 'Utente / Cittadino';
+        const safePhone = escapeTelegramHtml(reportData.phone);
         const safeLabel = escapeTelegramHtml(typeConfig.label);
 
         const message = `🚨 <b>NUOVA SEGNALAZIONE VIABILITÀ 118</b>\n\n` +
@@ -1628,6 +1643,7 @@ async function sendTelegramNotification(reportData) {
             `📍 <b>Luogo:</b> ${safeStreet}\n` +
             `📝 <b>Note:</b> ${safeNote}\n` +
             `👤 <b>Inviata da:</b> ${safeAuthor}\n` +
+            (safePhone ? `📞 <b>Telefono:</b> ${safePhone}\n` : '') +
             `🕒 <b>Data:</b> ${dateStr}\n\n` +
             `🗺️ <a href="${gmapsLink}">Visualizza su Google Maps</a>`;
 
@@ -1726,6 +1742,7 @@ function renderAdminReportsList() {
         const safeStreet = escapeHtml(r.street);
         const safeNote = escapeHtml(r.note);
         const safeAuthor = escapeHtml(r.author);
+        const safePhone = escapeHtml(r.phone);
         const dateStr = r.timestamp ? new Date(r.timestamp).toLocaleString('it-IT') : 'Data non specificata';
         const safeId = escapeHtml(r.id);
 
@@ -1742,7 +1759,7 @@ function renderAdminReportsList() {
                 ${safeStreet ? `<span class="report-card-street">📍 ${safeStreet}</span>` : `<span class="report-card-street">📍 Lat: ${r.lat.toFixed(4)}, Lng: ${r.lng.toFixed(4)}</span>`}
 
                 ${safeNote ? `<div class="report-card-note"><strong>Dettagli:</strong> ${safeNote}</div>` : ''}
-                ${safeAuthor ? `<div class="report-card-author">Inviato da: ${safeAuthor}</div>` : ''}
+                ${safeAuthor ? `<div class="report-card-author">👤 Inviato da: <strong>${safeAuthor}</strong>${safePhone ? ` &bull; 📞 <a href="tel:${safePhone}" style="color:#3b82f6; text-decoration:none;">${safePhone}</a>` : ''}</div>` : ''}
 
                 <div class="report-card-actions">
                     <button class="btn-card-view" onclick="previewReportOnMap('${safeId}')">👁️ Mostra su Mappa</button>
@@ -1798,6 +1815,8 @@ window.previewReportOnMap = function (reportId) {
     const safeType = escapeHtml(config.label);
     const safeStreet = escapeHtml(report.street);
     const safeNote = escapeHtml(report.note);
+    const safeAuthor = escapeHtml(report.author);
+    const safePhone = escapeHtml(report.phone);
     const safeId = escapeHtml(report.id);
 
     previewReportMarker = L.marker([report.lat, report.lng], {
@@ -1810,6 +1829,7 @@ window.previewReportOnMap = function (reportId) {
             <h3>${config.emoji} ${safeType}</h3>
             ${safeStreet ? `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${safeStreet}</div>` : ''}
             ${safeNote ? `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>` : ''}
+            ${safeAuthor ? `<div class="user-note" style="background:#f8fafc; border-color:#94a3b8;"><strong>👤 Inviato da:</strong> ${safeAuthor}${safePhone ? ` &bull; 📞 <a href="tel:${safePhone}" style="color:#3b82f6; text-decoration:none;">${safePhone}</a>` : ''}</div>` : ''}
             <div style="display:flex; gap:6px; width:100%; margin-top:4px;">
                 <button class="primary-btn" style="flex:1; padding:6px; font-size:0.8rem; background:#10b981;" onclick="approveReport('${safeId}')">✅ Inserisci</button>
                 <button class="delete-btn" style="flex:1; padding:6px; font-size:0.8rem;" onclick="rejectReport('${safeId}')">🗑️ Scarta</button>

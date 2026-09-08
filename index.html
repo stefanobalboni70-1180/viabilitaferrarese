@@ -254,10 +254,15 @@
                 <textarea id="report-note-input" rows="2" placeholder="Es. Senso unico alternato, strada bloccata per allagamento fino a domani..."></textarea>
             </div>
 
-            <!-- Segnalatore -->
+            <!-- Segnalatore e Contatto -->
             <div class="report-section">
-                <label class="section-label" for="report-author-input">Segnalato da (opzionale)</label>
-                <input type="text" id="report-author-input" placeholder="Es. Autista 118, Cittadino..." />
+                <label class="section-label" for="report-author-input">4. Nome e Cognome <span style="color:#ef4444; font-weight:700;">* (Obbligatorio)</span></label>
+                <input type="text" id="report-author-input" placeholder="Es. Mario Rossi (Autista 118, Operatore, Cittadino...)" required />
+            </div>
+
+            <div class="report-section">
+                <label class="section-label" for="report-phone-input">5. Numero di Telefono <span style="color:#64748b; font-weight:normal;">(opzionale)</span></label>
+                <input type="tel" id="report-phone-input" placeholder="Es. 348 1234567 (per eventuali chiarimenti)" />
             </div>
 
             <p id="user-report-error" class="error-msg hidden"></p>
