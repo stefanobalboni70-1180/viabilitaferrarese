@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v10');
+    const cached = localStorage.getItem('ferrara_street_cache_v11');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v10', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v11', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1133,6 +1133,8 @@ function normalizeStreetKey(name) {
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
+    // Se contiene virgole o parentesi, estrai solo il nome primario
+    s = s.split(/[,(]/)[0].trim();
     return s.replace(/[^a-z0-9]/g, '');
 }
 
@@ -1162,10 +1164,14 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Helper per scaricare il tracciato da endpoint OSRM
-async function fetchOsrmRoute(url, isReverse = false) {
+// Helper per scaricare il tracciato da endpoint OSRM con timeout rapido
+async function fetchOsrmRoute(url, isReverse = false, timeoutMs = 3500) {
     try {
-        const response = await fetch(url);
+        let signal;
+        if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+            signal = AbortSignal.timeout(timeoutMs);
+        }
+        const response = await fetch(url, signal ? { signal } : {});
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
@@ -1183,8 +1189,8 @@ async function fetchOsrmRoute(url, isReverse = false) {
     return null;
 }
 
-// Calcola il percorso reale tra due punti (anche su rampe a senso unico, svincoli e curve strette)
-// e garantisce che non si devii su provinciali (SP4) o altre strade
+// Calcola il percorso reale tra due punti seguendo fedelmente ogni curva della strada
+// Evita qualsiasi deviazione su strade estranee (come SP4) e supporta rampe a senso unico
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const isHighway = isMajorHighway(targetStreetName);
@@ -1192,65 +1198,83 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
     const normTarget = normalizeStreetKey(targetStreetName);
 
     // Endpoints in ordine di priorità:
-    // Per rampe e svincoli: testiamo car e bike in entrambi i sensi
-    const endpoints = (isHighway || isRamp)
-        ? [
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
-        ]
-        : [
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
-        ];
+    // 1. router.project-osrm.org (veloce e affidabile)
+    // 2. OpenStreetMap.de bike (perfetto per vie locali per non deviare su SP)
+    // 3. OpenStreetMap.de car
+    // 4. OpenStreetMap.de foot (percorre ogni tracciato stradale locale)
+    const endpoints = [
+        { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+        { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
+    ];
 
-    let bestCoords = null;
-    let maxMatchedDist = -1;
-    let bestDistDiff = Infinity;
+    let candidates = [];
 
     for (const ep of endpoints) {
         const res = await fetchOsrmRoute(ep.url, ep.rev);
         if (res && res.coords && res.coords.length >= 2) {
             let matchedDist = 0;
-            if (normTarget && normTarget.length >= 3 && res.steps && res.steps.length > 0) {
+            let totalStepDist = 0;
+            let hasForeignHighways = false;
+
+            if (res.steps && res.steps.length > 0) {
                 for (const step of res.steps) {
+                    totalStepDist += step.distance;
                     const normStep = normalizeStreetKey(step.name || '');
-                    if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
-                        matchedDist += step.distance;
+                    if (normTarget && normStep) {
+                        if (normStep.includes(normTarget) || normTarget.includes(normStep)) {
+                            matchedDist += step.distance;
+                        } else if (normStep.includes('sp') || normStep.includes('statale') || normStep.includes('ss') || normStep.includes('provinciale')) {
+                            hasForeignHighways = true;
+                        }
                     }
                 }
             }
 
-            const distDiff = Math.abs(res.distance - directDist);
+            const dist = res.distance || directDist;
+            const ratio = dist / Math.max(directDist, 1);
 
-            // Per vie ordinarie con nome specifico (es. Via Ruffetta): priorità a matchedDist
-            if (!isRamp && normTarget && matchedDist > maxMatchedDist) {
-                maxMatchedDist = matchedDist;
-                bestCoords = res.coords;
-                if (matchedDist >= directDist * 0.7 && res.coords.length > 2) {
-                    return res.coords;
-                }
-            } else if (distDiff < bestDistDiff && res.coords.length > 2) {
-                // Per rampe/svincoli e curve: scegli il percorso diretto senza giri a vuoto
-                bestDistDiff = distDiff;
-                bestCoords = res.coords;
-                if (res.distance <= directDist * 2.2) {
-                    return res.coords;
-                }
-            }
+            candidates.push({
+                coords: res.coords,
+                distance: dist,
+                ratio: ratio,
+                matchedDist: matchedDist,
+                totalStepDist: totalStepDist,
+                hasForeignHighways: hasForeignHighways,
+                pointsCount: res.coords.length
+            });
         }
     }
 
-    if (bestCoords && bestCoords.length >= 2) {
-        return bestCoords;
+    if (candidates.length > 0) {
+        // Se c'è un nome via specifico ed è una via ordinaria/locale (es. Via Ruffetta):
+        if (!isHighway && !isRamp && normTarget && normTarget.length >= 3) {
+            // Filtra i candidati che NON deviano su provinciali o statali esterne
+            const pureCandidates = candidates.filter(c => !c.hasForeignHighways && c.ratio <= 2.8);
+            if (pureCandidates.length > 0) {
+                // Ordina per fedeltà alla via e tracciato più curvo/preciso
+                pureCandidates.sort((a, b) => {
+                    if (b.matchedDist !== a.matchedDist) return b.matchedDist - a.matchedDist;
+                    return b.pointsCount - a.pointsCount;
+                });
+                return pureCandidates[0].coords;
+            }
+        }
+
+        // Per rampe, statali o casi generali: scegli il candidato con vere curve e ratio proporzionato
+        const curvedCandidates = candidates.filter(c => c.pointsCount > 2 && c.ratio <= 2.5);
+        if (curvedCandidates.length > 0) {
+            curvedCandidates.sort((a, b) => Math.abs(a.ratio - 1) - Math.abs(b.ratio - 1));
+            return curvedCandidates[0].coords;
+        }
+
+        // Fallback su miglior candidato disponibile con curve
+        candidates.sort((a, b) => b.pointsCount - a.pointsCount);
+        return candidates[0].coords;
     }
 
     return [[lat1, lng1], [lat2, lng2]];
