@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v6');
+    const cached = localStorage.getItem('ferrara_street_cache_v7');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v6', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v7', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1197,7 +1197,7 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
 // Recupera la geometria reale dell'intera tratta stradale
 async function getStreetGeometry(streetName, markerCoords) {
     const cacheKey = `${normalizeStreetKey(streetName) || streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
-    if (streetGeomCache[cacheKey]) {
+    if (streetGeomCache[cacheKey] && streetGeomCache[cacheKey].length > markerCoords.length) {
         return streetGeomCache[cacheKey];
     }
 
@@ -1211,7 +1211,8 @@ async function getStreetGeometry(streetName, markerCoords) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
         }
-        if (fullRoute.length >= 2) {
+        // Salva in cache SOLO se ha trovato curve reali (più punti rispetto alle coordinate di partenza)
+        if (fullRoute.length > markerCoords.length) {
             streetGeomCache[cacheKey] = fullRoute;
             saveStreetGeomCache();
             return fullRoute;
@@ -1269,8 +1270,8 @@ function orderPointsInCluster(pts) {
     return ordered;
 }
 
-// Raggruppa i punti della stessa via in cluster indipendenti se distanti tra loro (> 3.5 km)
-function clusterStreetPoints(points, maxDistanceMeters = 3500) {
+// Raggruppa i punti della stessa via in cluster indipendenti se distanti tra loro (> 8 km)
+function clusterStreetPoints(points, maxDistanceMeters = 8000) {
     if (points.length <= 2) return [points];
     const clusters = [];
     const visited = new Set();
