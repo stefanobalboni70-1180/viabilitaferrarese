@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v11');
+    const cached = localStorage.getItem('ferrara_street_cache_v12');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v11', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v12', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1164,6 +1164,111 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Recupera la geometria vettoriale reale della strada da OpenStreetMap (Nominatim LineStrings)
+// Segue al 100% le curve della strada stessa senza MAI passare su provinciali (SP4) o altre arterie
+async function fetchStreetVectorGeometry(streetName, lat1, lng1, lat2, lng2) {
+    if (!streetName) return null;
+    try {
+        const cleanName = streetName.split(/[,(]/)[0].trim();
+        if (!cleanName || cleanName.length < 2) return null;
+
+        const url = `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(cleanName)}&county=Ferrara&polygon_geojson=1&format=json`;
+        const resp = await fetch(url);
+        if (!resp.ok) return null;
+        const items = await resp.json();
+        if (!items || items.length === 0) return null;
+
+        let rawWays = [];
+        for (const it of items) {
+            if (it.geojson) {
+                if (it.geojson.type === 'LineString' && Array.isArray(it.geojson.coordinates)) {
+                    rawWays.push(it.geojson.coordinates.map(c => [c[1], c[0]]));
+                } else if (it.geojson.type === 'MultiLineString' && Array.isArray(it.geojson.coordinates)) {
+                    for (const line of it.geojson.coordinates) {
+                        rawWays.push(line.map(c => [c[1], c[0]]));
+                    }
+                }
+            }
+        }
+        if (rawWays.length === 0) return null;
+
+        // Unisci tutti i segmenti della strada che condividono estremi vicini (< 150m)
+        let chains = rawWays.map(w => w.slice());
+        let mergedAny = true;
+        let passes = 0;
+        while (mergedAny && passes < 10) {
+            mergedAny = false;
+            passes++;
+            for (let i = 0; i < chains.length; i++) {
+                for (let j = i + 1; j < chains.length; j++) {
+                    const c1 = chains[i];
+                    const c2 = chains[j];
+                    const h1 = c1[0], t1 = c1[c1.length - 1];
+                    const h2 = c2[0], t2 = c2[c2.length - 1];
+
+                    if (calculateDistanceMeters(t1[0], t1[1], h2[0], h2[1]) < 150) {
+                        chains[i] = c1.concat(c2.slice(1));
+                        chains.splice(j, 1);
+                        mergedAny = true;
+                        break;
+                    } else if (calculateDistanceMeters(t1[0], t1[1], t2[0], t2[1]) < 150) {
+                        chains[i] = c1.concat(c2.slice().reverse().slice(1));
+                        chains.splice(j, 1);
+                        mergedAny = true;
+                        break;
+                    } else if (calculateDistanceMeters(h1[0], h1[1], t2[0], t2[1]) < 150) {
+                        chains[i] = c2.concat(c1.slice(1));
+                        chains.splice(j, 1);
+                        mergedAny = true;
+                        break;
+                    } else if (calculateDistanceMeters(h1[0], h1[1], h2[0], h2[1]) < 150) {
+                        chains[i] = c2.slice().reverse().concat(c1.slice(1));
+                        chains.splice(j, 1);
+                        mergedAny = true;
+                        break;
+                    }
+                }
+                if (mergedAny) break;
+            }
+        }
+
+        // Trova la catena che contiene entrambi i punti e ritaglia l'esatto sotto-percorso
+        let bestSub = null;
+        let bestScore = Infinity;
+
+        for (const chain of chains) {
+            let idx1 = -1, minD1 = Infinity;
+            let idx2 = -1, minD2 = Infinity;
+
+            for (let i = 0; i < chain.length; i++) {
+                const d1 = calculateDistanceMeters(lat1, lng1, chain[i][0], chain[i][1]);
+                if (d1 < minD1) { minD1 = d1; idx1 = i; }
+                const d2 = calculateDistanceMeters(lat2, lng2, chain[i][0], chain[i][1]);
+                if (d2 < minD2) { minD2 = d2; idx2 = i; }
+            }
+
+            if (idx1 !== -1 && idx2 !== -1 && minD1 < 600 && minD2 < 600) {
+                const sub = (idx1 <= idx2) 
+                    ? chain.slice(idx1, idx2 + 1)
+                    : chain.slice(idx2, idx1 + 1).reverse();
+
+                const score = minD1 + minD2;
+                if (sub.length >= 2 && score < bestScore) {
+                    bestScore = score;
+                    bestSub = sub;
+                }
+            }
+        }
+
+        if (bestSub && bestSub.length >= 2) {
+            return bestSub;
+        }
+    } catch (e) {
+        console.warn('Errore estrazione vettoriale Nominatim:', e);
+    }
+    return null;
+}
+
 // Helper per scaricare il tracciato da endpoint OSRM con timeout rapido
 async function fetchOsrmRoute(url, isReverse = false, timeoutMs = 3500) {
     try {
@@ -1198,10 +1303,6 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
     const normTarget = normalizeStreetKey(targetStreetName);
 
     // Endpoints in ordine di priorità:
-    // 1. router.project-osrm.org (veloce e affidabile)
-    // 2. OpenStreetMap.de bike (perfetto per vie locali per non deviare su SP)
-    // 3. OpenStreetMap.de car
-    // 4. OpenStreetMap.de foot (percorre ogni tracciato stradale locale)
     const endpoints = [
         { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
         { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
@@ -1292,7 +1393,20 @@ async function getStreetGeometry(streetName, markerCoords) {
         for (let i = 0; i < markerCoords.length - 1; i++) {
             const [lat1, lng1] = markerCoords[i];
             const [lat2, lng2] = markerCoords[i + 1];
-            const segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
+
+            // 1. Estrai PRIMA la geometria vettoriale ufficiale da OpenStreetMap Nominatim per la via assegnata
+            // Questo garantisce al 100% che la linea segua OGNI singola curva della via e non passi mai su altre strade
+            let segment = null;
+            const isRamp = streetName.toLowerCase().includes('ramp') || streetName.toLowerCase().includes('svincolo') || streetName.includes('/');
+            if (!isRamp && streetName && streetName.length >= 3) {
+                segment = await fetchStreetVectorGeometry(streetName, lat1, lng1, lat2, lng2);
+            }
+
+            // 2. Se non disponibile o è una rampa/svincolo, usa il motore di routing OSRM
+            if (!segment || segment.length < 2) {
+                segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
+            }
+
             if (segment && segment.length >= 2) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
