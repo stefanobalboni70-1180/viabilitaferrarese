@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.8';
+const APP_VERSION = '3.9';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -252,8 +252,16 @@ function initMap() {
         openMarkerModal(e.latlng);
     });
 
-    // Evento click sulla mappa (per selezione punto da parte dell'utente)
+    // Evento click sulla mappa (per selezione punto utente o disegno tracciato admin)
     map.on('click', async function (e) {
+        if (isEditingRouteSegId) {
+            const point = [e.latlng.lat, e.latlng.lng];
+            const insertIdx = findBestInsertIndex(editingRouteCoords, point);
+            editingRouteCoords.splice(insertIdx, 0, point);
+            renderEditingRouteHandles();
+            return;
+        }
+
         if (isPickingPointOnMap) {
             isPickingPointOnMap = false;
             if (pickerBanner) pickerBanner.classList.add('hidden');
@@ -874,8 +882,276 @@ function createCustomIcon(type, status = 'active') {
     });
 }
 
+// --- COLLEGAMENTO MANUALE ICONE & TRACCIATO (ADMIN) ---
+let linkingSourceMarkerId = null;
+
+// Avvia la modalità di collegamento manuale tra due icone
+window.startLinkingSegment = function (markerId) {
+    linkingSourceMarkerId = markerId;
+    map.closePopup();
+    const banner = document.getElementById('link-segment-banner');
+    if (banner) banner.classList.remove('hidden');
+    showToast("🔗 Clicca sulla seconda icona per collegare il tratto stradale", "normal", 4000);
+};
+
+// Annulla il collegamento manuale
+window.cancelLinkingSegment = function () {
+    linkingSourceMarkerId = null;
+    const banner = document.getElementById('link-segment-banner');
+    if (banner) banner.classList.add('hidden');
+};
+
+const cancelLinkSegmentBtn = document.getElementById('cancel-link-segment-btn');
+if (cancelLinkSegmentBtn) {
+    cancelLinkSegmentBtn.addEventListener('click', cancelLinkingSegment);
+}
+
+// Completa il collegamento tra due icone
+window.completeLinkingSegment = function (targetMarkerId) {
+    if (!linkingSourceMarkerId || String(linkingSourceMarkerId) === String(targetMarkerId)) {
+        cancelLinkingSegment();
+        return;
+    }
+
+    const m1 = markersData.find(m => String(m.id) === String(linkingSourceMarkerId) || String(m.fbKey) === String(linkingSourceMarkerId));
+    const m2 = markersData.find(m => String(m.id) === String(targetMarkerId) || String(m.fbKey) === String(targetMarkerId));
+
+    if (m1 && m2) {
+        const segId = 'seg_' + Date.now();
+        m1.segmentId = segId;
+        m2.segmentId = segId;
+
+        if (isFirebaseOnline && markersRef) {
+            if (m1.fbKey) markersRef.child(m1.fbKey).update({ segmentId: segId }).catch(() => {});
+            if (m2.fbKey) markersRef.child(m2.fbKey).update({ segmentId: segId }).catch(() => {});
+        }
+
+        cancelLinkingSegment();
+        saveToLocalStorage();
+        updateRoadSegments();
+        refreshMarkers();
+        showToast("✅ Icone collegate nel tratto stradale!", "success", 4000);
+    } else {
+        cancelLinkingSegment();
+    }
+};
+
+// Scollega un marker dal suo tratto stradale
+window.unlinkSegment = function (markerId) {
+    const markerObj = markersData.find(m => String(m.id) === String(markerId) || String(m.fbKey) === String(markerId));
+    if (!markerObj) return;
+
+    const cluster = getClusterForMarker(markerObj);
+    const markersToUnlink = cluster || [markerObj];
+
+    markersToUnlink.forEach(m => {
+        const isolatedId = 'isolated_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+        m.segmentId = isolatedId;
+        m.customCoords = null;
+        if (isFirebaseOnline && markersRef && m.fbKey) {
+            markersRef.child(m.fbKey).update({ segmentId: isolatedId, customCoords: null }).catch(() => {});
+        }
+    });
+
+    saveToLocalStorage();
+    updateRoadSegments();
+    refreshMarkers();
+    showToast("Tratto stradale scollegato.", "normal");
+};
+
+// --- MODIFICA / TRACCIATURA MANUALE DELLA LINEA ROSSA (ADMIN) ---
+let isEditingRouteSegId = null;
+let editingRouteCoords = [];
+let editingRouteHandlesLayer = null;
+
+function dist2(v, w) {
+    return (v[0] - w[0]) * (v[0] - w[0]) + (v[1] - w[1]) * (v[1] - w[1]);
+}
+function distToSegmentSquared(p, v, w) {
+    const l2 = dist2(v, w);
+    if (l2 === 0) return dist2(p, v);
+    let t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return dist2(p, [v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1])]);
+}
+function findBestInsertIndex(coords, point) {
+    if (coords.length < 2) return coords.length;
+    let minD = Infinity;
+    let bestIdx = 1;
+    for (let i = 0; i < coords.length - 1; i++) {
+        const d = distToSegmentSquared(point, coords[i], coords[i + 1]);
+        if (d < minD) {
+            minD = d;
+            bestIdx = i + 1;
+        }
+    }
+    return bestIdx;
+}
+
+window.startEditingRoute = function (markerId) {
+    const markerObj = markersData.find(m => String(m.id) === String(markerId) || String(m.fbKey) === String(markerId));
+    if (!markerObj) return;
+    const cluster = getClusterForMarker(markerObj);
+    if (!cluster || cluster.length < 2) {
+        showToast("Questo marker non è ancora collegato a un tratto stradale.", "normal");
+        return;
+    }
+    const segId = cluster.map(m => String(m.id || m.fbKey)).sort().join('__');
+    startEditingRouteBySegId(segId, cluster);
+};
+
+window.startEditingRouteBySegId = function (segId, optionalCluster = null) {
+    if (!isAdmin) return;
+    map.closePopup();
+
+    const cluster = optionalCluster || computeClusters().find(c => c.map(m => String(m.id || m.fbKey)).sort().join('__') === segId);
+    if (!cluster) return;
+
+    isEditingRouteSegId = segId;
+
+    if (activeSegments[segId]) {
+        const latLngs = activeSegments[segId].getLatLngs();
+        editingRouteCoords = Array.isArray(latLngs) ? latLngs.map(ll => Array.isArray(ll) ? [ll[0], ll[1]] : [ll.lat, ll.lng]) : [];
+    }
+    if (!editingRouteCoords || editingRouteCoords.length < 2) {
+        editingRouteCoords = sortCoordsChain(cluster.map(m => [m.lat, m.lng]));
+    }
+
+    const banner = document.getElementById('edit-segment-banner');
+    if (banner) banner.classList.remove('hidden');
+
+    renderEditingRouteHandles();
+    showToast("✏️ Modalità Tracciato attiva: trascina i punti o clicca sulla mappa per sagomare la linea rossa.", "normal", 5000);
+};
+
+function renderEditingRouteHandles() {
+    if (editingRouteHandlesLayer) {
+        map.removeLayer(editingRouteHandlesLayer);
+    }
+    editingRouteHandlesLayer = L.layerGroup().addTo(map);
+
+    if (activeSegments[isEditingRouteSegId]) {
+        activeSegments[isEditingRouteSegId].setLatLngs(editingRouteCoords);
+    }
+
+    editingRouteCoords.forEach((coord, idx) => {
+        const handle = L.marker(coord, {
+            draggable: true,
+            icon: L.divIcon({
+                className: 'edit-vertex-icon',
+                html: '<div class="edit-vertex-dot" title="Trascina per spostare. Tasto destro per eliminare punto."></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            })
+        });
+
+        handle.on('drag', function (e) {
+            editingRouteCoords[idx] = [e.latlng.lat, e.latlng.lng];
+            if (activeSegments[isEditingRouteSegId]) {
+                activeSegments[isEditingRouteSegId].setLatLngs(editingRouteCoords);
+            }
+        });
+
+        handle.on('dragend', function () {
+            renderEditingRouteHandles();
+        });
+
+        handle.on('contextmenu', function (e) {
+            L.DomEvent.stopPropagation(e);
+            if (editingRouteCoords.length > 2) {
+                editingRouteCoords.splice(idx, 1);
+                renderEditingRouteHandles();
+            } else {
+                showToast("Un tratto deve avere almeno 2 punti estremi.", "normal");
+            }
+        });
+
+        editingRouteHandlesLayer.addLayer(handle);
+    });
+}
+
+window.saveEditingRoute = function () {
+    if (!isEditingRouteSegId) return;
+
+    const cluster = computeClusters().find(c => c.map(m => String(m.id || m.fbKey)).sort().join('__') === isEditingRouteSegId);
+    if (cluster) {
+        const segId = cluster[0].segmentId || ('seg_' + Date.now());
+        cluster.forEach(m => {
+            m.segmentId = segId;
+            m.customCoords = editingRouteCoords;
+            if (isFirebaseOnline && markersRef && m.fbKey) {
+                markersRef.child(m.fbKey).update({
+                    segmentId: segId,
+                    customCoords: editingRouteCoords
+                }).catch(() => {});
+            }
+        });
+
+        const rawCoords = cluster.map(m => [m.lat, m.lng]);
+        const sortedCoords = sortCoordsChain(rawCoords);
+        const cacheKey = `seg_${sortedCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        streetGeomCache[cacheKey] = editingRouteCoords;
+        saveStreetGeomCache();
+    }
+
+    cleanupEditingRoute();
+    saveToLocalStorage();
+    updateRoadSegments();
+    showToast("✅ Tracciato personalizzato salvato con successo!", "success", 4000);
+};
+
+window.resetEditingRoute = function () {
+    if (!isEditingRouteSegId) return;
+
+    const cluster = computeClusters().find(c => c.map(m => String(m.id || m.fbKey)).sort().join('__') === isEditingRouteSegId);
+    if (cluster) {
+        cluster.forEach(m => {
+            m.customCoords = null;
+            if (isFirebaseOnline && markersRef && m.fbKey) {
+                markersRef.child(m.fbKey).update({ customCoords: null }).catch(() => {});
+            }
+        });
+
+        const rawCoords = cluster.map(m => [m.lat, m.lng]);
+        const sortedCoords = sortCoordsChain(rawCoords);
+        const cacheKey = `seg_${sortedCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        delete streetGeomCache[cacheKey];
+        saveStreetGeomCache();
+    }
+
+    cleanupEditingRoute();
+    saveToLocalStorage();
+    updateRoadSegments();
+    showToast("Ripristinato tracciato stradale automatico.", "normal", 3000);
+};
+
+window.cancelEditingRoute = function () {
+    cleanupEditingRoute();
+    updateRoadSegments();
+};
+
+function cleanupEditingRoute() {
+    isEditingRouteSegId = null;
+    editingRouteCoords = [];
+    if (editingRouteHandlesLayer) {
+        map.removeLayer(editingRouteHandlesLayer);
+        editingRouteHandlesLayer = null;
+    }
+    const banner = document.getElementById('edit-segment-banner');
+    if (banner) banner.classList.add('hidden');
+}
+
+const saveEditSegmentBtn = document.getElementById('save-edit-segment-btn');
+if (saveEditSegmentBtn) saveEditSegmentBtn.addEventListener('click', saveEditingRoute);
+
+const resetEditSegmentBtn = document.getElementById('reset-edit-segment-btn');
+if (resetEditSegmentBtn) resetEditSegmentBtn.addEventListener('click', resetEditingRoute);
+
+const cancelEditSegmentBtn = document.getElementById('cancel-edit-segment-btn');
+if (cancelEditSegmentBtn) cancelEditSegmentBtn.addEventListener('click', cancelEditingRoute);
+
 // Aggiungi un marker alla mappa
-function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null) {
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null, segmentId = null, customCoords = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const ts = parseInt(markerId);
@@ -889,7 +1165,9 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         note: note || null,
         fbKey: fbKey || null,
         street: street || null,
-        schedule: schedule || null
+        schedule: schedule || null,
+        segmentId: segmentId || null,
+        customCoords: customCoords || null
     };
 
     const status = getMarkerScheduleStatus(markerObj);
@@ -927,9 +1205,23 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         }
 
         if (isAdmin) {
+            const cluster = getClusterForMarker(markerObj);
+            const isConnected = cluster && cluster.length >= 2;
+
             popupContent += `
                 <button class="edit-btn" onclick="editMarker('${safeId}')">✏️ Modifica / Programma</button>
-                <button class="delete-btn" onclick="removeMarker('${safeId}')">Risolto / Rimuovi</button>
+                <button class="link-btn" onclick="startLinkingSegment('${safeId}')">🔗 Collega a un'altra Icona</button>
+            `;
+
+            if (isConnected) {
+                popupContent += `
+                    <button class="edit-route-btn" onclick="startEditingRoute('${safeId}')">✏️ Modifica Tracciato Linea</button>
+                    <button class="unlink-btn" onclick="unlinkSegment('${safeId}')">⛓️ Scollega Tratto</button>
+                `;
+            }
+
+            popupContent += `
+                <button class="delete-btn" onclick="removeMarker('${safeId}')">🗑️ Risolto / Rimuovi</button>
             `;
         } else {
             if (!note || !note.includes("RISOLTO")) {
@@ -943,6 +1235,14 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         popupContent += `</div>`;
 
         marker.bindPopup(popupContent);
+
+        // Click sull'icona per completare collegamento se attivo
+        marker.on('click', function (e) {
+            if (linkingSourceMarkerId) {
+                L.DomEvent.stopPropagation(e);
+                completeLinkingSegment(markerId);
+            }
+        });
 
         // Zoom al doppio click sull'icona
         marker.on('dblclick', function () {
@@ -997,7 +1297,8 @@ function saveMarkerToFirebase(markerObj) {
         note: markerObj.note || null,
         street: markerObj.street || null,
         schedule: markerObj.schedule || null,
-        segmentId: markerObj.segmentId || null
+        segmentId: markerObj.segmentId || null,
+        customCoords: markerObj.customCoords || null
     };
     const newRef = markersRef.push(payload);
     markerObj.fbKey = newRef.key;
@@ -1083,8 +1384,8 @@ window.reportResolved = function (id) {
 // GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving Engine)
 // Segue fedelmente tutte le curve e i tratti della strada (Rampe, Svincoli, Statali e vie cittadine)
 // - Cache persistente locale v5 (istantaneo ai successivi caricamenti)
-// - Risoluzione tramite motore automobilistico ad alta precisione
-// - Raggruppamento a coppie/tratti indipendenti per vicinanza geografica
+// - Risoluzione tramite motore automobilistico ad alta precisione con fallback moto/bici per ZTL/svincoli
+// - Tracciatura manuale salvabile per le curve personalizzate
 // -------------------------------------------------------
 
 let streetGeomCache = {};
@@ -1160,64 +1461,89 @@ function normalizeStreetKey(name) {
     return s.replace(/[^a-z0-9]/g, '');
 }
 
-// Raggruppa i marker attivi in singoli segmenti indipendenti per prossimità o via
-function clusterMarkersIntoSegments(markers) {
-    const n = markers.length;
+// Raggruppa i marker attivi in singoli segmenti indipendenti (per segmentId esplicito o vicinanza/via)
+function computeClusters() {
+    const activeMarkers = markersData.filter(m => isMarkerVisible(m) && getMarkerScheduleStatus(m) === 'active');
+    const n = activeMarkers.length;
     if (n < 2) return [];
 
-    const adj = Array.from({ length: n }, () => []);
+    const explicitGroups = {};
+    const unassigned = [];
 
-    for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-            const m1 = markers[i];
-            const m2 = markers[j];
-            const distKm = getDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng) / 1000;
-
-            const key1 = normalizeStreetKey(m1.street);
-            const key2 = normalizeStreetKey(m2.street);
-
-            let areConnected = false;
-            // 1. Se condividono la stessa via/statale nota ed entro 6 km
-            if (key1 && key2 && key1 === key2 && distKm <= 6.0) {
-                areConnected = true;
-            }
-            // 2. Se sono due icone vicine (es. su rampe, svincoli, raccordi o senza nome via entro 3.5 km)
-            else if (distKm <= 3.5) {
-                areConnected = true;
-            }
-
-            if (areConnected) {
-                adj[i].push(j);
-                adj[j].push(i);
-            }
+    activeMarkers.forEach(m => {
+        if (m.segmentId && m.segmentId !== 'none' && !m.segmentId.startsWith('isolated_')) {
+            if (!explicitGroups[m.segmentId]) explicitGroups[m.segmentId] = [];
+            explicitGroups[m.segmentId].push(m);
+        } else if (!m.segmentId || !m.segmentId.startsWith('isolated_')) {
+            unassigned.push(m);
         }
-    }
+    });
 
-    const visited = new Array(n).fill(false);
     const clusters = [];
+    Object.values(explicitGroups).forEach(group => {
+        if (group.length >= 2) {
+            clusters.push(group);
+        }
+    });
 
-    for (let i = 0; i < n; i++) {
-        if (!visited[i]) {
-            const cluster = [];
-            const queue = [i];
-            visited[i] = true;
-            while (queue.length > 0) {
-                const u = queue.shift();
-                cluster.push(markers[u]);
-                for (const v of adj[u]) {
-                    if (!visited[v]) {
-                        visited[v] = true;
-                        queue.push(v);
-                    }
+    const uLen = unassigned.length;
+    if (uLen >= 2) {
+        const adj = Array.from({ length: uLen }, () => []);
+        for (let i = 0; i < uLen; i++) {
+            for (let j = i + 1; j < uLen; j++) {
+                const m1 = unassigned[i];
+                const m2 = unassigned[j];
+                const distKm = getDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng) / 1000;
+                const key1 = normalizeStreetKey(m1.street);
+                const key2 = normalizeStreetKey(m2.street);
+
+                let areConnected = false;
+                // 1. Condividono la stessa via/arteria nota ed entro 6 km
+                if (key1 && key2 && key1 === key2 && distKm <= 6.0) {
+                    areConnected = true;
+                }
+                // 2. Rampe, svincoli o coordinate vicine entro 2.5 km
+                else if (distKm <= 2.5) {
+                    areConnected = true;
+                }
+
+                if (areConnected) {
+                    adj[i].push(j);
+                    adj[j].push(i);
                 }
             }
-            if (cluster.length >= 2) {
-                clusters.push(cluster);
+        }
+
+        const visited = new Array(uLen).fill(false);
+        for (let i = 0; i < uLen; i++) {
+            if (!visited[i]) {
+                const cluster = [];
+                const queue = [i];
+                visited[i] = true;
+                while (queue.length > 0) {
+                    const u = queue.shift();
+                    cluster.push(unassigned[u]);
+                    for (const v of adj[u]) {
+                        if (!visited[v]) {
+                            visited[v] = true;
+                            queue.push(v);
+                        }
+                    }
+                }
+                if (cluster.length >= 2) {
+                    clusters.push(cluster);
+                }
             }
         }
     }
 
     return clusters;
+}
+
+function getClusterForMarker(markerObj) {
+    if (!markerObj) return null;
+    const clusters = computeClusters();
+    return clusters.find(c => c.some(m => String(m.id) === String(markerObj.id) || String(m.fbKey) === String(markerObj.fbKey))) || null;
 }
 
 // Helper per scaricare il tracciato e distanza da endpoint OSRM
@@ -1267,7 +1593,7 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2) {
     const altFwd = await fetchOsrmRouteWithDetails(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
     if (altFwd && altFwd.coords.length >= 2) return altFwd.coords;
 
-    // 3. Fallback OSM Bike (per ZTL / percorsi ciclabili del centro storico)
+    // 3. Fallback OSM Bike (per ZTL / percorsi ciclabili del centro storico o svincoli particolari)
     const bike = await fetchOsrmRouteWithDetails(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
     if (bike && bike.coords.length >= 2) return bike.coords;
 
@@ -1309,73 +1635,16 @@ async function getStreetGeometry(cacheKey, markerCoords) {
 
 // -------------------------------------------------------
 // TRATTI STRADALI ROSSI
-// Collega le icone che si trovano sulla stessa via o rampa
+// Tracciati a segmenti indipendenti basati su clustering o customCoords
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Filtra solo marker visibili e attivi adesso
-    const activeMarkers = markersData.filter(m => isMarkerVisible(m) && getMarkerScheduleStatus(m) === 'active');
-
-    // 2. Raggruppa i marker sulla stessa strada o vicini su rampa
-    const n = activeMarkers.length;
-    if (n < 2) {
+    const clusters = computeClusters();
+    if (clusters.length === 0) {
         for (let key in activeSegments) {
             map.removeLayer(activeSegments[key]);
             delete activeSegments[key];
         }
         return;
-    }
-
-    const adj = Array.from({ length: n }, () => []);
-
-    for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-            const m1 = activeMarkers[i];
-            const m2 = activeMarkers[j];
-            const distKm = getDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng) / 1000;
-
-            const key1 = normalizeStreetKey(m1.street);
-            const key2 = normalizeStreetKey(m2.street);
-
-            let areConnected = false;
-
-            // Caso A: Hanno lo stesso nome via/arteria (es. Via Ruffetta, Via Bologna, ecc.) ed entro 5 km
-            if (key1 && key2 && key1 === key2 && distKm <= 5.0) {
-                areConnected = true;
-            }
-            // Caso B: Uno dei due non ha nome via rilevato (rampe, svincoli, raccordi) e sono vicini entro 1.8 km
-            else if ((!key1 || !key2) && distKm <= 1.8) {
-                areConnected = true;
-            }
-
-            if (areConnected) {
-                adj[i].push(j);
-                adj[j].push(i);
-            }
-        }
-    }
-
-    const visited = new Array(n).fill(false);
-    const clusters = [];
-
-    for (let i = 0; i < n; i++) {
-        if (!visited[i]) {
-            const cluster = [];
-            const queue = [i];
-            visited[i] = true;
-            while (queue.length > 0) {
-                const u = queue.shift();
-                cluster.push(activeMarkers[u]);
-                for (const v of adj[u]) {
-                    if (!visited[v]) {
-                        visited[v] = true;
-                        queue.push(v);
-                    }
-                }
-            }
-            if (cluster.length >= 2) {
-                clusters.push(cluster);
-            }
-        }
     }
 
     const currentSegmentKeys = new Set();
@@ -1384,17 +1653,17 @@ async function updateRoadSegments() {
     clusters.forEach(cluster => {
         const rawCoords = cluster.map(m => [m.lat, m.lng]);
         const sortedCoords = sortCoordsChain(rawCoords);
-
-        // Identificativo univoco stabile del segmento
         const segId = cluster.map(m => String(m.id || m.fbKey)).sort().join('__');
         currentSegmentKeys.add(segId);
 
-        // Etichetta del tratto per il tooltip
         const namedMarker = cluster.find(m => m.street && m.street.trim());
         const displayLabel = namedMarker ? namedMarker.street.trim() : 'Strada chiusa';
 
+        const customMarkerWithCoords = cluster.find(m => m.customCoords && m.customCoords.length >= 2);
+        const customCoords = customMarkerWithCoords ? customMarkerWithCoords.customCoords : null;
+
         const cacheKey = `seg_${sortedCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
-        const initialCoords = streetGeomCache[cacheKey] || sortedCoords;
+        const initialCoords = customCoords || streetGeomCache[cacheKey] || sortedCoords;
 
         if (!activeSegments[segId]) {
             const polyline = L.polyline(initialCoords, {
@@ -1411,19 +1680,30 @@ async function updateRoadSegments() {
                 className: 'road-segment-tooltip'
             });
 
+            if (isAdmin) {
+                polyline.bindPopup(`
+                    <div class="popup-content" style="min-width: 170px;">
+                        <h3>🔴 ${escapeHtml(displayLabel)}</h3>
+                        <button class="edit-route-btn" onclick="startEditingRouteBySegId('${segId}')">✏️ Modifica Tracciato Linea</button>
+                    </div>
+                `);
+            }
+
             activeSegments[segId] = polyline;
         } else {
             activeSegments[segId].setLatLngs(initialCoords);
         }
 
-        segmentsToProcess.push({
-            segId,
-            cacheKey,
-            coords: sortedCoords
-        });
+        if (!customCoords && !streetGeomCache[cacheKey]) {
+            segmentsToProcess.push({
+                segId,
+                cacheKey,
+                coords: sortedCoords
+            });
+        }
     });
 
-    // 3. Rimuovi i segmenti non più esistenti
+    // Rimuovi i segmenti non più esistenti
     for (let key in activeSegments) {
         if (!currentSegmentKeys.has(key)) {
             map.removeLayer(activeSegments[key]);
@@ -1431,13 +1711,15 @@ async function updateRoadSegments() {
         }
     }
 
-    // 4. Aggiorna in parallelo il tracciato con le curve reali della strada
-    await Promise.all(segmentsToProcess.map(async (item) => {
-        const routeCoords = await getStreetGeometry(item.cacheKey, item.coords);
-        if (routeCoords && routeCoords.length >= 2 && activeSegments[item.segId]) {
-            activeSegments[item.segId].setLatLngs(routeCoords);
-        }
-    }));
+    // Aggiorna in parallelo il tracciato con le curve reali della strada
+    if (segmentsToProcess.length > 0) {
+        await Promise.all(segmentsToProcess.map(async (item) => {
+            const routeCoords = await getStreetGeometry(item.cacheKey, item.coords);
+            if (routeCoords && routeCoords.length >= 2 && activeSegments[item.segId]) {
+                activeSegments[item.segId].setLatLngs(routeCoords);
+            }
+        }));
+    }
 }
 
 // Local Storage (cache locale / fallback offline)
@@ -1449,8 +1731,6 @@ function saveToLocalStorage() {
 // altrimenti fallback a localStorage
 function loadMarkers() {
     if (isFirebaseOnline && markersRef) {
-        // .on('value') rimane in ascolto continuo: ogni modifica su Firebase
-        // aggiorna automaticamente la mappa su tutti i dispositivi connessi
         markersRef.on('value', function (snapshot) {
             markersData = [];
             for (let id in activeLayers) {
@@ -1470,10 +1750,12 @@ function loadMarkers() {
                         note: m.note || null,
                         fbKey: fbKey,
                         street: m.street || null,
-                        schedule: m.schedule || null
+                        schedule: m.schedule || null,
+                        segmentId: m.segmentId || null,
+                        customCoords: m.customCoords || null
                     };
                     markersData.push(markerObj);
-                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null, m.segmentId || null, m.customCoords || null);
                 });
                 saveToLocalStorage();
                 console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale da Firebase`);
@@ -1498,7 +1780,7 @@ function loadFromLocalStorage() {
         try {
             markersData = JSON.parse(saved);
             markersData.forEach(m => {
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null, m.customCoords || null);
             });
             console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
@@ -1518,7 +1800,7 @@ function refreshMarkers() {
     activeLayers = {};
 
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
+        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null, m.customCoords || null);
     });
 
     updateFilterCounts();
