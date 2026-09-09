@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -1079,14 +1079,15 @@ window.reportResolved = function (id) {
 
 // -------------------------------------------------------
 // GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving Engine)
-// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali e vie cittadine)
-// - Cache persistente locale v4 (istantaneo ai successivi caricamenti)
+// Segue fedelmente tutte le curve e i tratti della strada (Rampe, Svincoli, Statali e vie cittadine)
+// - Cache persistente locale v5 (istantaneo ai successivi caricamenti)
 // - Risoluzione tramite motore automobilistico ad alta precisione
+// - Raggruppamento a coppie/tratti indipendenti per vicinanza geografica
 // -------------------------------------------------------
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v4');
+    const cached = localStorage.getItem('ferrara_street_cache_v5');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1094,71 +1095,190 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v4', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v5', JSON.stringify(streetGeomCache));
     } catch (e) { }
+}
+
+// Distanza in metri tra due coordinate geografiche
+function getDistanceMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Ordina una serie di coordinate in una sequenza continua da estremo a estremo
+function sortCoordsChain(coords) {
+    if (coords.length <= 2) return coords;
+    let maxDist = -1;
+    let startIdx = 0;
+    for (let i = 0; i < coords.length; i++) {
+        for (let j = i + 1; j < coords.length; j++) {
+            const d = getDistanceMeters(coords[i][0], coords[i][1], coords[j][0], coords[j][1]);
+            if (d > maxDist) {
+                maxDist = d;
+                startIdx = i;
+            }
+        }
+    }
+    const result = [coords[startIdx]];
+    const remaining = coords.filter((_, idx) => idx !== startIdx);
+    while (remaining.length > 0) {
+        const last = result[result.length - 1];
+        let nearestIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+            const d = getDistanceMeters(last[0], last[1], remaining[i][0], remaining[i][1]);
+            if (d < minDist) {
+                minDist = d;
+                nearestIdx = i;
+            }
+        }
+        result.push(remaining[nearestIdx]);
+        remaining.splice(nearestIdx, 1);
+    }
+    return result;
 }
 
 // Normalizza i nomi delle strade per collegare segnalazioni appartenenti alla stessa arteria/statale
 function normalizeStreetKey(name) {
     if (!name || typeof name !== 'string') return '';
     let s = name.toLowerCase().trim();
-    // Normalizza abbreviazioni di strade statali e provinciali
     s = s.replace(/\bs\.?s\.?\s*16\b/g, 'ss16');
     s = s.replace(/\bs\.?s\.?\s*309\b/g, 'ss309');
     s = s.replace(/\bs\.?s\.?\s*64\b/g, 'ss64');
     s = s.replace(/\bs\.?p\.?\s*/g, 'sp');
-    // Rimuovi prefissi generici
     s = s.replace(/^(strada statale|strada provinciale|strada|via|viale|corso|piazza|piazzale|vicolo|largo|borgo)\s+/g, '');
-    // Riconoscimento speciale per arterie principali e statali
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
     return s.replace(/[^a-z0-9]/g, '');
 }
 
-// Helper per scaricare il tracciato da endpoint OSRM
-async function fetchOsrmRoute(url) {
+// Raggruppa i marker attivi in singoli segmenti indipendenti per prossimità o via
+function clusterMarkersIntoSegments(markers) {
+    const n = markers.length;
+    if (n < 2) return [];
+
+    const adj = Array.from({ length: n }, () => []);
+
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            const m1 = markers[i];
+            const m2 = markers[j];
+            const distKm = getDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng) / 1000;
+
+            const key1 = normalizeStreetKey(m1.street);
+            const key2 = normalizeStreetKey(m2.street);
+
+            let areConnected = false;
+            // 1. Se condividono la stessa via/statale nota ed entro 6 km
+            if (key1 && key2 && key1 === key2 && distKm <= 6.0) {
+                areConnected = true;
+            }
+            // 2. Se sono due icone vicine (es. su rampe, svincoli, raccordi o senza nome via entro 3.5 km)
+            else if (distKm <= 3.5) {
+                areConnected = true;
+            }
+
+            if (areConnected) {
+                adj[i].push(j);
+                adj[j].push(i);
+            }
+        }
+    }
+
+    const visited = new Array(n).fill(false);
+    const clusters = [];
+
+    for (let i = 0; i < n; i++) {
+        if (!visited[i]) {
+            const cluster = [];
+            const queue = [i];
+            visited[i] = true;
+            while (queue.length > 0) {
+                const u = queue.shift();
+                cluster.push(markers[u]);
+                for (const v of adj[u]) {
+                    if (!visited[v]) {
+                        visited[v] = true;
+                        queue.push(v);
+                    }
+                }
+            }
+            if (cluster.length >= 2) {
+                clusters.push(cluster);
+            }
+        }
+    }
+
+    return clusters;
+}
+
+// Helper per scaricare il tracciato e distanza da endpoint OSRM
+async function fetchOsrmRouteWithDetails(url) {
     try {
         const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                const r = data.routes[0];
+                return {
+                    coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+                    distance: r.distance || 0
+                };
             }
         }
     } catch (e) { }
     return null;
 }
 
-// Calcola il percorso reale tra due punti con routing automobilistico e fallback robusti
+// Calcola il percorso reale tra due punti con routing automobilistico per rampe e strade
 async function routeBetweenPoints(lat1, lng1, lat2, lng2) {
-    // 1. OSM Routed Car (profilo automobilistico principale - supporta statali, tangenziali, strade primarie)
-    let coords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
-    if (coords && coords.length >= 2) return coords;
+    const directDist = getDistanceMeters(lat1, lng1, lat2, lng2);
+
+    // 1. OSM Routed Car in avanti e a ritroso (gestisce rampe a senso unico e direzioni opposte)
+    const forwardUrl = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`;
+    const reverseUrl = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`;
+
+    const [fwd, rev] = await Promise.all([
+        fetchOsrmRouteWithDetails(forwardUrl),
+        fetchOsrmRouteWithDetails(reverseUrl)
+    ]);
+
+    // Se entrambi i percorsi esistono, scegli quello più fedele e diretto al tratto
+    if (fwd && rev) {
+        if (rev.distance < fwd.distance && fwd.distance > directDist * 2.5 && rev.distance < directDist * 2.0) {
+            return rev.coords.slice().reverse();
+        }
+        return fwd.coords;
+    }
+    if (fwd && fwd.distance <= Math.max(directDist * 3, 2000)) return fwd.coords;
+    if (rev && rev.distance <= Math.max(directDist * 3, 2000)) return rev.coords.slice().reverse();
+    if (fwd) return fwd.coords;
+    if (rev) return rev.coords.slice().reverse();
 
     // 2. Fallback Project-OSRM Car
-    coords = await fetchOsrmRoute(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
-    if (coords && coords.length >= 2) return coords;
+    const altFwd = await fetchOsrmRouteWithDetails(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (altFwd && altFwd.coords.length >= 2) return altFwd.coords;
 
-    // 3. Fallback senso inverso (nel caso di sensi unici / corsie separate disegnate in direzione opposta)
-    let revCoords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`);
-    if (revCoords && revCoords.length >= 2) return revCoords.slice().reverse();
+    // 3. Fallback OSM Bike (per ZTL / percorsi ciclabili del centro storico)
+    const bike = await fetchOsrmRouteWithDetails(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (bike && bike.coords.length >= 2) return bike.coords;
 
-    // 4. Fallback OSM Bike (per piazze pedonali, ZTL o percorsi ciclabili del centro storico)
-    coords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
-    if (coords && coords.length >= 2) return coords;
+    // 4. Fallback OSM Foot (per vicoli pedonali)
+    const foot = await fetchOsrmRouteWithDetails(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (foot && foot.coords.length >= 2) return foot.coords;
 
-    // 5. Fallback OSM Foot (per vicoli pedonali)
-    coords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
-    if (coords && coords.length >= 2) return coords;
-
-    // 6. Fallback finale: linea retta tra i due punti
+    // 5. Fallback linea retta
     return [[lat1, lng1], [lat2, lng2]];
 }
 
 // Recupera la geometria reale dell'intera tratta stradale
-async function getStreetGeometry(streetName, markerCoords) {
-    const cacheKey = `${normalizeStreetKey(streetName) || streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+async function getStreetGeometry(cacheKey, markerCoords) {
     if (streetGeomCache[cacheKey]) {
         return streetGeomCache[cacheKey];
     }
@@ -1187,43 +1307,35 @@ async function getStreetGeometry(streetName, markerCoords) {
 
 // -------------------------------------------------------
 // TRATTI STRADALI ROSSI
-// Rendering istantaneo con aggiornamento parallelo fluido
-// Include solo marker visibili e attivi
+// Tracciati a segmenti indipendenti che non si fondono tra loro
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Raggruppa i marker per via normalizzata (solo quelli visibili e attivi adesso)
-    const groups = {};
-    markersData.forEach(m => {
-        if (!m.street || m.street.trim() === '') return;
-        if (!isMarkerVisible(m)) return;
-        if (getMarkerScheduleStatus(m) !== 'active') return;
+    // 1. Filtra solo marker visibili e attivi adesso
+    const activeMarkers = markersData.filter(m => isMarkerVisible(m) && getMarkerScheduleStatus(m) === 'active');
 
-        const normKey = normalizeStreetKey(m.street);
-        const key = normKey || m.street.trim().toLowerCase();
-        if (!groups[key]) {
-            groups[key] = { streetName: m.street.trim(), coords: [] };
-        }
-        groups[key].coords.push([m.lat, m.lng]);
-    });
+    // 2. Raggruppa i marker in singoli segmenti indipendenti (coppie o catene vicine)
+    const clusters = clusterMarkersIntoSegments(activeMarkers);
 
-    // 2. Rimuovi le polyline non più presenti
-    for (let key in activeSegments) {
-        if (!groups[key] || groups[key].coords.length < 2) {
-            map.removeLayer(activeSegments[key]);
-            delete activeSegments[key];
-        }
-    }
+    const currentSegmentKeys = new Set();
+    const segmentsToProcess = [];
 
-    // 3. Disegna o aggiorna tutte le vie IN PARALLELO
-    const groupKeys = Object.keys(groups).filter(k => groups[k].coords.length >= 2);
+    clusters.forEach(cluster => {
+        // Ordina i punti del segmento
+        const rawCoords = cluster.map(m => [m.lat, m.lng]);
+        const sortedCoords = sortCoordsChain(rawCoords);
 
-    // Passo immediato: crea subito le linee sulla mappa (cache o coordinate dirette)
-    groupKeys.forEach(key => {
-        const group = groups[key];
-        const cacheKey = `${normalizeStreetKey(group.streetName) || group.streetName.toLowerCase()}_${group.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
-        const initialCoords = streetGeomCache[cacheKey] || group.coords;
+        // Identificativo univoco stabile del segmento
+        const segId = cluster.map(m => String(m.id || m.fbKey)).sort().join('__');
+        currentSegmentKeys.add(segId);
 
-        if (!activeSegments[key]) {
+        // Etichetta del tratto per il tooltip
+        const namedMarker = cluster.find(m => m.street && m.street.trim());
+        const displayLabel = namedMarker ? namedMarker.street.trim() : 'Tratto stradale';
+
+        const cacheKey = `seg_${sortedCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        const initialCoords = streetGeomCache[cacheKey] || sortedCoords;
+
+        if (!activeSegments[segId]) {
             const polyline = L.polyline(initialCoords, {
                 color: '#dc2626',
                 weight: 5,
@@ -1232,24 +1344,37 @@ async function updateRoadSegments() {
                 lineCap: 'round'
             }).addTo(map);
 
-            polyline.bindTooltip(`🔴 ${escapeHtml(group.streetName)}`, {
+            polyline.bindTooltip(`🔴 ${escapeHtml(displayLabel)}`, {
                 permanent: false,
                 direction: 'center',
                 className: 'road-segment-tooltip'
             });
 
-            activeSegments[key] = polyline;
+            activeSegments[segId] = polyline;
         } else {
-            activeSegments[key].setLatLngs(initialCoords);
+            activeSegments[segId].setLatLngs(initialCoords);
         }
+
+        segmentsToProcess.push({
+            segId,
+            cacheKey,
+            coords: sortedCoords
+        });
     });
 
-    // Passo asincrono parallelo: affina il tracciato con le curve reali della strada
-    await Promise.all(groupKeys.map(async (key) => {
-        const group = groups[key];
-        const routeCoords = await getStreetGeometry(group.streetName, group.coords);
-        if (routeCoords && routeCoords.length >= 2 && activeSegments[key]) {
-            activeSegments[key].setLatLngs(routeCoords);
+    // 3. Rimuovi i segmenti non più esistenti
+    for (let key in activeSegments) {
+        if (!currentSegmentKeys.has(key)) {
+            map.removeLayer(activeSegments[key]);
+            delete activeSegments[key];
+        }
+    }
+
+    // 4. Aggiorna in parallelo il tracciato con le curve reali della strada
+    await Promise.all(segmentsToProcess.map(async (item) => {
+        const routeCoords = await getStreetGeometry(item.cacheKey, item.coords);
+        if (routeCoords && routeCoords.length >= 2 && activeSegments[item.segId]) {
+            activeSegments[item.segId].setLatLngs(routeCoords);
         }
     }));
 }
