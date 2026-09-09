@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v9');
+    const cached = localStorage.getItem('ferrara_street_cache_v10');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v9', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v10', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1188,17 +1188,20 @@ async function fetchOsrmRoute(url, isReverse = false) {
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const isHighway = isMajorHighway(targetStreetName);
+    const isRamp = targetStreetName.toLowerCase().includes('ramp') || targetStreetName.toLowerCase().includes('svincolo') || targetStreetName.includes('/');
     const normTarget = normalizeStreetKey(targetStreetName);
 
     // Endpoints in ordine di priorità:
-    // Per vie locali/rurali/cittadine e rampe: prima il profilo bike/local (in entrambi i sensi)
-    // per non uscire dalla via assegnata (es. evitare assolutamente deviazioni su SP4)
-    const endpoints = isHighway
+    // Per rampe e svincoli: testiamo car e bike in entrambi i sensi
+    const endpoints = (isHighway || isRamp)
         ? [
             { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
             { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
         ]
         : [
             { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
@@ -1216,9 +1219,8 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
     for (const ep of endpoints) {
         const res = await fetchOsrmRoute(ep.url, ep.rev);
         if (res && res.coords && res.coords.length >= 2) {
-            // Calcola quanti metri sono effettivamente percorsi sulla via indicata
             let matchedDist = 0;
-            if (normTarget && normTarget.length >= 3 && res.steps.length > 0) {
+            if (normTarget && normTarget.length >= 3 && res.steps && res.steps.length > 0) {
                 for (const step of res.steps) {
                     const normStep = normalizeStreetKey(step.name || '');
                     if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
@@ -1229,17 +1231,20 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
 
             const distDiff = Math.abs(res.distance - directDist);
 
-            // Se la via target corrisponde con alta percentuale, selezionalo subito!
-            if (matchedDist > maxMatchedDist) {
+            // Per vie ordinarie con nome specifico (es. Via Ruffetta): priorità a matchedDist
+            if (!isRamp && normTarget && matchedDist > maxMatchedDist) {
                 maxMatchedDist = matchedDist;
                 bestCoords = res.coords;
-                // Se la maggior parte del percorso è sulla via corretta e ha curve reali, ritorna subito
                 if (matchedDist >= directDist * 0.7 && res.coords.length > 2) {
                     return res.coords;
                 }
-            } else if (maxMatchedDist <= 0 && distDiff < bestDistDiff && res.coords.length > 2) {
+            } else if (distDiff < bestDistDiff && res.coords.length > 2) {
+                // Per rampe/svincoli e curve: scegli il percorso diretto senza giri a vuoto
                 bestDistDiff = distDiff;
                 bestCoords = res.coords;
+                if (res.distance <= directDist * 2.2) {
+                    return res.coords;
+                }
             }
         }
     }
@@ -1287,10 +1292,13 @@ async function getStreetGeometry(streetName, markerCoords) {
 // - 1a e 2a icona collegate tra loro in un tratto di strada
 // - 3a e 4a icona collegate tra loro in un altro tratto
 // - e così via (ogni coppia forma un tratto autonomo e indipendente)
+// - Supporto nativo per rampe di accesso e svincoli
 // -------------------------------------------------------
 async function updateRoadSegments() {
     // 1. Raggruppa i marker per via (o per segmentId se presente)
     const rawGroups = {};
+    const singleMarkers = [];
+
     markersData.forEach(m => {
         if (!isMarkerVisible(m)) return;
         if (getMarkerScheduleStatus(m) !== 'active') return;
@@ -1314,8 +1322,9 @@ async function updateRoadSegments() {
         rawGroups[key].markers.push(m);
     });
 
-    // 2. Suddivide ogni gruppo in coppie indipendenti (1-2, 3-4, 5-6...)
     const validSegments = {};
+
+    // 2. Suddivide ogni gruppo in coppie indipendenti (1-2, 3-4, 5-6...)
     Object.keys(rawGroups).forEach(key => {
         const group = rawGroups[key];
         // Ordina cronologicamente per timestamp/id
@@ -1330,9 +1339,44 @@ async function updateRoadSegments() {
                 coords: [[m1.lat, m1.lng], [m2.lat, m2.lng]]
             };
         }
+
+        // Se è rimasto un marker spaiato (es. su una rampa di svincolo con nome diverso all'altra estremità)
+        if (group.markers.length % 2 === 1) {
+            singleMarkers.push(group.markers[group.markers.length - 1]);
+        }
     });
 
-    // 3. Rimuovi le polyline non più presenti
+    // 3. Collega eventuali marker singoli vicini tra loro (es. estremità di rampe/svincoli tra SS16 e RA8)
+    const usedSingle = new Set();
+    for (let i = 0; i < singleMarkers.length; i++) {
+        if (usedSingle.has(i)) continue;
+        const m1 = singleMarkers[i];
+        let bestJ = -1;
+        let minDist = 2500; // Massimo 2.5 km per collegare due punti di una rampa/svincolo
+
+        for (let j = i + 1; j < singleMarkers.length; j++) {
+            if (usedSingle.has(j)) continue;
+            const m2 = singleMarkers[j];
+            const d = calculateDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng);
+            if (d < minDist) {
+                minDist = d;
+                bestJ = j;
+            }
+        }
+
+        if (bestJ !== -1) {
+            const m2 = singleMarkers[bestJ];
+            usedSingle.add(i);
+            usedSingle.add(bestJ);
+            const rampKey = `ramp_${m1.id}_${m2.id}`;
+            validSegments[rampKey] = {
+                streetName: m1.street && m2.street ? `${m1.street} / ${m2.street}` : (m1.street || m2.street || 'Rampa di raccordo'),
+                coords: [[m1.lat, m1.lng], [m2.lat, m2.lng]]
+            };
+        }
+    }
+
+    // 4. Rimuovi le polyline non più presenti
     for (let segKey in activeSegments) {
         if (!validSegments[segKey]) {
             map.removeLayer(activeSegments[segKey]);
@@ -1340,7 +1384,7 @@ async function updateRoadSegments() {
         }
     }
 
-    // 4. Disegna subito le linee sulla mappa (cache o coordinate dirette)
+    // 5. Disegna subito le linee sulla mappa (cache o coordinate dirette)
     const segKeys = Object.keys(validSegments);
     segKeys.forEach(segKey => {
         const segment = validSegments[segKey];
@@ -1368,7 +1412,7 @@ async function updateRoadSegments() {
         }
     });
 
-    // 5. Passo asincrono parallelo: affina il tracciato con le curve reali della strada/rampa
+    // 6. Passo asincrono parallelo: affina il tracciato con le curve reali della strada/rampa
     await Promise.all(segKeys.map(async (segKey) => {
         const segment = validSegments[segKey];
         const routeCoords = await getStreetGeometry(segment.streetName, segment.coords);
