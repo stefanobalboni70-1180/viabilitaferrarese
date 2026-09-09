@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v8');
+    const cached = localStorage.getItem('ferrara_street_cache_v9');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v8', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v9', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1134,6 +1134,18 @@ function normalizeStreetKey(name) {
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
     return s.replace(/[^a-z0-9]/g, '');
+}
+
+function isMajorHighway(streetName) {
+    if (!streetName) return false;
+    const s = streetName.toLowerCase();
+    return s.includes('statale') ||
+           s.includes('ss16') ||
+           s.includes('ss309') ||
+           s.includes('ss64') ||
+           s.includes('tangenziale') ||
+           s.includes('raccordo') ||
+           s.includes('autostrad');
 }
 
 // Calcola distanza in metri tra due coordinate geografiche (formula Haversine)
@@ -1162,7 +1174,8 @@ async function fetchOsrmRoute(url, isReverse = false) {
                 if (isReverse) coords = coords.slice().reverse();
                 return {
                     coords: coords,
-                    distance: route.distance || 0
+                    distance: route.distance || 0,
+                    steps: (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : []
                 };
             }
         }
@@ -1171,48 +1184,68 @@ async function fetchOsrmRoute(url, isReverse = false) {
 }
 
 // Calcola il percorso reale tra due punti (anche su rampe a senso unico, svincoli e curve strette)
+// e garantisce che non si devii su provinciali (SP4) o altre strade
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
+    const isHighway = isMajorHighway(targetStreetName);
+    const normTarget = normalizeStreetKey(targetStreetName);
 
-    // Lista di endpoint da testare:
-    // Include routing in entrambi i sensi (fondamentale per rampe a senso unico)
-    // e profili car/bike/foot per garantire il tracciamento anche dove car fa giri infiniti
-    const endpoints = [
-        // 1. Car in avanti
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-        // 2. Car in senso opposto (se senso unico / rampa di immissione)
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-        // 3. Bike in avanti (segue direttamente rampe e strade secondarie senza deviare su autostrade)
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-        // 4. Bike in senso opposto
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-        // 5. Project-OSRM Car fallback
-        { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-        { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-        // 6. Foot fallback
-        { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false }
-    ];
+    // Endpoints in ordine di priorità:
+    // Per vie locali/rurali/cittadine e rampe: prima il profilo bike/local (in entrambi i sensi)
+    // per non uscire dalla via assegnata (es. evitare assolutamente deviazioni su SP4)
+    const endpoints = isHighway
+        ? [
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
+        ]
+        : [
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
+        ];
 
-    const candidates = [];
+    let bestCoords = null;
+    let maxMatchedDist = -1;
+    let bestDistDiff = Infinity;
+
     for (const ep of endpoints) {
         const res = await fetchOsrmRoute(ep.url, ep.rev);
         if (res && res.coords && res.coords.length >= 2) {
-            candidates.push(res);
-            // Se troviamo un percorso molto vicino alla distanza diretta, è la rampa/strada diretta
-            if (res.distance <= directDist * 2.2 && res.coords.length > 2) {
-                return res.coords;
+            // Calcola quanti metri sono effettivamente percorsi sulla via indicata
+            let matchedDist = 0;
+            if (normTarget && normTarget.length >= 3 && res.steps.length > 0) {
+                for (const step of res.steps) {
+                    const normStep = normalizeStreetKey(step.name || '');
+                    if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
+                        matchedDist += step.distance;
+                    }
+                }
+            }
+
+            const distDiff = Math.abs(res.distance - directDist);
+
+            // Se la via target corrisponde con alta percentuale, selezionalo subito!
+            if (matchedDist > maxMatchedDist) {
+                maxMatchedDist = matchedDist;
+                bestCoords = res.coords;
+                // Se la maggior parte del percorso è sulla via corretta e ha curve reali, ritorna subito
+                if (matchedDist >= directDist * 0.7 && res.coords.length > 2) {
+                    return res.coords;
+                }
+            } else if (maxMatchedDist <= 0 && distDiff < bestDistDiff && res.coords.length > 2) {
+                bestDistDiff = distDiff;
+                bestCoords = res.coords;
             }
         }
     }
 
-    if (candidates.length > 0) {
-        // Scegli il percorso con distanza più vicina a quella reale (evita anelli di 10km)
-        candidates.sort((a, b) => {
-            const diffA = Math.abs(a.distance - directDist);
-            const diffB = Math.abs(b.distance - directDist);
-            return diffA - diffB;
-        });
-        return candidates[0].coords;
+    if (bestCoords && bestCoords.length >= 2) {
+        return bestCoords;
     }
 
     return [[lat1, lng1], [lat2, lng2]];
