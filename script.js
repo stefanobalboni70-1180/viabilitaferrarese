@@ -1278,6 +1278,9 @@ async function updateRoadSegments() {
             key = normKey || m.street.trim().toLowerCase();
             displayName = m.street.trim();
         } else {
+            // Marker senza nome via esplicito (es. rampa di raccordo o svincolo):
+            // inseriscilo subito tra i singleMarkers per il collegamento automatico
+            singleMarkers.push(m);
             return;
         }
 
@@ -1312,12 +1315,15 @@ async function updateRoadSegments() {
     });
 
     // 3. Collega eventuali marker singoli vicini tra loro (es. estremità di rampe/svincoli tra SS16 e RA8)
+    // Ordina singleMarkers cronologicamente per rispettare l'ordine di inserimento (coppie 1-2, 3-4...)
+    singleMarkers.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
+
     const usedSingle = new Set();
     for (let i = 0; i < singleMarkers.length; i++) {
         if (usedSingle.has(i)) continue;
         const m1 = singleMarkers[i];
         let bestJ = -1;
-        let minDist = 2500; // Massimo 2.5 km per collegare due punti di una rampa/svincolo
+        let minDist = 3000; // Massimo 3 km per collegare due punti di una rampa/svincolo
 
         for (let j = i + 1; j < singleMarkers.length; j++) {
             if (usedSingle.has(j)) continue;
