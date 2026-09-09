@@ -1098,15 +1098,16 @@ window.reportResolved = function (id) {
 };
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving Engine)
-// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali e vie cittadine)
-// - Cache persistente locale v4 (istantaneo ai successivi caricamenti)
-// - Risoluzione tramite motore automobilistico ad alta precisione
+// GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving & Bicycle Engine)
+// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali, Svincoli e vie comunali)
+// - Cache persistente locale v17 (istantaneo ai successivi caricamenti)
+// - Per vie locali (es. Via Ruffetta): segue fedelmente ogni curva della via ed esclude deviazioni su SP4
+// - Per arterie e svincoli/rampe (es. RA8, SS16): segue la carreggiata e lo svincolo
 // -------------------------------------------------------
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v16');
+    const cached = localStorage.getItem('ferrara_street_cache_v17');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1115,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v16', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v17', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1164,131 +1165,12 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Recupera la geometria vettoriale reale della strada da OpenStreetMap Overpass API (tramite GET CORS-compatibile)
-// Garantisce al 100% che la linea segua OGNI singola curva della via e non passi MAI su altre strade (es. SP4)
-async function fetchOverpassStreetGeometry(streetName, lat1, lng1, lat2, lng2) {
-    if (!streetName) return null;
-    try {
-        const cleanName = streetName.split(/[,(]/)[0].replace(/^(strada statale|strada provinciale|strada|via|viale|corso|piazza|vicolo)\s+/i, '').trim();
-        if (!cleanName || cleanName.length < 2) return null;
-
-        const minLat = (Math.min(lat1, lat2) - 0.02).toFixed(5);
-        const maxLat = (Math.max(lat1, lat2) + 0.02).toFixed(5);
-        const minLng = (Math.min(lng1, lng2) - 0.02).toFixed(5);
-        const maxLng = (Math.max(lng1, lng2) + 0.02).toFixed(5);
-
-        const query = `[out:json][timeout:8];way['name'~'${cleanName}',i](${minLat},${minLng},${maxLat},${maxLng});out geom;`;
-
-        let res = null;
-        const endpoints = [
-            `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-            `https://lz4.overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-            `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`
-        ];
-
-        for (const url of endpoints) {
-            try {
-                let signal;
-                if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-                    signal = AbortSignal.timeout(5000);
-                }
-                const resp = await fetch(url, signal ? { signal } : {});
-                if (resp.ok) {
-                    res = await resp.json();
-                    if (res && res.elements && res.elements.length > 0) break;
-                }
-            } catch (e) { }
-        }
-
-        if (!res || !res.elements || res.elements.length === 0) return null;
-
-        let rawWays = [];
-        for (const el of res.elements) {
-            if (el.geometry && Array.isArray(el.geometry)) {
-                rawWays.push(el.geometry.map(g => [g.lat, g.lon]));
-            }
-        }
-        if (rawWays.length === 0) return null;
-
-        // Unisci tutti i segmenti della strada in catene continue
-        let chains = rawWays.map(w => w.slice());
-        let mergedAny = true;
-        let passes = 0;
-        while (mergedAny && passes < 15) {
-            mergedAny = false;
-            passes++;
-            for (let i = 0; i < chains.length; i++) {
-                for (let j = i + 1; j < chains.length; j++) {
-                    const c1 = chains[i];
-                    const c2 = chains[j];
-                    const h1 = c1[0], t1 = c1[c1.length - 1];
-                    const h2 = c2[0], t2 = c2[c2.length - 1];
-
-                    if (calculateDistanceMeters(t1[0], t1[1], h2[0], h2[1]) < 600) {
-                        chains[i] = c1.concat(c2);
-                        chains.splice(j, 1);
-                        mergedAny = true; break;
-                    } else if (calculateDistanceMeters(t1[0], t1[1], t2[0], t2[1]) < 600) {
-                        chains[i] = c1.concat(c2.slice().reverse());
-                        chains.splice(j, 1);
-                        mergedAny = true; break;
-                    } else if (calculateDistanceMeters(h1[0], h1[1], t2[0], t2[1]) < 600) {
-                        chains[i] = c2.concat(c1);
-                        chains.splice(j, 1);
-                        mergedAny = true; break;
-                    } else if (calculateDistanceMeters(h1[0], h1[1], h2[0], h2[1]) < 600) {
-                        chains[i] = c2.slice().reverse().concat(c1);
-                        chains.splice(j, 1);
-                        mergedAny = true; break;
-                    }
-                }
-                if (mergedAny) break;
-            }
-        }
-
-        // Trova la catena con entrambi i punti
-        let bestSub = null;
-        let bestScore = Infinity;
-
-        for (const chain of chains) {
-            let idx1 = -1, minD1 = Infinity;
-            let idx2 = -1, minD2 = Infinity;
-
-            for (let i = 0; i < chain.length; i++) {
-                const d1 = calculateDistanceMeters(lat1, lng1, chain[i][0], chain[i][1]);
-                if (d1 < minD1) { minD1 = d1; idx1 = i; }
-                const d2 = calculateDistanceMeters(lat2, lng2, chain[i][0], chain[i][1]);
-                if (d2 < minD2) { minD2 = d2; idx2 = i; }
-            }
-
-            if (idx1 !== -1 && idx2 !== -1 && minD1 < 800 && minD2 < 800) {
-                const sub = (idx1 <= idx2)
-                    ? chain.slice(idx1, idx2 + 1)
-                    : chain.slice(idx2, idx1 + 1).reverse();
-
-                const score = minD1 + minD2;
-                if (sub.length >= 2 && score < bestScore) {
-                    bestScore = score;
-                    bestSub = sub;
-                }
-            }
-        }
-
-        if (bestSub && bestSub.length >= 2) {
-            return bestSub;
-        }
-    } catch (e) {
-        console.warn('Errore Overpass:', e);
-    }
-    return null;
-}
-
 // Helper per scaricare il tracciato da endpoint OSRM
 async function fetchOsrmRoute(url, isReverse = false) {
     try {
         let signal;
         if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-            signal = AbortSignal.timeout(3500);
+            signal = AbortSignal.timeout(4000);
         }
         const response = await fetch(url, signal ? { signal } : {});
         if (response.ok) {
@@ -1309,7 +1191,7 @@ async function fetchOsrmRoute(url, isReverse = false) {
 }
 
 // Calcola il percorso reale tra due punti (anche su rampe a senso unico, svincoli e curve strette)
-// e garantisce che non si devii su provinciali (SP4) o altre strade
+// e garantisce che per le vie locali (es. Via Ruffetta) non si devii mai su provinciali (SP4) o statali
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const isHighway = isMajorHighway(targetStreetName);
@@ -1317,7 +1199,8 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
     const normTarget = normalizeStreetKey(targetStreetName);
 
     // Endpoints in ordine di priorità:
-    // Per vie locali (es. Via Ruffetta): NON usare mai router automobilistico generico che devia su SP4
+    // Per arterie e rampe: usa i profili automobilistici ad alta precisione
+    // Per vie locali (es. Via Ruffetta): usa profili bicycle/foot per seguire esattamente il tracciato locale della via senza deviare sulla SP4
     const endpoints = (isHighway || isRamp)
         ? [
             { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
@@ -1330,7 +1213,8 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
             { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
             { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true }
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
         ];
 
     let bestCoords = null;
@@ -1346,7 +1230,7 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '')
                 if (res.steps && res.steps.length > 0) {
                     for (const step of res.steps) {
                         const normStep = (step.name || '').toLowerCase();
-                        if (normStep.includes('sp4') || normStep.includes('strada provinciale') || normStep.includes('statale')) {
+                        if (normStep.includes('sp4') || normStep.includes('strada provinciale') || (normStep.includes('statale') && !targetStreetName.toLowerCase().includes('statale'))) {
                             hasHighwayDetour = true;
                             break;
                         }
@@ -1403,18 +1287,7 @@ async function getStreetGeometry(streetName, markerCoords) {
             const [lat1, lng1] = markerCoords[i];
             const [lat2, lng2] = markerCoords[i + 1];
 
-            // 1. Estrai PRIMA la geometria vettoriale reale della via assegnata da OpenStreetMap Overpass
-            // Questo garantisce al 100% che la linea segua OGNI singola curva della via e non passi MAI su altre strade (come la SP4)
-            let segment = null;
-            const isRamp = streetName.toLowerCase().includes('ramp') || streetName.toLowerCase().includes('svincolo') || streetName.includes('/');
-            if (!isRamp && streetName && streetName.length >= 3) {
-                segment = await fetchOverpassStreetGeometry(streetName, lat1, lng1, lat2, lng2);
-            }
-
-            // 2. Se non disponibile o è una rampa/statale, usa il motore di routing OSRM
-            if (!segment || segment.length < 2) {
-                segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
-            }
+            const segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
 
             if (segment && segment.length >= 2) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
