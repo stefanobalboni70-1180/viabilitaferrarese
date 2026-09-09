@@ -24,14 +24,14 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.5">
+    <link rel="stylesheet" href="style.css?v=3.5.1">
 </head>
 <body>
     
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.5</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.5.1</span></h1>
             <div class="header-actions">
                 <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
                 <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
@@ -127,13 +127,19 @@
                     </button>
                 </div>
 
-                <!-- Sezione 2: Note / Dettagli -->
+                <!-- Sezione 2: Nome Via / Strada -->
                 <div class="form-section-item">
-                    <label class="section-label" for="admin-marker-note">2. Dettagli o note (opzionale)</label>
+                    <label class="section-label" for="admin-marker-street">2. Nome Via / Strada (es. Via Ruffetta, Via Bologna...)</label>
+                    <input type="text" id="admin-marker-street" placeholder="Rilevamento automatico o modifica..." style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(0, 0, 0, 0.2); color: var(--text-color); outline: none; font-size: 0.95rem; width: 100%; box-sizing: border-box;" />
+                </div>
+
+                <!-- Sezione 3: Note / Dettagli -->
+                <div class="form-section-item">
+                    <label class="section-label" for="admin-marker-note">3. Dettagli o note (opzionale)</label>
                     <textarea id="admin-marker-note" rows="2" placeholder="Es. Chiusura per asfaltatura, passaggio consentito solo a residenti..."></textarea>
                 </div>
 
-                <!-- Sezione 3: Programmazione a tempo -->
+                <!-- Sezione 4: Programmazione a tempo -->
                 <div class="form-section-item schedule-box">
                     <div class="schedule-box-header">
                         <label class="section-label" style="margin-bottom:0;">⏱️ Programmazione Temporale (Apparizione / Scomparsa)</label>

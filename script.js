@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.5.1';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -133,6 +133,7 @@ const modalOverlay = document.getElementById('marker-modal');
 const closeModalBtn = document.getElementById('close-modal');
 const markerModalTitle = document.getElementById('marker-modal-title');
 const adminOptionCards = document.querySelectorAll('#admin-options-grid .option-card');
+const adminMarkerStreet = document.getElementById('admin-marker-street');
 const adminMarkerNote = document.getElementById('admin-marker-note');
 const schedTypeBtns = document.querySelectorAll('.sched-type-btn');
 const schedWindowBlock = document.getElementById('sched-window-block');
@@ -672,6 +673,7 @@ function openMarkerModal(latlng = null, markerToEdit = null) {
         if (markerModalTitle) markerModalTitle.textContent = "✏️ Modifica Segnalazione (Admin)";
         if (adminSaveMarkerBtn) adminSaveMarkerBtn.textContent = "Salva Modifiche";
         selectedAdminType = markerToEdit.type || 'lavori';
+        if (adminMarkerStreet) adminMarkerStreet.value = markerToEdit.street || '';
         if (adminMarkerNote) adminMarkerNote.value = markerToEdit.note || '';
 
         const sched = markerToEdit.schedule || { mode: 'always' };
@@ -685,6 +687,7 @@ function openMarkerModal(latlng = null, markerToEdit = null) {
         if (markerModalTitle) markerModalTitle.textContent = "Nuova Segnalazione (Admin)";
         if (adminSaveMarkerBtn) adminSaveMarkerBtn.textContent = "Salva Segnalazione";
         selectedAdminType = 'lavori';
+        if (adminMarkerStreet) adminMarkerStreet.value = '';
         if (adminMarkerNote) adminMarkerNote.value = '';
         selectedScheduleMode = 'always';
         if (adminSchedStart) adminSchedStart.value = '';
@@ -692,6 +695,15 @@ function openMarkerModal(latlng = null, markerToEdit = null) {
         if (adminSchedTimeStart) adminSchedTimeStart.value = '06:00';
         if (adminSchedTimeEnd) adminSchedTimeEnd.value = '14:00';
         selectedRecurringDays = [1, 2, 3, 4, 5];
+
+        // Rileva in automatico la via per precompilare il campo modificabile
+        if (latlng) {
+            reverseGeocode(latlng.lat, latlng.lng).then(street => {
+                if (street && adminMarkerStreet && !adminMarkerStreet.value) {
+                    adminMarkerStreet.value = street;
+                }
+            });
+        }
     }
 
     // Aggiorna selezione tipo
@@ -806,6 +818,7 @@ if (adminSaveMarkerBtn) {
             scheduleObj.timeEnd = adminSchedTimeEnd ? adminSchedTimeEnd.value : '14:00';
         }
 
+        const customStreet = adminMarkerStreet ? adminMarkerStreet.value.trim() : '';
         const note = adminMarkerNote ? adminMarkerNote.value.trim().slice(0, 500) : null;
 
         if (editingMarkerId) {
@@ -816,18 +829,23 @@ if (adminSaveMarkerBtn) {
                 currentMarker.type = selectedAdminType;
                 currentMarker.note = note || null;
                 currentMarker.schedule = scheduleObj;
+                if (customStreet !== '') {
+                    currentMarker.street = customStreet;
+                }
 
                 if (isFirebaseOnline && markersRef && currentMarker.fbKey) {
                     markersRef.child(currentMarker.fbKey).update({
                         type: selectedAdminType,
                         note: note || null,
-                        schedule: scheduleObj
+                        schedule: scheduleObj,
+                        street: currentMarker.street || null
                     }).catch(e => console.warn('Errore aggiornamento Firebase:', e.message));
                 }
 
                 saveToLocalStorage();
                 closeMarkerModal();
                 refreshMarkers();
+                updateRoadSegments();
                 showToast("✅ Segnalazione modificata con successo!", "success");
             }
         } else {
@@ -839,22 +857,24 @@ if (adminSaveMarkerBtn) {
             const lat = pendingLatLng.lat;
             const lng = pendingLatLng.lng;
 
-            addMarker(lat, lng, selectedAdminType, null, true, note || null, null, null, scheduleObj);
+            addMarker(lat, lng, selectedAdminType, null, true, note || null, null, customStreet || null, scheduleObj);
             closeMarkerModal();
             showToast("✅ Segnalazione inserita!", "success");
 
-            // Rileva la via in background tramite reverse geocoding
-            const street = await reverseGeocode(lat, lng);
-            if (street) {
-                const lastMarker = markersData[markersData.length - 1];
-                if (lastMarker) {
-                    lastMarker.street = street;
-                    if (isFirebaseOnline && markersRef && lastMarker.fbKey) {
-                        markersRef.child(lastMarker.fbKey).update({ street: street });
+            // Se la via non è stata inserita a mano, rileva automaticamente in background
+            if (!customStreet) {
+                const street = await reverseGeocode(lat, lng);
+                if (street) {
+                    const lastMarker = markersData[markersData.length - 1];
+                    if (lastMarker) {
+                        lastMarker.street = street;
+                        if (isFirebaseOnline && markersRef && lastMarker.fbKey) {
+                            markersRef.child(lastMarker.fbKey).update({ street: street });
+                        }
+                        saveToLocalStorage();
+                        updateRoadSegments();
+                        console.log(`📍 Via rilevata automaticamente: ${street}`);
                     }
-                    saveToLocalStorage();
-                    updateRoadSegments();
-                    console.log(`📍 Via rilevata automaticamente: ${street}`);
                 }
             }
         }
@@ -1185,14 +1205,90 @@ async function getStreetGeometry(streetName, markerCoords) {
     return markerCoords;
 }
 
+// Calcola distanza in metri tra due coordinate geografiche (formula Haversine)
+function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Raggio terrestre in metri
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Ordina i punti all'interno di un cluster stradale lungo la traiettoria più naturale
+function orderPointsInCluster(pts) {
+    if (pts.length <= 2) return pts;
+    let maxDist = -1;
+    let startIdx = 0;
+    for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+            const d = calculateDistanceMeters(pts[i][0], pts[i][1], pts[j][0], pts[j][1]);
+            if (d > maxDist) {
+                maxDist = d;
+                startIdx = i;
+            }
+        }
+    }
+    const ordered = [pts[startIdx]];
+    const unvisited = pts.filter((_, idx) => idx !== startIdx);
+    while (unvisited.length > 0) {
+        const last = ordered[ordered.length - 1];
+        let nearestIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < unvisited.length; i++) {
+            const d = calculateDistanceMeters(last[0], last[1], unvisited[i][0], unvisited[i][1]);
+            if (d < minDist) {
+                minDist = d;
+                nearestIdx = i;
+            }
+        }
+        ordered.push(unvisited.splice(nearestIdx, 1)[0]);
+    }
+    return ordered;
+}
+
+// Raggruppa i punti della stessa via in cluster indipendenti se distanti tra loro (> 3.5 km)
+function clusterStreetPoints(points, maxDistanceMeters = 3500) {
+    if (points.length <= 2) return [points];
+    const clusters = [];
+    const visited = new Set();
+
+    for (let i = 0; i < points.length; i++) {
+        if (visited.has(i)) continue;
+        const currentCluster = [points[i]];
+        visited.add(i);
+        const queue = [points[i]];
+
+        while (queue.length > 0) {
+            const p1 = queue.shift();
+            for (let j = 0; j < points.length; j++) {
+                if (!visited.has(j)) {
+                    const p2 = points[j];
+                    if (calculateDistanceMeters(p1[0], p1[1], p2[0], p2[1]) <= maxDistanceMeters) {
+                        visited.add(j);
+                        currentCluster.push(p2);
+                        queue.push(p2);
+                    }
+                }
+            }
+        }
+        clusters.push(currentCluster);
+    }
+    return clusters.map(c => orderPointsInCluster(c));
+}
+
 // -------------------------------------------------------
 // TRATTI STRADALI ROSSI
 // Rendering istantaneo con aggiornamento parallelo fluido
-// Include solo marker visibili e attivi
+// Include solo marker visibili e attivi, gestendo tratti indipendenti
 // -------------------------------------------------------
 async function updateRoadSegments() {
     // 1. Raggruppa i marker per via normalizzata (solo quelli visibili e attivi adesso)
-    const groups = {};
+    const rawGroups = {};
     markersData.forEach(m => {
         if (!m.street || m.street.trim() === '') return;
         if (!isMarkerVisible(m)) return;
@@ -1200,30 +1296,44 @@ async function updateRoadSegments() {
 
         const normKey = normalizeStreetKey(m.street);
         const key = normKey || m.street.trim().toLowerCase();
-        if (!groups[key]) {
-            groups[key] = { streetName: m.street.trim(), coords: [] };
+        if (!rawGroups[key]) {
+            rawGroups[key] = { streetName: m.street.trim(), coords: [] };
         }
-        groups[key].coords.push([m.lat, m.lng]);
+        rawGroups[key].coords.push([m.lat, m.lng]);
     });
 
-    // 2. Rimuovi le polyline non più presenti
-    for (let key in activeSegments) {
-        if (!groups[key] || groups[key].coords.length < 2) {
-            map.removeLayer(activeSegments[key]);
-            delete activeSegments[key];
+    // 2. Suddivide ogni via in cluster indipendenti (es. due tratti distinti sulla stessa statale)
+    const validSegments = {};
+    Object.keys(rawGroups).forEach(key => {
+        const group = rawGroups[key];
+        const clusters = clusterStreetPoints(group.coords, 3500);
+        clusters.forEach((clustCoords, clustIdx) => {
+            if (clustCoords.length >= 2) {
+                const segKey = `${key}_seg_${clustIdx}`;
+                validSegments[segKey] = {
+                    streetName: group.streetName,
+                    coords: clustCoords
+                };
+            }
+        });
+    });
+
+    // 3. Rimuovi le polyline non più presenti
+    for (let segKey in activeSegments) {
+        if (!validSegments[segKey]) {
+            map.removeLayer(activeSegments[segKey]);
+            delete activeSegments[segKey];
         }
     }
 
-    // 3. Disegna o aggiorna tutte le vie IN PARALLELO
-    const groupKeys = Object.keys(groups).filter(k => groups[k].coords.length >= 2);
+    // 4. Disegna subito le linee sulla mappa (cache o coordinate dirette)
+    const segKeys = Object.keys(validSegments);
+    segKeys.forEach(segKey => {
+        const segment = validSegments[segKey];
+        const cacheKey = `${normalizeStreetKey(segment.streetName) || segment.streetName.toLowerCase()}_${segment.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        const initialCoords = streetGeomCache[cacheKey] || segment.coords;
 
-    // Passo immediato: crea subito le linee sulla mappa (cache o coordinate dirette)
-    groupKeys.forEach(key => {
-        const group = groups[key];
-        const cacheKey = `${normalizeStreetKey(group.streetName) || group.streetName.toLowerCase()}_${group.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
-        const initialCoords = streetGeomCache[cacheKey] || group.coords;
-
-        if (!activeSegments[key]) {
+        if (!activeSegments[segKey]) {
             const polyline = L.polyline(initialCoords, {
                 color: '#dc2626',
                 weight: 5,
@@ -1232,24 +1342,24 @@ async function updateRoadSegments() {
                 lineCap: 'round'
             }).addTo(map);
 
-            polyline.bindTooltip(`🔴 ${escapeHtml(group.streetName)}`, {
+            polyline.bindTooltip(`🔴 ${escapeHtml(segment.streetName)}`, {
                 permanent: false,
                 direction: 'center',
                 className: 'road-segment-tooltip'
             });
 
-            activeSegments[key] = polyline;
+            activeSegments[segKey] = polyline;
         } else {
-            activeSegments[key].setLatLngs(initialCoords);
+            activeSegments[segKey].setLatLngs(initialCoords);
         }
     });
 
-    // Passo asincrono parallelo: affina il tracciato con le curve reali della strada
-    await Promise.all(groupKeys.map(async (key) => {
-        const group = groups[key];
-        const routeCoords = await getStreetGeometry(group.streetName, group.coords);
-        if (routeCoords && routeCoords.length >= 2 && activeSegments[key]) {
-            activeSegments[key].setLatLngs(routeCoords);
+    // 5. Passo asincrono parallelo: affina il tracciato con le curve reali OSRM
+    await Promise.all(segKeys.map(async (segKey) => {
+        const segment = validSegments[segKey];
+        const routeCoords = await getStreetGeometry(segment.streetName, segment.coords);
+        if (routeCoords && routeCoords.length >= 2 && activeSegments[segKey]) {
+            activeSegments[segKey].setLatLngs(routeCoords);
         }
     }));
 }
