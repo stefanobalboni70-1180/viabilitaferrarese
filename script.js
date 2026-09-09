@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.0';
+const APP_VERSION = '3.6.1';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2303,26 +2303,81 @@ async function geocodeAddressQuery(query) {
     } catch (e) {
         console.warn("Geocoding error:", e);
     }
-    return null;
+// Calcola la distanza minima in metri tra un punto P e un segmento stradale AB (coordinate geografiche)
+function distPointToSegmentMeters(pLat, pLng, lat1, lng1, lat2, lng2) {
+    const latMid = (lat1 + lat2) / 2;
+    const cosLat = Math.cos(latMid * Math.PI / 180);
+
+    const x1 = (lng1 - pLng) * 111320 * cosLat;
+    const y1 = (lat1 - pLat) * 110540;
+    const x2 = (lng2 - pLng) * 111320 * cosLat;
+    const y2 = (lat2 - pLat) * 110540;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+
+    if (lenSq < 1e-6) {
+        return Math.sqrt(x1 * x1 + y1 * y1);
+    }
+
+    let t = -(x1 * dx + y1 * dy) / lenSq;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+
+    const projX = x1 + t * dx;
+    const projY = y1 + t * dy;
+    return Math.sqrt(projX * projX + projY * projY);
+}
+
+// Calcola la distanza minima reale in metri tra un punto e l'intera geometria di un percorso
+function distPointToPolylineMeters(pLat, pLng, coords) {
+    if (!coords || coords.length === 0) return Infinity;
+    if (coords.length === 1) return calculateDistanceMeters(pLat, pLng, coords[0][0], coords[0][1]);
+
+    let minDist = Infinity;
+    for (let i = 0; i < coords.length - 1; i++) {
+        const d = distPointToSegmentMeters(
+            pLat, pLng,
+            coords[i][0], coords[i][1],
+            coords[i + 1][0], coords[i + 1][1]
+        );
+        if (d < minDist) {
+            minDist = d;
+            if (minDist < 5) break;
+        }
+    }
+    return minDist;
 }
 
 // Rileva tutti gli ostacoli e le strade chiuse attive al momento
-function getActiveNavigationObstacles() {
+// Se destLat e destLng sono forniti, contrassegna come "isDestinationTarget" gli ostacoli situati sul punto di arrivo
+function getActiveNavigationObstacles(destLat = null, destLng = null) {
     const pointObstacles = [];
     const polylineObstacles = [];
+    const BLOCKING_TYPES = ['chiusa', 'lavori', 'ponte', 'mercato', 'sagra', 'incidente'];
 
     markersData.forEach(m => {
         if (!isMarkerVisible(m)) return;
         if (getMarkerScheduleStatus(m) !== 'active') return;
 
-        // Ostacoli che bloccano il transito
-        if (['chiusa', 'sagra', 'mercato', 'lavori'].includes(m.type)) {
+        // Ostacoli che bloccano il transito o devono essere evitati
+        if (BLOCKING_TYPES.includes(m.type)) {
+            let isDestinationTarget = false;
+            if (destLat !== null && destLng !== null) {
+                const distToDest = calculateDistanceMeters(destLat, destLng, m.lat, m.lng);
+                if (distToDest < 85) {
+                    isDestinationTarget = true;
+                }
+            }
+
             pointObstacles.push({
                 lat: m.lat,
                 lng: m.lng,
                 type: m.type,
                 street: m.street || 'Tratto stradale',
-                note: m.note || ''
+                note: m.note || '',
+                isDestinationTarget: isDestinationTarget
             });
         }
     });
@@ -2333,9 +2388,20 @@ function getActiveNavigationObstacles() {
         if (polyline && polyline.getLatLngs) {
             const lls = polyline.getLatLngs();
             if (Array.isArray(lls) && lls.length > 0) {
+                const coords = lls.map(ll => [ll.lat, ll.lng]);
+                let isDestinationTarget = false;
+                if (destLat !== null && destLng !== null) {
+                    for (const c of coords) {
+                        if (calculateDistanceMeters(destLat, destLng, c[0], c[1]) < 65) {
+                            isDestinationTarget = true;
+                            break;
+                        }
+                    }
+                }
                 polylineObstacles.push({
-                    coords: lls.map(ll => [ll.lat, ll.lng]),
-                    name: key
+                    coords: coords,
+                    name: key,
+                    isDestinationTarget: isDestinationTarget
                 });
             }
         }
@@ -2344,11 +2410,11 @@ function getActiveNavigationObstacles() {
     return { pointObstacles, polylineObstacles };
 }
 
-// Verifica se la destinazione è in un'area chiusa/interrotta
+// Verifica se la destinazione ricade all'interno di un'area chiusa/interrotta o evento
 function checkDestinationObstacle(destLat, destLng, obstacles) {
     for (const po of obstacles.pointObstacles) {
         const d = calculateDistanceMeters(destLat, destLng, po.lat, po.lng);
-        if (d < 80) {
+        if (d < 85) {
             return {
                 isBlocked: true,
                 street: po.street,
@@ -2362,7 +2428,7 @@ function checkDestinationObstacle(destLat, destLng, obstacles) {
         for (let i = 0; i < seg.coords.length; i++) {
             const [cLat, cLng] = seg.coords[i];
             const d = calculateDistanceMeters(destLat, destLng, cLat, cLng);
-            if (d < 60) {
+            if (d < 65) {
                 return {
                     isBlocked: true,
                     street: seg.name || 'Strada chiusa',
@@ -2376,19 +2442,42 @@ function checkDestinationObstacle(destLat, destLng, obstacles) {
     return { isBlocked: false };
 }
 
-// Verifica se un percorso interseca ostacoli attivi
+// Verifica se un percorso interseca ostacoli attivi da evitare
+// (Ignora gli ostacoli che coincidono con la destinazione stessa dell'intervento 118)
 function evaluateRouteObstacles(routeCoords, obstacles) {
     let intersects = false;
     let reasons = [];
+    let collidedObstacles = [];
 
-    for (const po of obstacles.pointObstacles) {
-        for (let i = 0; i < routeCoords.length; i++) {
-            const [rLat, rLng] = routeCoords[i];
-            const d = calculateDistanceMeters(rLat, rLng, po.lat, po.lng);
-            if (d < 35) {
+    const avoidablePoints = (obstacles.pointObstacles || []).filter(po => !po.isDestinationTarget);
+    const avoidablePolys = (obstacles.polylineObstacles || []).filter(po => !po.isDestinationTarget);
+
+    for (const po of avoidablePoints) {
+        // Raggio di rilevamento ostacolo geometrico su tutta la carreggiata
+        const threshold = (po.type === 'sagra' || po.type === 'mercato') ? 65 : 45;
+        const d = distPointToPolylineMeters(po.lat, po.lng, routeCoords);
+
+        if (d < threshold) {
+            intersects = true;
+            const typeLabel = po.type === 'ponte' ? 'Ponte interrotto' :
+                              po.type === 'lavori' ? 'Lavori in corso' :
+                              po.type === 'chiusa' ? 'Strada chiusa' :
+                              po.type === 'mercato' ? 'Mercato' :
+                              po.type === 'sagra' ? 'Sagra/Fiera' : 'Ostacolo';
+            const rText = `${typeLabel} (${po.street || 'strada'})`;
+            if (!reasons.includes(rText)) reasons.push(rText);
+            collidedObstacles.push(po);
+        }
+    }
+
+    for (const poly of avoidablePolys) {
+        for (const [pLat, pLng] of poly.coords) {
+            const d = distPointToPolylineMeters(pLat, pLng, routeCoords);
+            if (d < 45) {
                 intersects = true;
-                const rText = `${po.type === 'sagra' ? 'Sagra' : (po.type === 'mercato' ? 'Mercato' : 'Chiusura')} su ${po.street}`;
+                const rText = `Tratto chiuso (${poly.name || 'strada'})`;
                 if (!reasons.includes(rText)) reasons.push(rText);
+                collidedObstacles.push({ lat: pLat, lng: pLng, type: 'chiusa', street: poly.name });
                 break;
             }
         }
@@ -2396,8 +2485,176 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
 
     return {
         intersects: intersects,
-        reasons: reasons
+        reasons: reasons,
+        collidedObstacles: collidedObstacles
     };
+}
+
+// Genera automaticamente percorsi con DEVIAZIONE per aggirare le interruzioni (strada chiusa, lavori, ponti, mercati, fiere)
+async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obstacles, collidedObstacles, directCoords = []) {
+    const candidateDetours = [];
+    const testedWaypoints = [];
+
+    // Raccoglie i punti di blocco unici da aggirare
+    const uniqueObstacles = [];
+    for (const obs of collidedObstacles) {
+        const already = uniqueObstacles.some(u => calculateDistanceMeters(u.lat, u.lng, obs.lat, obs.lng) < 60);
+        if (!already) uniqueObstacles.push(obs);
+    }
+
+    // Per ogni ostacolo sul percorso, calcola punti di passaggio alternativi (waypoint di deviazione)
+    for (const obs of uniqueObstacles) {
+        const obsLat = obs.lat;
+        const obsLng = obs.lng;
+
+        // Trova la direzione del percorso attorno all'ostacolo se disponibile
+        let dLat = destLat - startLat;
+        let dLng = destLng - startLng;
+
+        if (directCoords && directCoords.length > 2) {
+            // Trova il punto più vicino all'ostacolo
+            let closestIdx = 0;
+            let minDist = Infinity;
+            for (let i = 0; i < directCoords.length; i++) {
+                const dist = calculateDistanceMeters(directCoords[i][0], directCoords[i][1], obsLat, obsLng);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestIdx = i;
+                }
+            }
+            const preIdx = Math.max(0, closestIdx - 5);
+            const postIdx = Math.min(directCoords.length - 1, closestIdx + 5);
+            if (preIdx !== postIdx) {
+                dLat = directCoords[postIdx][0] - directCoords[preIdx][0];
+                dLng = directCoords[postIdx][1] - directCoords[preIdx][1];
+            }
+        }
+
+        // Calcola vettori perpendicolari (deviazione a destra e a sinistra)
+        const latMeters = dLat * 111000;
+        const lngMeters = dLng * 111000 * Math.cos(obsLat * Math.PI / 180);
+        const len = Math.sqrt(latMeters * latMeters + lngMeters * lngMeters) || 1;
+
+        const perp1Lat = -lngMeters / len;
+        const perp1Lng = latMeters / len;
+        const perp2Lat = lngMeters / len;
+        const perp2Lng = -latMeters / len;
+
+        // Distanze di deviazione laterali e radiali in metri
+        const lateralOffsets = [300, 600, 1000, 1500];
+        const radialOffsets = [400, 800, 1200];
+
+        const waypointsToTry = [];
+
+        // Deviazioni perpendicolari (destra e sinistra)
+        for (const off of lateralOffsets) {
+            const w1Lat = obsLat + (perp1Lat * off) / 111000;
+            const w1Lng = obsLng + (perp1Lng * off) / (111000 * Math.cos(obsLat * Math.PI / 180));
+            waypointsToTry.push({ lat: w1Lat, lng: w1Lng, offset: off });
+
+            const w2Lat = obsLat + (perp2Lat * off) / 111000;
+            const w2Lng = obsLng + (perp2Lng * off) / (111000 * Math.cos(obsLat * Math.PI / 180));
+            waypointsToTry.push({ lat: w2Lat, lng: w2Lng, offset: off });
+        }
+
+        // Deviazioni radiali (Nord, Sud, Est, Ovest per incroci urbani e provinciali)
+        for (const off of radialOffsets) {
+            const dDegLat = off / 111000;
+            const dDegLng = off / (111000 * Math.cos(obsLat * Math.PI / 180));
+            waypointsToTry.push({ lat: obsLat + dDegLat, lng: obsLng, offset: off });
+            waypointsToTry.push({ lat: obsLat - dDegLat, lng: obsLng, offset: off });
+            waypointsToTry.push({ lat: obsLat, lng: obsLng + dDegLng, offset: off });
+            waypointsToTry.push({ lat: obsLat, lng: obsLng - dDegLng, offset: off });
+        }
+
+        // Prova i waypoint generati
+        for (const wp of waypointsToTry) {
+            // Verifica che il waypoint stesso non sia all'interno di un ostacolo
+            let wpCollides = false;
+            for (const po of (obstacles.pointObstacles || [])) {
+                if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 80) {
+                    wpCollides = true;
+                    break;
+                }
+            }
+            if (wpCollides) continue;
+
+            // Evita duplicati di waypoint troppo vicini
+            const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 80);
+            if (alreadyTested) continue;
+            testedWaypoints.push(wp);
+
+            // Richiedi percorso OSRM via waypoint: Start -> Waypoint -> Dest
+            const detourUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
+            try {
+                const resp = await fetch(detourUrl);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                        const r = data.routes[0];
+                        const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+                        const check = evaluateRouteObstacles(rCoords, obstacles);
+
+                        // Se la deviazione evita completamente tutti gli ostacoli
+                        if (!check.intersects) {
+                            const rawSteps = [];
+                            if (r.legs) {
+                                r.legs.forEach(leg => {
+                                    if (leg.steps) rawSteps.push(...leg.steps);
+                                });
+                            }
+                            candidateDetours.push({
+                                isDetour: true,
+                                coords: rCoords,
+                                distanceKm: (r.distance / 1000).toFixed(1),
+                                durationMin: Math.max(1, Math.round(r.duration / 60)),
+                                intersectsBlock: false,
+                                blockReasons: check.reasons,
+                                avoidedObstacles: obs.street ? [obs.street] : [],
+                                steps: formatManeuverSteps(rawSteps),
+                                rawSteps: rawSteps
+                            });
+
+                            // Se abbiamo già trovato 3 buone deviazioni libere, possiamo fermarci per velocizzare
+                            if (candidateDetours.length >= 3) break;
+                        }
+                    }
+                }
+            } catch (e) { }
+        }
+    }
+
+    // Se necessario, prova anche con il profilo alternativo bicycle per tracciati urbani ZTL/vie minori
+    if (candidateDetours.length === 0) {
+        try {
+            const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
+            const resp = await fetch(bikeUrl);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    const r = data.routes[0];
+                    const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+                    const check = evaluateRouteObstacles(rCoords, obstacles);
+                    if (!check.intersects) {
+                        const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps : [];
+                        candidateDetours.push({
+                            isDetour: true,
+                            coords: rCoords,
+                            distanceKm: (r.distance / 1000).toFixed(1),
+                            durationMin: Math.max(1, Math.round(r.duration / 60)),
+                            intersectsBlock: false,
+                            blockReasons: check.reasons,
+                            avoidedObstacles: [],
+                            steps: formatManeuverSteps(steps),
+                            rawSteps: steps
+                        });
+                    }
+                }
+            }
+        } catch (e) { }
+    }
+
+    return candidateDetours;
 }
 
 // Formatta i passi di svolta turn-by-turn
@@ -2451,8 +2708,14 @@ function formatManeuverSteps(rawSteps) {
     });
 }
 
-// Calcola i percorsi di emergenza (proponendo fino a 2 opzioni distinte)
+// Calcola i percorsi di emergenza:
+// - Esclude automaticamente interruzioni (strada chiusa, lavori, ponti) e mercati/fiere
+// - Se la strada principale è interrotta, calcola automaticamente una DEVIAZIONE per arrivare il prima possibile
+// - Se la destinazione è dentro l'area chiusa/evento (necessità di intervenire lì), consente l'accesso diretto e allerta l'equipaggio
 async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
+    const obstacles = getActiveNavigationObstacles(destLat, destLng);
+
+    // Endpoints per percorsi diretti primari
     const endpoints = [
         `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`,
         `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`
@@ -2472,7 +2735,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         } catch (e) { }
     }
 
-    // Se OSRM ha restituito 1 sola opzione, proviamo a generare un'alternativa per offrire 2 scelte
+    // Se OSRM ha restituito 1 sola opzione, proviamo a generare un'alternativa iniziale
     if (rawRoutes.length === 1) {
         try {
             const altResp = await fetch(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`);
@@ -2485,9 +2748,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         } catch (e) { }
     }
 
-    const obstacles = getActiveNavigationObstacles();
-
-    const processedRoutes = rawRoutes.map((r, idx) => {
+    let processedRoutes = rawRoutes.map((r, idx) => {
         const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
         const distanceKm = (r.distance / 1000).toFixed(1);
         const durationMin = Math.max(1, Math.round(r.duration / 60));
@@ -2496,32 +2757,85 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
         return {
             index: idx,
-            title: idx === 0 ? "Percorso 1 (Consigliato)" : `Percorso ${idx + 1} (Alternativo)`,
+            isDetour: false,
             coords: coords,
             distanceKm: distanceKm,
             durationMin: durationMin,
             intersectsBlock: obsCheck.intersects,
             blockReasons: obsCheck.reasons,
+            collidedObstacles: obsCheck.collidedObstacles,
             steps: formatManeuverSteps(steps),
             rawSteps: steps
         };
     });
 
-    // Ordina: prima i percorsi liberi da ostacoli, poi per tempo
+    // Se i percorsi diretti incontrano ostacoli da evitare, calcola automaticamente DEVIAZIONI
+    const blockedRoutes = processedRoutes.filter(r => r.intersectsBlock);
+    if (blockedRoutes.length > 0) {
+        const allCollided = [];
+        blockedRoutes.forEach(br => {
+            if (br.collidedObstacles) allCollided.push(...br.collidedObstacles);
+        });
+
+        const directRefCoords = blockedRoutes[0] ? blockedRoutes[0].coords : [];
+        const detourRoutes = await calculateDetourRoutes(
+            startLat, startLng,
+            destLat, destLng,
+            obstacles,
+            allCollided,
+            directRefCoords
+        );
+
+        if (detourRoutes && detourRoutes.length > 0) {
+            // Unisci le deviazioni ai candidati
+            processedRoutes.push(...detourRoutes);
+        }
+    }
+
+    // Filtra e ordina:
+    // 1. Percorsi liberi da ostacoli (inclusi quelli ottenuti tramite deviazione) hanno priorità assoluta
+    // 2. Tempo di percorrenza stimato più veloce
+    // 3. Minore distanza
     processedRoutes.sort((a, b) => {
         if (a.intersectsBlock !== b.intersectsBlock) {
             return a.intersectsBlock ? 1 : -1;
         }
-        return a.durationMin - b.durationMin;
+        if (a.durationMin !== b.durationMin) {
+            return a.durationMin - b.durationMin;
+        }
+        return parseFloat(a.distanceKm) - parseFloat(b.distanceKm);
     });
 
-    // Rinomina coerentemente dopo il sorting
-    processedRoutes.forEach((r, i) => {
-        r.title = i === 0 ? "Percorso 1 (Più Veloce / Consigliato)" : `Percorso ${i + 1} (Alternativo)`;
+    // Rimuovi duplicati identici o quasi identici
+    const uniqueRoutes = [];
+    for (const r of processedRoutes) {
+        const isDuplicate = uniqueRoutes.some(u =>
+            Math.abs(parseFloat(u.distanceKm) - parseFloat(r.distanceKm)) < 0.15 &&
+            Math.abs(u.durationMin - r.durationMin) <= 1 &&
+            u.intersectsBlock === r.intersectsBlock
+        );
+        if (!isDuplicate) {
+            uniqueRoutes.push(r);
+        }
+    }
+
+    const finalRoutes = (uniqueRoutes.length > 0 ? uniqueRoutes : processedRoutes).slice(0, 2);
+
+    // Titoli e descrizioni coerenti
+    finalRoutes.forEach((r, i) => {
+        if (i === 0) {
+            r.title = r.isDetour
+                ? "Percorso 1 (Più Veloce con Deviazione)"
+                : "Percorso 1 (Più Veloce / Consigliato)";
+        } else {
+            r.title = r.isDetour
+                ? "Percorso 2 (Alternativo con Deviazione)"
+                : `Percorso ${i + 1} (Alternativo)`;
+        }
     });
 
     return {
-        routes: processedRoutes.slice(0, 2),
+        routes: finalRoutes,
         obstacles: obstacles
     };
 }
@@ -2542,7 +2856,7 @@ async function handleCalculateNav() {
 
     if (calcBtn) {
         calcBtn.disabled = true;
-        calcBtn.innerHTML = "<span>⏳ Calcolo percorsi in corso...</span>";
+        calcBtn.innerHTML = "<span>⏳ Calcolo percorsi e deviazioni...</span>";
     }
 
     try {
@@ -2594,8 +2908,11 @@ async function handleCalculateNav() {
         const alertBox = document.getElementById('nav-dest-alert');
         const alertMsg = document.getElementById('nav-dest-alert-msg');
         if (destCheck.isBlocked) {
-            const reasonName = destCheck.type === 'sagra' ? 'Sagra / Manifestazione' : (destCheck.type === 'mercato' ? 'Mercato rionale' : 'Strada Chiusa');
-            if (alertMsg) alertMsg.textContent = `La destinazione richiesta si trova all'interno o a ridosso di una chiusura attiva (${reasonName} su ${destCheck.street}).`;
+            const reasonName = destCheck.type === 'sagra' ? 'Sagra / Fiera' :
+                               destCheck.type === 'mercato' ? 'Mercato settimanale' :
+                               destCheck.type === 'ponte' ? 'Ponte interrotto' :
+                               destCheck.type === 'lavori' ? 'Cantiere / Lavori' : 'Strada Chiusa';
+            if (alertMsg) alertMsg.textContent = `Intervento diretto sul posto: la destinazione si trova all'interno di una chiusura attiva (${reasonName} su ${destCheck.street}). Il percorso conduce direttamente al luogo di soccorso.`;
             if (alertBox) alertBox.classList.remove('hidden');
         } else {
             if (alertBox) alertBox.classList.add('hidden');
@@ -2673,15 +2990,32 @@ function renderNavRoutes(routes) {
         // Crea card per la lista
         const card = document.createElement('div');
         card.className = `nav-route-card ${isActive ? 'active' : ''}`;
+        
+        let badgesHtml = '';
+        if (idx === 0) badgesHtml += '<span class="nav-badge-pill fastest">⚡ Più Veloce</span>';
+        badgesHtml += '<span class="nav-badge-pill ztl">🛡️ ZTL Ammessa</span>';
+        if (route.isDetour) {
+            badgesHtml += '<span class="nav-badge-pill detour">🔄 Deviazione Attiva</span>';
+            badgesHtml += '<span class="nav-badge-pill avoided">🟢 Ostacoli Evitati</span>';
+        } else if (!route.intersectsBlock) {
+            badgesHtml += '<span class="nav-badge-pill clear">🟢 Viabilità Libera</span>';
+        } else {
+            badgesHtml += '<span class="nav-badge-pill" style="background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid #ef4444;">⚠️ Possibile ostacolo</span>';
+        }
+
+        let detourNoteHtml = '';
+        if (route.isDetour) {
+            detourNoteHtml = `<div class="nav-card-detour-note">🔄 Deviazione applicata: aggiramento interruzioni per arrivo prioritario al target.</div>`;
+        }
+
         card.innerHTML = `
             <div class="nav-card-left">
-                <span class="nav-card-title">${route.title}</span>
+                <span class="nav-card-title">${escapeHtml(route.title)}</span>
                 <span class="nav-card-dist">📏 ${route.distanceKm} km &bull; ⏱️ ${route.durationMin} min</span>
                 <div class="nav-card-badges">
-                    ${idx === 0 ? '<span class="nav-badge-pill fastest">⚡ Più Veloce</span>' : ''}
-                    <span class="nav-badge-pill ztl">🛡️ ZTL Ammessa</span>
-                    ${!route.intersectsBlock ? '<span class="nav-badge-pill clear">🟢 Viabilità Libera</span>' : '<span class="nav-badge-pill" style="background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid #ef4444;">⚠️ Possibile ostacolo</span>'}
+                    ${badgesHtml}
                 </div>
+                ${detourNoteHtml}
             </div>
             <div class="nav-card-time">${route.durationMin} min</div>
         `;
@@ -2728,6 +3062,24 @@ function renderNavSteps(route) {
     stepsList.innerHTML = '';
     const steps = route.steps || [];
     if (stepsCount) stepsCount.textContent = steps.length.toString();
+
+    if (route.isDetour) {
+        const detourBanner = document.createElement('div');
+        detourBanner.className = 'nav-step-item';
+        detourBanner.style.background = 'rgba(245, 158, 11, 0.15)';
+        detourBanner.style.border = '1px solid rgba(245, 158, 11, 0.35)';
+        detourBanner.style.borderRadius = '8px';
+        detourBanner.style.padding = '6px 8px';
+        detourBanner.style.marginBottom = '6px';
+        detourBanner.innerHTML = `
+            <div class="nav-step-icon">🔄</div>
+            <div class="nav-step-info">
+                <div style="color:#fbbf24; font-weight:700;">Deviazione attiva</div>
+                <div class="nav-step-dist" style="color:#cbd5e1;">Percorso ricalcolato per aggirare interruzioni, cantieri, ponti o mercati/fiere.</div>
+            </div>
+        `;
+        stepsList.appendChild(detourBanner);
+    }
 
     steps.forEach((s) => {
         const item = document.createElement('div');
