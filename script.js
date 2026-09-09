@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v12');
+    const cached = localStorage.getItem('ferrara_street_cache_v13');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v12', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v13', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1122,18 +1122,14 @@ function saveStreetGeomCache() {
 function normalizeStreetKey(name) {
     if (!name || typeof name !== 'string') return '';
     let s = name.toLowerCase().trim();
-    // Normalizza abbreviazioni di strade statali e provinciali
     s = s.replace(/\bs\.?s\.?\s*16\b/g, 'ss16');
     s = s.replace(/\bs\.?s\.?\s*309\b/g, 'ss309');
     s = s.replace(/\bs\.?s\.?\s*64\b/g, 'ss64');
     s = s.replace(/\bs\.?p\.?\s*/g, 'sp');
-    // Rimuovi prefissi generici
     s = s.replace(/^(strada statale|strada provinciale|strada|via|viale|corso|piazza|piazzale|vicolo|largo|borgo)\s+/g, '');
-    // Riconoscimento speciale per arterie principali e statali
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
-    // Se contiene virgole o parentesi, estrai solo il nome primario
     s = s.split(/[,(]/)[0].trim();
     return s.replace(/[^a-z0-9]/g, '');
 }
@@ -1164,218 +1160,62 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Recupera la geometria vettoriale reale della strada da OpenStreetMap (Nominatim LineStrings)
-// Segue al 100% le curve della strada stessa senza MAI passare su provinciali (SP4) o altre arterie
-async function fetchStreetVectorGeometry(streetName, lat1, lng1, lat2, lng2) {
-    if (!streetName) return null;
-    try {
-        const cleanName = streetName.split(/[,(]/)[0].trim();
-        if (!cleanName || cleanName.length < 2) return null;
-
-        const url = `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(cleanName)}&county=Ferrara&polygon_geojson=1&format=json`;
-        const resp = await fetch(url);
-        if (!resp.ok) return null;
-        const items = await resp.json();
-        if (!items || items.length === 0) return null;
-
-        let rawWays = [];
-        for (const it of items) {
-            if (it.geojson) {
-                if (it.geojson.type === 'LineString' && Array.isArray(it.geojson.coordinates)) {
-                    rawWays.push(it.geojson.coordinates.map(c => [c[1], c[0]]));
-                } else if (it.geojson.type === 'MultiLineString' && Array.isArray(it.geojson.coordinates)) {
-                    for (const line of it.geojson.coordinates) {
-                        rawWays.push(line.map(c => [c[1], c[0]]));
-                    }
-                }
-            }
-        }
-        if (rawWays.length === 0) return null;
-
-        // Unisci tutti i segmenti della strada che condividono estremi vicini (< 150m)
-        let chains = rawWays.map(w => w.slice());
-        let mergedAny = true;
-        let passes = 0;
-        while (mergedAny && passes < 10) {
-            mergedAny = false;
-            passes++;
-            for (let i = 0; i < chains.length; i++) {
-                for (let j = i + 1; j < chains.length; j++) {
-                    const c1 = chains[i];
-                    const c2 = chains[j];
-                    const h1 = c1[0], t1 = c1[c1.length - 1];
-                    const h2 = c2[0], t2 = c2[c2.length - 1];
-
-                    if (calculateDistanceMeters(t1[0], t1[1], h2[0], h2[1]) < 150) {
-                        chains[i] = c1.concat(c2.slice(1));
-                        chains.splice(j, 1);
-                        mergedAny = true;
-                        break;
-                    } else if (calculateDistanceMeters(t1[0], t1[1], t2[0], t2[1]) < 150) {
-                        chains[i] = c1.concat(c2.slice().reverse().slice(1));
-                        chains.splice(j, 1);
-                        mergedAny = true;
-                        break;
-                    } else if (calculateDistanceMeters(h1[0], h1[1], t2[0], t2[1]) < 150) {
-                        chains[i] = c2.concat(c1.slice(1));
-                        chains.splice(j, 1);
-                        mergedAny = true;
-                        break;
-                    } else if (calculateDistanceMeters(h1[0], h1[1], h2[0], h2[1]) < 150) {
-                        chains[i] = c2.slice().reverse().concat(c1.slice(1));
-                        chains.splice(j, 1);
-                        mergedAny = true;
-                        break;
-                    }
-                }
-                if (mergedAny) break;
-            }
-        }
-
-        // Trova la catena che contiene entrambi i punti e ritaglia l'esatto sotto-percorso
-        let bestSub = null;
-        let bestScore = Infinity;
-
-        for (const chain of chains) {
-            let idx1 = -1, minD1 = Infinity;
-            let idx2 = -1, minD2 = Infinity;
-
-            for (let i = 0; i < chain.length; i++) {
-                const d1 = calculateDistanceMeters(lat1, lng1, chain[i][0], chain[i][1]);
-                if (d1 < minD1) { minD1 = d1; idx1 = i; }
-                const d2 = calculateDistanceMeters(lat2, lng2, chain[i][0], chain[i][1]);
-                if (d2 < minD2) { minD2 = d2; idx2 = i; }
-            }
-
-            if (idx1 !== -1 && idx2 !== -1 && minD1 < 600 && minD2 < 600) {
-                const sub = (idx1 <= idx2) 
-                    ? chain.slice(idx1, idx2 + 1)
-                    : chain.slice(idx2, idx1 + 1).reverse();
-
-                const score = minD1 + minD2;
-                if (sub.length >= 2 && score < bestScore) {
-                    bestScore = score;
-                    bestSub = sub;
-                }
-            }
-        }
-
-        if (bestSub && bestSub.length >= 2) {
-            return bestSub;
-        }
-    } catch (e) {
-        console.warn('Errore estrazione vettoriale Nominatim:', e);
-    }
-    return null;
-}
-
-// Helper per scaricare il tracciato da endpoint OSRM con timeout rapido
-async function fetchOsrmRoute(url, isReverse = false, timeoutMs = 3500) {
+// Helper per scaricare le coordinate da endpoint OSRM
+async function fetchOsrmCoords(url, isReverse = false) {
     try {
         let signal;
         if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-            signal = AbortSignal.timeout(timeoutMs);
+            signal = AbortSignal.timeout(4000);
         }
         const response = await fetch(url, signal ? { signal } : {});
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
-                let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                if (isReverse) coords = coords.slice().reverse();
-                return {
-                    coords: coords,
-                    distance: route.distance || 0,
-                    steps: (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : []
-                };
+                if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length >= 2) {
+                    let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                    if (isReverse) coords = coords.slice().reverse();
+                    return coords;
+                }
             }
         }
     } catch (e) { }
     return null;
 }
 
-// Calcola il percorso reale tra due punti seguendo fedelmente ogni curva della strada
-// Evita qualsiasi deviazione su strade estranee (come SP4) e supporta rampe a senso unico
+// Calcola il percorso reale tra due punti seguendo fedelmente ogni curva della strada (stile v2.8)
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
-    const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const isHighway = isMajorHighway(targetStreetName);
     const isRamp = targetStreetName.toLowerCase().includes('ramp') || targetStreetName.toLowerCase().includes('svincolo') || targetStreetName.includes('/');
-    const normTarget = normalizeStreetKey(targetStreetName);
 
-    // Endpoints in ordine di priorità:
-    const endpoints = [
-        { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-        { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-        { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
-    ];
-
-    let candidates = [];
-
-    for (const ep of endpoints) {
-        const res = await fetchOsrmRoute(ep.url, ep.rev);
-        if (res && res.coords && res.coords.length >= 2) {
-            let matchedDist = 0;
-            let totalStepDist = 0;
-            let hasForeignHighways = false;
-
-            if (res.steps && res.steps.length > 0) {
-                for (const step of res.steps) {
-                    totalStepDist += step.distance;
-                    const normStep = normalizeStreetKey(step.name || '');
-                    if (normTarget && normStep) {
-                        if (normStep.includes(normTarget) || normTarget.includes(normStep)) {
-                            matchedDist += step.distance;
-                        } else if (normStep.includes('sp') || normStep.includes('statale') || normStep.includes('ss') || normStep.includes('provinciale')) {
-                            hasForeignHighways = true;
-                        }
-                    }
-                }
-            }
-
-            const dist = res.distance || directDist;
-            const ratio = dist / Math.max(directDist, 1);
-
-            candidates.push({
-                coords: res.coords,
-                distance: dist,
-                ratio: ratio,
-                matchedDist: matchedDist,
-                totalStepDist: totalStepDist,
-                hasForeignHighways: hasForeignHighways,
-                pointsCount: res.coords.length
-            });
-        }
+    let urls = [];
+    if (isHighway || isRamp) {
+        // Per statali e rampe: prova guida diretta avanti/retro, poi bici
+        urls = [
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false }
+        ];
+    } else {
+        // Per vie ordinarie, locali e rurali (come Via Ruffetta, Via Scandiana, ecc.):
+        // Il motore routed-bike e routed-foot (come nella v2.8) segue rigorosamente ogni curva della carreggiata locale
+        // senza mai deviare su superstrade (SP4)
+        urls = [
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false }
+        ];
     }
 
-    if (candidates.length > 0) {
-        // Se c'è un nome via specifico ed è una via ordinaria/locale (es. Via Ruffetta):
-        if (!isHighway && !isRamp && normTarget && normTarget.length >= 3) {
-            // Filtra i candidati che NON deviano su provinciali o statali esterne
-            const pureCandidates = candidates.filter(c => !c.hasForeignHighways && c.ratio <= 2.8);
-            if (pureCandidates.length > 0) {
-                // Ordina per fedeltà alla via e tracciato più curvo/preciso
-                pureCandidates.sort((a, b) => {
-                    if (b.matchedDist !== a.matchedDist) return b.matchedDist - a.matchedDist;
-                    return b.pointsCount - a.pointsCount;
-                });
-                return pureCandidates[0].coords;
-            }
+    for (const item of urls) {
+        const coords = await fetchOsrmCoords(item.url, item.rev);
+        if (coords && coords.length > 2) {
+            return coords;
         }
-
-        // Per rampe, statali o casi generali: scegli il candidato con vere curve e ratio proporzionato
-        const curvedCandidates = candidates.filter(c => c.pointsCount > 2 && c.ratio <= 2.5);
-        if (curvedCandidates.length > 0) {
-            curvedCandidates.sort((a, b) => Math.abs(a.ratio - 1) - Math.abs(b.ratio - 1));
-            return curvedCandidates[0].coords;
-        }
-
-        // Fallback su miglior candidato disponibile con curve
-        candidates.sort((a, b) => b.pointsCount - a.pointsCount);
-        return candidates[0].coords;
     }
 
     return [[lat1, lng1], [lat2, lng2]];
@@ -1393,20 +1233,7 @@ async function getStreetGeometry(streetName, markerCoords) {
         for (let i = 0; i < markerCoords.length - 1; i++) {
             const [lat1, lng1] = markerCoords[i];
             const [lat2, lng2] = markerCoords[i + 1];
-
-            // 1. Estrai PRIMA la geometria vettoriale ufficiale da OpenStreetMap Nominatim per la via assegnata
-            // Questo garantisce al 100% che la linea segua OGNI singola curva della via e non passi mai su altre strade
-            let segment = null;
-            const isRamp = streetName.toLowerCase().includes('ramp') || streetName.toLowerCase().includes('svincolo') || streetName.includes('/');
-            if (!isRamp && streetName && streetName.length >= 3) {
-                segment = await fetchStreetVectorGeometry(streetName, lat1, lng1, lat2, lng2);
-            }
-
-            // 2. Se non disponibile o è una rampa/svincolo, usa il motore di routing OSRM
-            if (!segment || segment.length < 2) {
-                segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
-            }
-
+            const segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
             if (segment && segment.length >= 2) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
