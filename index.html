@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara v4.0 - Gestione Tratti e Segnalazioni</title>
+    <title>Viabilità Ferrara v3.5 - Segnalazioni a Tempo</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v4.0">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.5">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -24,14 +24,14 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=4.0">
+    <link rel="stylesheet" href="style.css?v=3.5">
 </head>
 <body>
     
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 4.0</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.5</span></h1>
             <div class="header-actions">
                 <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
                 <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
@@ -65,28 +65,6 @@
             <span class="picker-banner-icon">📍</span>
             <span class="picker-banner-text">Tocca o clicca sulla mappa per indicare il punto del problema</span>
             <button id="cancel-picker-btn" class="picker-cancel-btn">Annulla</button>
-        </div>
-    </div>
-
-    <!-- Banner collegamento tratto tra icone (Admin) -->
-    <div id="link-segment-banner" class="picker-banner hidden" style="border-color: #10b981; background: #064e3b;">
-        <div class="picker-banner-content">
-            <span class="picker-banner-icon">🔗</span>
-            <span class="picker-banner-text">Clicca sulla seconda icona per collegare il tratto stradale</span>
-            <button id="cancel-link-segment-btn" class="picker-cancel-btn">Annulla</button>
-        </div>
-    </div>
-
-    <!-- Banner modifica tracciato linea rossa (Admin) -->
-    <div id="edit-segment-banner" class="picker-banner hidden" style="border-color: #f59e0b; background: #1e1b4b; max-width: 600px;">
-        <div class="picker-banner-content" style="flex-wrap: wrap; gap: 8px;">
-            <span class="picker-banner-icon">✏️</span>
-            <span class="picker-banner-text" id="edit-segment-text" style="line-height: 1.3;">Trascina i pallini o clicca sulla mappa per modellare la curva/rampa. Tasto destro per eliminare un punto.</span>
-            <div style="display:flex; gap:6px; margin-left:auto; flex-wrap:wrap;">
-                <button id="save-edit-segment-btn" class="picker-cancel-btn" style="background:#10b981; border-color:#059669; color:white; font-weight:600;">💾 Salva Tracciato</button>
-                <button id="reset-edit-segment-btn" class="picker-cancel-btn" style="background:#ef4444; border-color:#dc2626; color:white;">↺ Reset Auto</button>
-                <button id="cancel-edit-segment-btn" class="picker-cancel-btn">Annulla</button>
-            </div>
         </div>
     </div>
 
@@ -343,6 +321,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=4.0"></script>
+    <script src="script.js?v=3.4"></script>
 </body>
 </html>
