@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.5.1';
+const APP_VERSION = '3.5.2';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v7');
+    const cached = localStorage.getItem('ferrara_street_cache_v8');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v7', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v8', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1136,59 +1136,83 @@ function normalizeStreetKey(name) {
     return s.replace(/[^a-z0-9]/g, '');
 }
 
-function isMajorHighway(streetName) {
-    if (!streetName) return false;
-    const s = streetName.toLowerCase();
-    return s.includes('statale') ||
-           s.includes('ss16') ||
-           s.includes('ss309') ||
-           s.includes('ss64') ||
-           s.includes('tangenziale') ||
-           s.includes('raccordo') ||
-           s.includes('autostrad');
+// Calcola distanza in metri tra due coordinate geografiche (formula Haversine)
+function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Raggio terrestre in metri
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
 
 // Helper per scaricare il tracciato da endpoint OSRM
-async function fetchOsrmRoute(url) {
+async function fetchOsrmRoute(url, isReverse = false) {
     try {
         const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                const route = data.routes[0];
+                let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                if (isReverse) coords = coords.slice().reverse();
+                return {
+                    coords: coords,
+                    distance: route.distance || 0
+                };
             }
         }
     } catch (e) { }
     return null;
 }
 
-// Calcola il percorso reale tra due punti massimizzando la fedeltà alla strada richiesta
-// (evita che strade locali come Via Ruffetta vengano deviate erroneamente su provinciali/SP4)
+// Calcola il percorso reale tra due punti (anche su rampe a senso unico, svincoli e curve strette)
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
-    const isHighway = isMajorHighway(targetStreetName);
+    const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
 
-    // Per le statali e tangenziali usiamo prima il profilo car;
-    // Per tutte le vie cittadine, rurali e locali (es. Via Ruffetta) usiamo prima il profilo bike/local
-    // per garantire che il tracciato segua fedelmente la via senza deviare su provinciali o tangenziali
-    const endpoints = isHighway
-        ? [
-            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
-            `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
-            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`,
-            `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`
-        ]
-        : [
-            `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
-            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
-            `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
-            `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`
-        ];
+    // Lista di endpoint da testare:
+    // Include routing in entrambi i sensi (fondamentale per rampe a senso unico)
+    // e profili car/bike/foot per garantire il tracciamento anche dove car fa giri infiniti
+    const endpoints = [
+        // 1. Car in avanti
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+        // 2. Car in senso opposto (se senso unico / rampa di immissione)
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+        // 3. Bike in avanti (segue direttamente rampe e strade secondarie senza deviare su autostrade)
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+        // 4. Bike in senso opposto
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+        // 5. Project-OSRM Car fallback
+        { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
+        { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
+        // 6. Foot fallback
+        { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false }
+    ];
 
-    for (const url of endpoints) {
-        const coords = await fetchOsrmRoute(url);
-        if (coords && coords.length >= 2) {
-            return coords;
+    const candidates = [];
+    for (const ep of endpoints) {
+        const res = await fetchOsrmRoute(ep.url, ep.rev);
+        if (res && res.coords && res.coords.length >= 2) {
+            candidates.push(res);
+            // Se troviamo un percorso molto vicino alla distanza diretta, è la rampa/strada diretta
+            if (res.distance <= directDist * 2.2 && res.coords.length > 2) {
+                return res.coords;
+            }
         }
+    }
+
+    if (candidates.length > 0) {
+        // Scegli il percorso con distanza più vicina a quella reale (evita anelli di 10km)
+        candidates.sort((a, b) => {
+            const diffA = Math.abs(a.distance - directDist);
+            const diffB = Math.abs(b.distance - directDist);
+            return diffA - diffB;
+        });
+        return candidates[0].coords;
     }
 
     return [[lat1, lng1], [lat2, lng2]];
@@ -1211,7 +1235,7 @@ async function getStreetGeometry(streetName, markerCoords) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
         }
-        // Salva in cache SOLO se ha trovato curve reali (più punti rispetto alle coordinate di partenza)
+        // Salva in cache SOLO se ha trovato curve reali
         if (fullRoute.length > markerCoords.length) {
             streetGeomCache[cacheKey] = fullRoute;
             saveStreetGeomCache();
@@ -1224,117 +1248,55 @@ async function getStreetGeometry(streetName, markerCoords) {
     return markerCoords;
 }
 
-// Calcola distanza in metri tra due coordinate geografiche (formula Haversine)
-function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // Raggio terrestre in metri
-    const phi1 = lat1 * Math.PI / 180;
-    const phi2 = lat2 * Math.PI / 180;
-    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
-    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-              Math.cos(phi1) * Math.cos(phi2) *
-              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-
-// Ordina i punti all'interno di un cluster stradale lungo la traiettoria più naturale
-function orderPointsInCluster(pts) {
-    if (pts.length <= 2) return pts;
-    let maxDist = -1;
-    let startIdx = 0;
-    for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-            const d = calculateDistanceMeters(pts[i][0], pts[i][1], pts[j][0], pts[j][1]);
-            if (d > maxDist) {
-                maxDist = d;
-                startIdx = i;
-            }
-        }
-    }
-    const ordered = [pts[startIdx]];
-    const unvisited = pts.filter((_, idx) => idx !== startIdx);
-    while (unvisited.length > 0) {
-        const last = ordered[ordered.length - 1];
-        let nearestIdx = 0;
-        let minDist = Infinity;
-        for (let i = 0; i < unvisited.length; i++) {
-            const d = calculateDistanceMeters(last[0], last[1], unvisited[i][0], unvisited[i][1]);
-            if (d < minDist) {
-                minDist = d;
-                nearestIdx = i;
-            }
-        }
-        ordered.push(unvisited.splice(nearestIdx, 1)[0]);
-    }
-    return ordered;
-}
-
-// Raggruppa i punti della stessa via in cluster indipendenti se distanti tra loro (> 8 km)
-function clusterStreetPoints(points, maxDistanceMeters = 8000) {
-    if (points.length <= 2) return [points];
-    const clusters = [];
-    const visited = new Set();
-
-    for (let i = 0; i < points.length; i++) {
-        if (visited.has(i)) continue;
-        const currentCluster = [points[i]];
-        visited.add(i);
-        const queue = [points[i]];
-
-        while (queue.length > 0) {
-            const p1 = queue.shift();
-            for (let j = 0; j < points.length; j++) {
-                if (!visited.has(j)) {
-                    const p2 = points[j];
-                    if (calculateDistanceMeters(p1[0], p1[1], p2[0], p2[1]) <= maxDistanceMeters) {
-                        visited.add(j);
-                        currentCluster.push(p2);
-                        queue.push(p2);
-                    }
-                }
-            }
-        }
-        clusters.push(currentCluster);
-    }
-    return clusters.map(c => orderPointsInCluster(c));
-}
-
 // -------------------------------------------------------
 // TRATTI STRADALI ROSSI
-// Rendering istantaneo con aggiornamento parallelo fluido
-// Include solo marker visibili e attivi, gestendo tratti indipendenti
+// Regola ferrea delle coppie:
+// - 1a e 2a icona collegate tra loro in un tratto di strada
+// - 3a e 4a icona collegate tra loro in un altro tratto
+// - e così via (ogni coppia forma un tratto autonomo e indipendente)
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Raggruppa i marker per via normalizzata (solo quelli visibili e attivi adesso)
+    // 1. Raggruppa i marker per via (o per segmentId se presente)
     const rawGroups = {};
     markersData.forEach(m => {
-        if (!m.street || m.street.trim() === '') return;
         if (!isMarkerVisible(m)) return;
         if (getMarkerScheduleStatus(m) !== 'active') return;
 
-        const normKey = normalizeStreetKey(m.street);
-        const key = normKey || m.street.trim().toLowerCase();
-        if (!rawGroups[key]) {
-            rawGroups[key] = { streetName: m.street.trim(), coords: [] };
+        let key = '';
+        let displayName = '';
+        if (m.segmentId) {
+            key = m.segmentId;
+            displayName = m.street || 'Tratto stradale';
+        } else if (m.street && m.street.trim() !== '') {
+            const normKey = normalizeStreetKey(m.street);
+            key = normKey || m.street.trim().toLowerCase();
+            displayName = m.street.trim();
+        } else {
+            return;
         }
-        rawGroups[key].coords.push([m.lat, m.lng]);
+
+        if (!rawGroups[key]) {
+            rawGroups[key] = { streetName: displayName, markers: [] };
+        }
+        rawGroups[key].markers.push(m);
     });
 
-    // 2. Suddivide ogni via in cluster indipendenti (es. due tratti distinti sulla stessa statale)
+    // 2. Suddivide ogni gruppo in coppie indipendenti (1-2, 3-4, 5-6...)
     const validSegments = {};
     Object.keys(rawGroups).forEach(key => {
         const group = rawGroups[key];
-        const clusters = clusterStreetPoints(group.coords, 3500);
-        clusters.forEach((clustCoords, clustIdx) => {
-            if (clustCoords.length >= 2) {
-                const segKey = `${key}_seg_${clustIdx}`;
-                validSegments[segKey] = {
-                    streetName: group.streetName,
-                    coords: clustCoords
-                };
-            }
-        });
+        // Ordina cronologicamente per timestamp/id
+        group.markers.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
+
+        for (let i = 0; i < group.markers.length - 1; i += 2) {
+            const m1 = group.markers[i];
+            const m2 = group.markers[i + 1];
+            const segKey = `${key}_pair_${Math.floor(i / 2)}`;
+            validSegments[segKey] = {
+                streetName: group.streetName,
+                coords: [[m1.lat, m1.lng], [m2.lat, m2.lng]]
+            };
+        }
     });
 
     // 3. Rimuovi le polyline non più presenti
@@ -1373,7 +1335,7 @@ async function updateRoadSegments() {
         }
     });
 
-    // 5. Passo asincrono parallelo: affina il tracciato con le curve reali OSRM
+    // 5. Passo asincrono parallelo: affina il tracciato con le curve reali della strada/rampa
     await Promise.all(segKeys.map(async (segKey) => {
         const segment = validSegments[segKey];
         const routeCoords = await getStreetGeometry(segment.streetName, segment.coords);
