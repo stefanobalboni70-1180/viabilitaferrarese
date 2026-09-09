@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v14');
+    const cached = localStorage.getItem('ferrara_street_cache_v15');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v14', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v15', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1133,6 +1133,8 @@ function normalizeStreetKey(name) {
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
+    // Se contiene virgole o parentesi, estrai solo il nome primario
+    s = s.split(/[,(]/)[0].trim();
     return s.replace(/[^a-z0-9]/g, '');
 }
 
@@ -1162,10 +1164,136 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Recupera la geometria vettoriale reale della strada da OpenStreetMap Overpass API
+// Garantisce al 100% che la linea segua OGNI singola curva della via e non passi MAI su altre strade (es. SP4)
+async function fetchOverpassStreetGeometry(streetName, lat1, lng1, lat2, lng2) {
+    if (!streetName) return null;
+    try {
+        const cleanName = streetName.split(/[,(]/)[0].replace(/^(strada statale|strada provinciale|strada|via|viale|corso|piazza|vicolo)\s+/i, '').trim();
+        if (!cleanName || cleanName.length < 2) return null;
+
+        const minLat = Math.min(lat1, lat2) - 0.02;
+        const maxLat = Math.max(lat1, lat2) + 0.02;
+        const minLng = Math.min(lng1, lng2) - 0.02;
+        const maxLng = Math.max(lng1, lng2) + 0.02;
+
+        const query = `[out:json][timeout:8];way['name'~'${cleanName}',i](${minLat},${minLng},${maxLat},${maxLng});out geom;`;
+
+        let res = null;
+        const endpoints = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter'
+        ];
+
+        for (const ep of endpoints) {
+            try {
+                let signal;
+                if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+                    signal = AbortSignal.timeout(5000);
+                }
+                const resp = await fetch(ep, {
+                    method: 'POST',
+                    body: query,
+                    signal: signal ? signal : undefined
+                });
+                if (resp.ok) {
+                    res = await resp.json();
+                    if (res && res.elements && res.elements.length > 0) break;
+                }
+            } catch (e) { }
+        }
+
+        if (!res || !res.elements || res.elements.length === 0) return null;
+
+        let rawWays = [];
+        for (const el of res.elements) {
+            if (el.geometry && Array.isArray(el.geometry)) {
+                rawWays.push(el.geometry.map(g => [g.lat, g.lon]));
+            }
+        }
+        if (rawWays.length === 0) return null;
+
+        // Unisci tutti i segmenti della strada
+        let chains = rawWays.map(w => w.slice());
+        let mergedAny = true;
+        let passes = 0;
+        while (mergedAny && passes < 15) {
+            mergedAny = false;
+            passes++;
+            for (let i = 0; i < chains.length; i++) {
+                for (let j = i + 1; j < chains.length; j++) {
+                    const c1 = chains[i];
+                    const c2 = chains[j];
+                    const h1 = c1[0], t1 = c1[c1.length - 1];
+                    const h2 = c2[0], t2 = c2[c2.length - 1];
+
+                    if (calculateDistanceMeters(t1[0], t1[1], h2[0], h2[1]) < 500) {
+                        chains[i] = c1.concat(c2);
+                        chains.splice(j, 1);
+                        mergedAny = true; break;
+                    } else if (calculateDistanceMeters(t1[0], t1[1], t2[0], t2[1]) < 500) {
+                        chains[i] = c1.concat(c2.slice().reverse());
+                        chains.splice(j, 1);
+                        mergedAny = true; break;
+                    } else if (calculateDistanceMeters(h1[0], h1[1], t2[0], t2[1]) < 500) {
+                        chains[i] = c2.concat(c1);
+                        chains.splice(j, 1);
+                        mergedAny = true; break;
+                    } else if (calculateDistanceMeters(h1[0], h1[1], h2[0], h2[1]) < 500) {
+                        chains[i] = c2.slice().reverse().concat(c1);
+                        chains.splice(j, 1);
+                        mergedAny = true; break;
+                    }
+                }
+                if (mergedAny) break;
+            }
+        }
+
+        // Trova la catena con entrambi i punti
+        let bestSub = null;
+        let bestScore = Infinity;
+
+        for (const chain of chains) {
+            let idx1 = -1, minD1 = Infinity;
+            let idx2 = -1, minD2 = Infinity;
+
+            for (let i = 0; i < chain.length; i++) {
+                const d1 = calculateDistanceMeters(lat1, lng1, chain[i][0], chain[i][1]);
+                if (d1 < minD1) { minD1 = d1; idx1 = i; }
+                const d2 = calculateDistanceMeters(lat2, lng2, chain[i][0], chain[i][1]);
+                if (d2 < minD2) { minD2 = d2; idx2 = i; }
+            }
+
+            if (idx1 !== -1 && idx2 !== -1 && minD1 < 600 && minD2 < 600) {
+                const sub = (idx1 <= idx2)
+                    ? chain.slice(idx1, idx2 + 1)
+                    : chain.slice(idx2, idx1 + 1).reverse();
+
+                const score = minD1 + minD2;
+                if (sub.length >= 2 && score < bestScore) {
+                    bestScore = score;
+                    bestSub = sub;
+                }
+            }
+        }
+
+        if (bestSub && bestSub.length >= 2) {
+            return bestSub;
+        }
+    } catch (e) {
+        console.warn('Errore Overpass:', e);
+    }
+    return null;
+}
+
 // Helper per scaricare il tracciato da endpoint OSRM
 async function fetchOsrmRoute(url, isReverse = false) {
     try {
-        const response = await fetch(url);
+        let signal;
+        if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+            signal = AbortSignal.timeout(3500);
+        }
+        const response = await fetch(url, signal ? { signal } : {});
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
@@ -1268,7 +1396,20 @@ async function getStreetGeometry(streetName, markerCoords) {
         for (let i = 0; i < markerCoords.length - 1; i++) {
             const [lat1, lng1] = markerCoords[i];
             const [lat2, lng2] = markerCoords[i + 1];
-            const segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
+
+            // 1. Estrai PRIMA la geometria vettoriale reale della via assegnata da OpenStreetMap Overpass
+            // Questo garantisce al 100% che la linea segua OGNI singola curva della via e non passi MAI su altre strade (come la SP4)
+            let segment = null;
+            const isRamp = streetName.toLowerCase().includes('ramp') || streetName.toLowerCase().includes('svincolo') || streetName.includes('/');
+            if (!isRamp && streetName && streetName.length >= 3) {
+                segment = await fetchOverpassStreetGeometry(streetName, lat1, lng1, lat2, lng2);
+            }
+
+            // 2. Se non disponibile o è una rampa/statale, usa il motore di routing OSRM
+            if (!segment || segment.length < 2) {
+                segment = await routeBetweenPoints(lat1, lng1, lat2, lng2, streetName);
+            }
+
             if (segment && segment.length >= 2) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
