@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.7';
+const APP_VERSION = '3.8';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -839,33 +839,9 @@ if (adminSaveMarkerBtn) {
             const lat = pendingLatLng.lat;
             const lng = pendingLatLng.lng;
 
-            // Se c'è un'icona precedentemente inserita entro 5 km non ancora associata a un tratto,
-            // unisci automaticamente le due icone in una coppia/tratto chiuso esclusivo
-            let assignedSegmentId = null;
-            const unpairedCandidates = markersData.filter(m => !m.segmentId);
-            if (unpairedCandidates.length > 0) {
-                const candidatesWithDist = unpairedCandidates
-                    .map(m => ({ marker: m, distKm: getDistanceMeters(lat, lng, m.lat, m.lng) / 1000 }))
-                    .filter(item => item.distKm <= 5.0)
-                    .sort((a, b) => (parseInt(b.marker.id) || 0) - (parseInt(a.marker.id) || 0));
-
-                if (candidatesWithDist.length > 0) {
-                    const partner = candidatesWithDist[0].marker;
-                    assignedSegmentId = 'seg_' + partner.id + '_' + Date.now();
-                    partner.segmentId = assignedSegmentId;
-                    if (isFirebaseOnline && markersRef && partner.fbKey) {
-                        markersRef.child(partner.fbKey).update({ segmentId: assignedSegmentId }).catch(() => {});
-                    }
-                }
-            }
-
-            addMarker(lat, lng, selectedAdminType, null, true, note || null, null, null, scheduleObj, assignedSegmentId);
+            addMarker(lat, lng, selectedAdminType, null, true, note || null, null, null, scheduleObj);
             closeMarkerModal();
-            if (assignedSegmentId) {
-                showToast("🔗 Tratto stradale collegato tra le due icone!", "success", 4000);
-            } else {
-                showToast("✅ Segnalazione inserita!", "success");
-            }
+            showToast("✅ Segnalazione inserita!", "success");
 
             // Rileva la via in background tramite reverse geocoding
             const street = await reverseGeocode(lat, lng);
@@ -885,80 +861,6 @@ if (adminSaveMarkerBtn) {
     });
 }
 
-// Stato collegamento manuale tra icone (Admin)
-let linkingSourceMarkerId = null;
-
-// Avvia la procedura di collegamento manuale tra due icone
-window.startLinkingSegment = function (markerId) {
-    linkingSourceMarkerId = markerId;
-    map.closePopup();
-    const banner = document.getElementById('link-segment-banner');
-    if (banner) banner.classList.remove('hidden');
-    showToast("🔗 Clicca sulla seconda icona per collegare il tratto", "normal", 4000);
-};
-
-// Annulla il collegamento manuale
-window.cancelLinkingSegment = function () {
-    linkingSourceMarkerId = null;
-    const banner = document.getElementById('link-segment-banner');
-    if (banner) banner.classList.add('hidden');
-};
-
-const cancelLinkSegmentBtn = document.getElementById('cancel-link-segment-btn');
-if (cancelLinkSegmentBtn) {
-    cancelLinkSegmentBtn.addEventListener('click', cancelLinkingSegment);
-}
-
-// Completa il collegamento tra due icone
-window.completeLinkingSegment = function (targetMarkerId) {
-    if (!linkingSourceMarkerId || String(linkingSourceMarkerId) === String(targetMarkerId)) {
-        cancelLinkingSegment();
-        return;
-    }
-
-    const m1 = markersData.find(m => String(m.id) === String(linkingSourceMarkerId) || String(m.fbKey) === String(linkingSourceMarkerId));
-    const m2 = markersData.find(m => String(m.id) === String(targetMarkerId) || String(m.fbKey) === String(targetMarkerId));
-
-    if (m1 && m2) {
-        const segId = 'seg_' + Date.now();
-        m1.segmentId = segId;
-        m2.segmentId = segId;
-
-        if (isFirebaseOnline && markersRef) {
-            if (m1.fbKey) markersRef.child(m1.fbKey).update({ segmentId: segId }).catch(() => {});
-            if (m2.fbKey) markersRef.child(m2.fbKey).update({ segmentId: segId }).catch(() => {});
-        }
-
-        saveToLocalStorage();
-        updateRoadSegments();
-        refreshMarkers();
-        showToast("✅ Tratto stradale collegato con successo!", "success", 4000);
-    }
-    cancelLinkingSegment();
-};
-
-// Scollega un'icona o un tratto stradale
-window.unlinkSegment = function (markerId) {
-    const markerObj = markersData.find(m => String(m.id) === String(markerId) || String(m.fbKey) === String(markerId));
-    if (!markerObj || !markerObj.segmentId) return;
-
-    const segId = markerObj.segmentId;
-    markersData.forEach(m => {
-        if (m.segmentId === segId) {
-            m.segmentId = null;
-            if (isFirebaseOnline && markersRef && m.fbKey) {
-                markersRef.child(m.fbKey).update({ segmentId: null }).catch(() => {});
-            }
-        }
-    });
-
-    saveToLocalStorage();
-    updateRoadSegments();
-    refreshMarkers();
-    map.closePopup();
-    showToast("Tratto stradale scollegato.", "normal", 3000);
-};
-
 // Crea l'icona custom per Leaflet con supporto visivo a stati temporali in Admin
 function createCustomIcon(type, status = 'active') {
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
@@ -973,7 +875,7 @@ function createCustomIcon(type, status = 'active') {
 }
 
 // Aggiungi un marker alla mappa
-function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null, segmentId = null) {
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const ts = parseInt(markerId);
@@ -987,8 +889,7 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         note: note || null,
         fbKey: fbKey || null,
         street: street || null,
-        schedule: schedule || null,
-        segmentId: segmentId || null
+        schedule: schedule || null
     };
 
     const status = getMarkerScheduleStatus(markerObj);
@@ -1026,12 +927,6 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         }
 
         if (isAdmin) {
-            if (markerObj.segmentId) {
-                popupContent += `<button class="note-btn" onclick="unlinkSegment('${safeId}')" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); margin-bottom: 8px;">✂️ Scollega Linea Tratto</button>`;
-            } else {
-                popupContent += `<button class="note-btn" onclick="startLinkingSegment('${safeId}')" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3); margin-bottom: 8px;">🔗 Collega ad un'altra icona</button>`;
-            }
-
             popupContent += `
                 <button class="edit-btn" onclick="editMarker('${safeId}')">✏️ Modifica / Programma</button>
                 <button class="delete-btn" onclick="removeMarker('${safeId}')">Risolto / Rimuovi</button>
@@ -1048,14 +943,6 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         popupContent += `</div>`;
 
         marker.bindPopup(popupContent);
-
-        // Click sull'icona: gestisce sia il collegamento manuale che l'apertura popup
-        marker.on('click', function (e) {
-            if (linkingSourceMarkerId) {
-                L.DomEvent.stopPropagation(e);
-                completeLinkingSegment(markerId);
-            }
-        });
 
         // Zoom al doppio click sull'icona
         marker.on('dblclick', function () {
@@ -1123,19 +1010,6 @@ window.removeMarker = function (id) {
     const markerObj = markersData.find(m => String(m.id) === String(id) || String(m.fbKey) === String(id));
     const fbKeyToDelete = (markerObj && markerObj.fbKey) ? markerObj.fbKey : id;
 
-    // Se faceva parte di un tratto stradale, libera il partner
-    if (markerObj && markerObj.segmentId) {
-        const segId = markerObj.segmentId;
-        markersData.forEach(m => {
-            if (m.segmentId === segId && String(m.id) !== String(id) && String(m.fbKey) !== String(id)) {
-                m.segmentId = null;
-                if (isFirebaseOnline && markersRef && m.fbKey) {
-                    markersRef.child(m.fbKey).update({ segmentId: null }).catch(() => {});
-                }
-            }
-        });
-    }
-
     // Rimuovi visivamente subito dalla mappa
     if (activeLayers[id]) {
         map.removeLayer(activeLayers[id]);
@@ -1146,21 +1020,22 @@ window.removeMarker = function (id) {
         delete activeLayers[markerObj.id];
     }
 
-    if (isFirebaseOnline && markersRef && fbKeyToDelete) {
-        markersRef.child(fbKeyToDelete).remove()
-            .then(() => {
-                console.log('🗑️ Marker rimosso da Firebase:', fbKeyToDelete);
-            })
-            .catch(e => {
-                console.error('Errore rimozione Firebase:', e);
-                alert('Impossibile eliminare da Firebase: ' + e.message + '\n\nAssicurati di aver pubblicato le regole aggiornate sulla console Firebase.');
-            });
-    }
-
     markersData = markersData.filter(m => String(m.id) !== String(id) && String(m.fbKey) !== String(id));
     saveToLocalStorage();
     updateFilterCounts();
     updateRoadSegments();
+
+    if (isFirebaseOnline && markersRef && fbKeyToDelete) {
+        markersRef.child(fbKeyToDelete).remove()
+            .then(() => {
+                console.log('🗑️ Marker rimosso da Firebase:', fbKeyToDelete);
+                showToast("Segnalazione rimossa con successo.", "normal");
+            })
+            .catch(e => {
+                console.error('Errore rimozione Firebase:', e);
+                showToast("Errore durante la rimozione su Firebase: " + e.message, "error");
+            });
+    }
 };
 
 // Aggiungi Nota
@@ -1432,63 +1307,91 @@ async function getStreetGeometry(cacheKey, markerCoords) {
     return markerCoords;
 }
 
-// Migra o associa a coppie indipendenti i marker che non hanno ancora un segmentId esplicito
-function autoMigrateUnpairedMarkers() {
-    const unpaired = markersData.filter(m => !m.segmentId);
-    if (unpaired.length < 2) return;
+// -------------------------------------------------------
+// TRATTI STRADALI ROSSI
+// Collega le icone che si trovano sulla stessa via o rampa
+// -------------------------------------------------------
+async function updateRoadSegments() {
+    // 1. Filtra solo marker visibili e attivi adesso
+    const activeMarkers = markersData.filter(m => isMarkerVisible(m) && getMarkerScheduleStatus(m) === 'active');
 
-    // Ordina per timestamp o ordine cronologico
-    unpaired.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
+    // 2. Raggruppa i marker sulla stessa strada o vicini su rampa
+    const n = activeMarkers.length;
+    if (n < 2) {
+        for (let key in activeSegments) {
+            map.removeLayer(activeSegments[key]);
+            delete activeSegments[key];
+        }
+        return;
+    }
 
-    // Associa a coppie di 2 se entro 5 km
-    for (let i = 0; i < unpaired.length - 1; i += 2) {
-        const m1 = unpaired[i];
-        const m2 = unpaired[i + 1];
-        if (m1 && m2 && !m1.segmentId && !m2.segmentId) {
+    const adj = Array.from({ length: n }, () => []);
+
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            const m1 = activeMarkers[i];
+            const m2 = activeMarkers[j];
             const distKm = getDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng) / 1000;
-            if (distKm <= 5.0) {
-                const newSegId = 'seg_' + m1.id + '_' + m2.id;
-                m1.segmentId = newSegId;
-                m2.segmentId = newSegId;
 
-                if (isFirebaseOnline && markersRef) {
-                    if (m1.fbKey) markersRef.child(m1.fbKey).update({ segmentId: newSegId }).catch(() => {});
-                    if (m2.fbKey) markersRef.child(m2.fbKey).update({ segmentId: newSegId }).catch(() => {});
-                }
+            const key1 = normalizeStreetKey(m1.street);
+            const key2 = normalizeStreetKey(m2.street);
+
+            let areConnected = false;
+
+            // Caso A: Hanno lo stesso nome via/arteria (es. Via Ruffetta, Via Bologna, ecc.) ed entro 5 km
+            if (key1 && key2 && key1 === key2 && distKm <= 5.0) {
+                areConnected = true;
+            }
+            // Caso B: Uno dei due non ha nome via rilevato (rampe, svincoli, raccordi) e sono vicini entro 1.8 km
+            else if ((!key1 || !key2) && distKm <= 1.8) {
+                areConnected = true;
+            }
+
+            if (areConnected) {
+                adj[i].push(j);
+                adj[j].push(i);
             }
         }
     }
-}
 
-// -------------------------------------------------------
-// TRATTI STRADALI ROSSI
-// Tracciati a segmenti indipendenti basati su segmentId
-// -------------------------------------------------------
-async function updateRoadSegments() {
-    // 1. Raggruppa i marker SOLO per segmentId (solo quelli visibili e attivi)
-    const segmentGroups = {};
-    markersData.forEach(m => {
-        if (!m.segmentId) return;
-        if (!isMarkerVisible(m)) return;
-        if (getMarkerScheduleStatus(m) !== 'active') return;
+    const visited = new Array(n).fill(false);
+    const clusters = [];
 
-        if (!segmentGroups[m.segmentId]) {
-            segmentGroups[m.segmentId] = [];
+    for (let i = 0; i < n; i++) {
+        if (!visited[i]) {
+            const cluster = [];
+            const queue = [i];
+            visited[i] = true;
+            while (queue.length > 0) {
+                const u = queue.shift();
+                cluster.push(activeMarkers[u]);
+                for (const v of adj[u]) {
+                    if (!visited[v]) {
+                        visited[v] = true;
+                        queue.push(v);
+                    }
+                }
+            }
+            if (cluster.length >= 2) {
+                clusters.push(cluster);
+            }
         }
-        segmentGroups[m.segmentId].push(m);
-    });
+    }
 
-    const currentSegmentKeys = new Set(Object.keys(segmentGroups).filter(k => segmentGroups[k].length >= 2));
+    const currentSegmentKeys = new Set();
     const segmentsToProcess = [];
 
-    currentSegmentKeys.forEach(segId => {
-        const markers = segmentGroups[segId];
-        const rawCoords = markers.map(m => [m.lat, m.lng]);
+    clusters.forEach(cluster => {
+        const rawCoords = cluster.map(m => [m.lat, m.lng]);
         const sortedCoords = sortCoordsChain(rawCoords);
 
+        // Identificativo univoco stabile del segmento
+        const segId = cluster.map(m => String(m.id || m.fbKey)).sort().join('__');
+        currentSegmentKeys.add(segId);
+
         // Etichetta del tratto per il tooltip
-        const namedMarker = markers.find(m => m.street && m.street.trim());
-        const displayLabel = namedMarker ? namedMarker.street.trim() : 'Tratto stradale';
+        const namedMarker = cluster.find(m => m.street && m.street.trim());
+        const displayLabel = namedMarker ? namedMarker.street.trim() : 'Strada chiusa';
 
         const cacheKey = `seg_${sortedCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
         const initialCoords = streetGeomCache[cacheKey] || sortedCoords;
@@ -1520,7 +1423,7 @@ async function updateRoadSegments() {
         });
     });
 
-    // 2. Rimuovi i segmenti non più esistenti
+    // 3. Rimuovi i segmenti non più esistenti
     for (let key in activeSegments) {
         if (!currentSegmentKeys.has(key)) {
             map.removeLayer(activeSegments[key]);
@@ -1528,7 +1431,7 @@ async function updateRoadSegments() {
         }
     }
 
-    // 3. Aggiorna in parallelo il tracciato con le curve reali della strada
+    // 4. Aggiorna in parallelo il tracciato con le curve reali della strada
     await Promise.all(segmentsToProcess.map(async (item) => {
         const routeCoords = await getStreetGeometry(item.cacheKey, item.coords);
         if (routeCoords && routeCoords.length >= 2 && activeSegments[item.segId]) {
@@ -1567,19 +1470,11 @@ function loadMarkers() {
                         note: m.note || null,
                         fbKey: fbKey,
                         street: m.street || null,
-                        schedule: m.schedule || null,
-                        segmentId: m.segmentId || null
+                        schedule: m.schedule || null
                     };
                     markersData.push(markerObj);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null);
                 });
-
-                // Associa a coppie isolate i marker preesistenti senza segmentId
-                autoMigrateUnpairedMarkers();
-
-                markersData.forEach(m => {
-                    addMarker(m.lat, m.lng, m.type, m.id, false, m.note || null, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
-                });
-
                 saveToLocalStorage();
                 console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale da Firebase`);
             }
@@ -1602,9 +1497,8 @@ function loadFromLocalStorage() {
     if (saved) {
         try {
             markersData = JSON.parse(saved);
-            autoMigrateUnpairedMarkers();
             markersData.forEach(m => {
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
             });
             console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
@@ -1624,7 +1518,7 @@ function refreshMarkers() {
     activeLayers = {};
 
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
+        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
     });
 
     updateFilterCounts();
