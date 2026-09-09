@@ -1,4 +1,4 @@
-# Viabilità Ferrara 118 - Versione 3.6.1
+# Viabilità Ferrara 118 - Versione 3.6.2
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara.
 

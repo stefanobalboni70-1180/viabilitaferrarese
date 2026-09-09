@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.6.2';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2493,7 +2493,8 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
     };
 }
 
-// Genera automaticamente percorsi con DEVIAZIONE per aggirare le interruzioni (strada chiusa, lavori, ponti, mercati, fiere)
+// Genera automaticamente percorsi con DEVIAZIONE RAPIDA per aggirare le interruzioni (strada chiusa, lavori, ponti, mercati, fiere)
+// Utilizza micro-waypoint sulle vie limitrofe (es. Via Borso, Via Guarini, Via Ariosto) e profili con transito ZTL 118
 async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obstacles, collidedObstacles, directCoords = []) {
     const candidateDetours = [];
     const testedWaypoints = [];
@@ -2501,11 +2502,22 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
     // Raccoglie i punti di blocco unici da aggirare
     const uniqueObstacles = [];
     for (const obs of collidedObstacles) {
-        const already = uniqueObstacles.some(u => calculateDistanceMeters(u.lat, u.lng, obs.lat, obs.lng) < 60);
+        const already = uniqueObstacles.some(u => calculateDistanceMeters(u.lat, u.lng, obs.lat, obs.lng) < 50);
         if (!already) uniqueObstacles.push(obs);
     }
 
-    // Per ogni ostacolo sul percorso, calcola punti di passaggio alternativi (waypoint di deviazione)
+    // Calcolo realistico tempo di percorrenza per mezzo di soccorso 118 (velocità media urbana ~36 km/h)
+    function calcEmergencyDuration(distanceMeters, osrmCarDuration = null) {
+        const distKm = distanceMeters / 1000;
+        if (osrmCarDuration && osrmCarDuration > 0) {
+            // Se car OSRM è disponibile, usa il tempo car (o accelerato per emergenza)
+            const carMin = Math.round(osrmCarDuration / 60);
+            return Math.max(1, Math.min(carMin, Math.round((distKm / 40) * 60)));
+        }
+        return Math.max(1, Math.round((distKm / 36) * 60));
+    }
+
+    // Per ogni ostacolo sul percorso, calcola punti di passaggio alternativi a corto raggio (vie adiacenti)
     for (const obs of uniqueObstacles) {
         const obsLat = obs.lat;
         const obsLng = obs.lng;
@@ -2515,7 +2527,6 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
         let dLng = destLng - startLng;
 
         if (directCoords && directCoords.length > 2) {
-            // Trova il punto più vicino all'ostacolo
             let closestIdx = 0;
             let minDist = Infinity;
             for (let i = 0; i < directCoords.length; i++) {
@@ -2525,15 +2536,15 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
                     closestIdx = i;
                 }
             }
-            const preIdx = Math.max(0, closestIdx - 5);
-            const postIdx = Math.min(directCoords.length - 1, closestIdx + 5);
+            const preIdx = Math.max(0, closestIdx - 4);
+            const postIdx = Math.min(directCoords.length - 1, closestIdx + 4);
             if (preIdx !== postIdx) {
                 dLat = directCoords[postIdx][0] - directCoords[preIdx][0];
                 dLng = directCoords[postIdx][1] - directCoords[preIdx][1];
             }
         }
 
-        // Calcola vettori perpendicolari (deviazione a destra e a sinistra)
+        // Calcola vettori perpendicolari (destra e sinistra)
         const latMeters = dLat * 111000;
         const lngMeters = dLng * 111000 * Math.cos(obsLat * Math.PI / 180);
         const len = Math.sqrt(latMeters * latMeters + lngMeters * lngMeters) || 1;
@@ -2543,13 +2554,13 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
         const perp2Lat = lngMeters / len;
         const perp2Lng = -latMeters / len;
 
-        // Distanze di deviazione laterali e radiali in metri
-        const lateralOffsets = [300, 600, 1000, 1500];
-        const radialOffsets = [400, 800, 1200];
+        // Distanze di deviazione a partire da micro-distanze (per trovare subito la prima via parallela es. Via Borso/Guarini/Ariosto)
+        const lateralOffsets = [70, 140, 220, 350, 550, 850, 1300];
+        const radialOffsets = [80, 160, 280, 450, 700, 1100];
 
         const waypointsToTry = [];
 
-        // Deviazioni perpendicolari (destra e sinistra)
+        // Deviazioni perpendicolari (destra e sinistra immediate)
         for (const off of lateralOffsets) {
             const w1Lat = obsLat + (perp1Lat * off) / 111000;
             const w1Lng = obsLng + (perp1Lng * off) / (111000 * Math.cos(obsLat * Math.PI / 180));
@@ -2560,7 +2571,7 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
             waypointsToTry.push({ lat: w2Lat, lng: w2Lng, offset: off });
         }
 
-        // Deviazioni radiali (Nord, Sud, Est, Ovest per incroci urbani e provinciali)
+        // Deviazioni radiali (Nord, Sud, Est, Ovest per isolati urbani)
         for (const off of radialOffsets) {
             const dDegLat = off / 111000;
             const dDegLng = off / (111000 * Math.cos(obsLat * Math.PI / 180));
@@ -2572,89 +2583,73 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
 
         // Prova i waypoint generati
         for (const wp of waypointsToTry) {
-            // Verifica che il waypoint stesso non sia all'interno di un ostacolo
+            // Verifica che il waypoint stesso non sia dentro un ostacolo
             let wpCollides = false;
             for (const po of (obstacles.pointObstacles || [])) {
-                if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 80) {
+                if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 60) {
                     wpCollides = true;
                     break;
                 }
             }
             if (wpCollides) continue;
 
-            // Evita duplicati di waypoint troppo vicini
-            const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 80);
+            const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 45);
             if (alreadyTested) continue;
             testedWaypoints.push(wp);
 
-            // Richiedi percorso OSRM via waypoint: Start -> Waypoint -> Dest
-            const detourUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
-            try {
-                const resp = await fetch(detourUrl);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                        const r = data.routes[0];
-                        const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
-                        const check = evaluateRouteObstacles(rCoords, obstacles);
+            // Prova con routing ZTL (bicycle / emergency network) e con routing car
+            const routerEndpoints = [
+                { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: true },
+                { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: false }
+            ];
 
-                        // Se la deviazione evita completamente tutti gli ostacoli
-                        if (!check.intersects) {
-                            const rawSteps = [];
-                            if (r.legs) {
-                                r.legs.forEach(leg => {
-                                    if (leg.steps) rawSteps.push(...leg.steps);
+            for (const ep of routerEndpoints) {
+                try {
+                    const resp = await fetch(ep.url);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                            const r = data.routes[0];
+                            const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+                            const check = evaluateRouteObstacles(rCoords, obstacles);
+
+                            // Se la deviazione evita completamente tutti gli ostacoli
+                            if (!check.intersects) {
+                                const rawSteps = [];
+                                if (r.legs) {
+                                    r.legs.forEach(leg => {
+                                        if (leg.steps) rawSteps.push(...leg.steps);
+                                    });
+                                }
+
+                                const distKm = (r.distance / 1000).toFixed(1);
+                                const durMin = ep.isZtl
+                                    ? calcEmergencyDuration(r.distance, null)
+                                    : calcEmergencyDuration(r.distance, r.duration);
+
+                                candidateDetours.push({
+                                    isDetour: true,
+                                    coords: rCoords,
+                                    distanceKm: distKm,
+                                    durationMin: durMin,
+                                    distanceRaw: r.distance,
+                                    intersectsBlock: false,
+                                    blockReasons: check.reasons,
+                                    avoidedObstacles: obs.street ? [obs.street] : [],
+                                    steps: formatManeuverSteps(rawSteps),
+                                    rawSteps: rawSteps
                                 });
-                            }
-                            candidateDetours.push({
-                                isDetour: true,
-                                coords: rCoords,
-                                distanceKm: (r.distance / 1000).toFixed(1),
-                                durationMin: Math.max(1, Math.round(r.duration / 60)),
-                                intersectsBlock: false,
-                                blockReasons: check.reasons,
-                                avoidedObstacles: obs.street ? [obs.street] : [],
-                                steps: formatManeuverSteps(rawSteps),
-                                rawSteps: rawSteps
-                            });
 
-                            // Se abbiamo già trovato 3 buone deviazioni libere, possiamo fermarci per velocizzare
-                            if (candidateDetours.length >= 3) break;
+                                // Se abbiamo già trovato diverse deviazioni valide, procediamo con le migliori
+                                if (candidateDetours.length >= 6) break;
+                            }
                         }
                     }
-                }
-            } catch (e) { }
-        }
-    }
-
-    // Se necessario, prova anche con il profilo alternativo bicycle per tracciati urbani ZTL/vie minori
-    if (candidateDetours.length === 0) {
-        try {
-            const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
-            const resp = await fetch(bikeUrl);
-            if (resp.ok) {
-                const data = await resp.json();
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    const r = data.routes[0];
-                    const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
-                    const check = evaluateRouteObstacles(rCoords, obstacles);
-                    if (!check.intersects) {
-                        const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps : [];
-                        candidateDetours.push({
-                            isDetour: true,
-                            coords: rCoords,
-                            distanceKm: (r.distance / 1000).toFixed(1),
-                            durationMin: Math.max(1, Math.round(r.duration / 60)),
-                            intersectsBlock: false,
-                            blockReasons: check.reasons,
-                            avoidedObstacles: [],
-                            steps: formatManeuverSteps(steps),
-                            rawSteps: steps
-                        });
-                    }
-                }
+                } catch (e) { }
             }
-        } catch (e) { }
+
+            if (candidateDetours.length >= 6) break;
+        }
     }
 
     return candidateDetours;
@@ -2713,39 +2708,29 @@ function formatManeuverSteps(rawSteps) {
 
 // Calcola i percorsi di emergenza:
 // - Esclude automaticamente interruzioni (strada chiusa, lavori, ponti) e mercati/fiere
-// - Se la strada principale è interrotta, calcola automaticamente una DEVIAZIONE per arrivare il prima possibile
+// - Calcola la DEVIAZIONE PIÙ VELOCE E CORTA (anche attraverso vie ZTL come Via Borso, Via Guarini, Via Ariosto)
 // - Se la destinazione è dentro l'area chiusa/evento (necessità di intervenire lì), consente l'accesso diretto e allerta l'equipaggio
 async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const obstacles = getActiveNavigationObstacles(destLat, destLng);
 
-    // Endpoints per percorsi diretti primari
+    // Endpoints per percorsi primari (Car + ZTL Emergency)
     const endpoints = [
-        `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`,
-        `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isZtl: false },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isZtl: false },
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: true }
     ];
 
     let rawRoutes = [];
-    for (const u of endpoints) {
+    for (const ep of endpoints) {
         try {
-            const resp = await fetch(u);
+            const resp = await fetch(ep.url);
             if (resp.ok) {
                 const data = await resp.json();
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    rawRoutes = data.routes;
-                    break;
-                }
-            }
-        } catch (e) { }
-    }
-
-    // Se OSRM ha restituito 1 sola opzione, proviamo a generare un'alternativa iniziale
-    if (rawRoutes.length === 1) {
-        try {
-            const altResp = await fetch(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`);
-            if (altResp.ok) {
-                const altData = await altResp.json();
-                if (altData.code === 'Ok' && altData.routes && altData.routes.length > 0) {
-                    rawRoutes.push(altData.routes[0]);
+                    data.routes.forEach(r => {
+                        r._isZtl = ep.isZtl;
+                        rawRoutes.push(r);
+                    });
                 }
             }
         } catch (e) { }
@@ -2754,7 +2739,15 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     let processedRoutes = rawRoutes.map((r, idx) => {
         const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
         const distanceKm = (r.distance / 1000).toFixed(1);
-        const durationMin = Math.max(1, Math.round(r.duration / 60));
+        
+        let durationMin;
+        if (r._isZtl) {
+            // Velocità media emergenza 118 in ZTL/centro (~36 km/h)
+            durationMin = Math.max(1, Math.round(((r.distance / 1000) / 36) * 60));
+        } else {
+            durationMin = Math.max(1, Math.round(r.duration / 60));
+        }
+
         const obsCheck = evaluateRouteObstacles(coords, obstacles);
         const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps : [];
 
@@ -2763,6 +2756,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             isDetour: false,
             coords: coords,
             distanceKm: distanceKm,
+            distanceRaw: r.distance,
             durationMin: durationMin,
             intersectsBlock: obsCheck.intersects,
             blockReasons: obsCheck.reasons,
@@ -2772,7 +2766,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         };
     });
 
-    // Se i percorsi diretti incontrano ostacoli da evitare, calcola automaticamente DEVIAZIONI
+    // Se i percorsi diretti incontrano ostacoli da evitare, calcola le DEVIAZIONI PIÙ BREVI E RAPIDE
     const blockedRoutes = processedRoutes.filter(r => r.intersectsBlock);
     if (blockedRoutes.length > 0) {
         const allCollided = [];
@@ -2790,15 +2784,14 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         );
 
         if (detourRoutes && detourRoutes.length > 0) {
-            // Unisci le deviazioni ai candidati
             processedRoutes.push(...detourRoutes);
         }
     }
 
     // Filtra e ordina:
-    // 1. Percorsi liberi da ostacoli (inclusi quelli ottenuti tramite deviazione) hanno priorità assoluta
+    // 1. Percorsi liberi da ostacoli (inclusi quelli con deviazione attiva) hanno priorità assoluta
     // 2. Tempo di percorrenza stimato più veloce
-    // 3. Minore distanza
+    // 3. Minore distanza (favorisce la deviazione breve attraverso vie adiacenti es. Via Borso/Guarini/Ariosto rispetto a lunghi giri)
     processedRoutes.sort((a, b) => {
         if (a.intersectsBlock !== b.intersectsBlock) {
             return a.intersectsBlock ? 1 : -1;
@@ -2806,14 +2799,14 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         if (a.durationMin !== b.durationMin) {
             return a.durationMin - b.durationMin;
         }
-        return parseFloat(a.distanceKm) - parseFloat(b.distanceKm);
+        return (a.distanceRaw || parseFloat(a.distanceKm)) - (b.distanceRaw || parseFloat(b.distanceKm));
     });
 
-    // Rimuovi duplicati identici o quasi identici
+    // Rimuovi duplicati geometricamente identici
     const uniqueRoutes = [];
     for (const r of processedRoutes) {
         const isDuplicate = uniqueRoutes.some(u =>
-            Math.abs(parseFloat(u.distanceKm) - parseFloat(r.distanceKm)) < 0.15 &&
+            Math.abs(parseFloat(u.distanceKm) - parseFloat(r.distanceKm)) < 0.1 &&
             Math.abs(u.durationMin - r.durationMin) <= 1 &&
             u.intersectsBlock === r.intersectsBlock
         );
@@ -2824,7 +2817,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
     const finalRoutes = (uniqueRoutes.length > 0 ? uniqueRoutes : processedRoutes).slice(0, 2);
 
-    // Titoli e descrizioni coerenti
+    // Titoli coerenti
     finalRoutes.forEach((r, i) => {
         if (i === 0) {
             r.title = r.isDetour
