@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.5';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -512,11 +512,14 @@ async function reverseGeocode(lat, lng) {
         );
         const data = await response.json();
         if (data && data.address) {
-            // Nominatim restituisce road, pedestrian, path, ecc.
+            // Nominatim restituisce road, highway, pedestrian, path, ecc.
             return data.address.road ||
+                   data.address.highway ||
                    data.address.pedestrian ||
                    data.address.path ||
                    data.address.footway ||
+                   data.address.cycleway ||
+                   data.name ||
                    null;
         }
     } catch (e) {
@@ -1075,15 +1078,15 @@ window.reportResolved = function (id) {
 };
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap
-// Segue fedelmente tutte le curve e i tratti della strada
-// - Cache persistente locale (0ms ai successivi caricamenti)
-// - Risoluzione rapida (~80ms) con curve esatte
+// GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving Engine)
+// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali e vie cittadine)
+// - Cache persistente locale v4 (istantaneo ai successivi caricamenti)
+// - Risoluzione tramite motore automobilistico ad alta precisione
 // -------------------------------------------------------
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v3');
+    const cached = localStorage.getItem('ferrara_street_cache_v4');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1091,31 +1094,83 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v3', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v4', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
-// Recupera la geometria reale della strada in modo rapido ed esatto
+// Normalizza i nomi delle strade per collegare segnalazioni appartenenti alla stessa arteria/statale
+function normalizeStreetKey(name) {
+    if (!name || typeof name !== 'string') return '';
+    let s = name.toLowerCase().trim();
+    // Normalizza abbreviazioni di strade statali e provinciali
+    s = s.replace(/\bs\.?s\.?\s*16\b/g, 'ss16');
+    s = s.replace(/\bs\.?s\.?\s*309\b/g, 'ss309');
+    s = s.replace(/\bs\.?s\.?\s*64\b/g, 'ss64');
+    s = s.replace(/\bs\.?p\.?\s*/g, 'sp');
+    // Rimuovi prefissi generici
+    s = s.replace(/^(strada statale|strada provinciale|strada|via|viale|corso|piazza|piazzale|vicolo|largo|borgo)\s+/g, '');
+    // Riconoscimento speciale per arterie principali e statali
+    if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
+    if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
+    if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
+    return s.replace(/[^a-z0-9]/g, '');
+}
+
+// Helper per scaricare il tracciato da endpoint OSRM
+async function fetchOsrmRoute(url) {
+    try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            }
+        }
+    } catch (e) { }
+    return null;
+}
+
+// Calcola il percorso reale tra due punti con routing automobilistico e fallback robusti
+async function routeBetweenPoints(lat1, lng1, lat2, lng2) {
+    // 1. OSM Routed Car (profilo automobilistico principale - supporta statali, tangenziali, strade primarie)
+    let coords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (coords && coords.length >= 2) return coords;
+
+    // 2. Fallback Project-OSRM Car
+    coords = await fetchOsrmRoute(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (coords && coords.length >= 2) return coords;
+
+    // 3. Fallback senso inverso (nel caso di sensi unici / corsie separate disegnate in direzione opposta)
+    let revCoords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`);
+    if (revCoords && revCoords.length >= 2) return revCoords.slice().reverse();
+
+    // 4. Fallback OSM Bike (per piazze pedonali, ZTL o percorsi ciclabili del centro storico)
+    coords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (coords && coords.length >= 2) return coords;
+
+    // 5. Fallback OSM Foot (per vicoli pedonali)
+    coords = await fetchOsrmRoute(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`);
+    if (coords && coords.length >= 2) return coords;
+
+    // 6. Fallback finale: linea retta tra i due punti
+    return [[lat1, lng1], [lat2, lng2]];
+}
+
+// Recupera la geometria reale dell'intera tratta stradale
 async function getStreetGeometry(streetName, markerCoords) {
-    const cacheKey = `${streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+    const cacheKey = `${normalizeStreetKey(streetName) || streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
     if (streetGeomCache[cacheKey]) {
         return streetGeomCache[cacheKey];
     }
 
-    // Metodo 1: OSM Routed Bike (istantaneo ~80ms, segue fedelmente ogni curva della via specifica)
     try {
         let fullRoute = [];
         for (let i = 0; i < markerCoords.length - 1; i++) {
             const [lat1, lng1] = markerCoords[i];
             const [lat2, lng2] = markerCoords[i + 1];
-            const url = `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`;
-            const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                    fullRoute = fullRoute.length > 0 ? fullRoute.concat(coords.slice(1)) : coords;
-                }
+            const segment = await routeBetweenPoints(lat1, lng1, lat2, lng2);
+            if (segment && segment.length >= 2) {
+                fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
         }
         if (fullRoute.length >= 2) {
@@ -1123,30 +1178,9 @@ async function getStreetGeometry(streetName, markerCoords) {
             saveStreetGeomCache();
             return fullRoute;
         }
-    } catch (e) { }
-
-    // Metodo 2: OSM Routed Foot (fallback per tratti particolari)
-    try {
-        let fullRoute = [];
-        for (let i = 0; i < markerCoords.length - 1; i++) {
-            const [lat1, lng1] = markerCoords[i];
-            const [lat2, lng2] = markerCoords[i + 1];
-            const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`;
-            const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                    fullRoute = fullRoute.length > 0 ? fullRoute.concat(coords.slice(1)) : coords;
-                }
-            }
-        }
-        if (fullRoute.length >= 2) {
-            streetGeomCache[cacheKey] = fullRoute;
-            saveStreetGeomCache();
-            return fullRoute;
-        }
-    } catch (e) { }
+    } catch (e) {
+        console.warn('Errore calcolo geometria stradale:', e.message);
+    }
 
     return markerCoords;
 }
@@ -1157,14 +1191,15 @@ async function getStreetGeometry(streetName, markerCoords) {
 // Include solo marker visibili e attivi
 // -------------------------------------------------------
 async function updateRoadSegments() {
-    // 1. Raggruppa i marker per nome via (solo quelli visibili e attivi adesso)
+    // 1. Raggruppa i marker per via normalizzata (solo quelli visibili e attivi adesso)
     const groups = {};
     markersData.forEach(m => {
         if (!m.street || m.street.trim() === '') return;
         if (!isMarkerVisible(m)) return;
         if (getMarkerScheduleStatus(m) !== 'active') return;
 
-        const key = m.street.trim().toLowerCase();
+        const normKey = normalizeStreetKey(m.street);
+        const key = normKey || m.street.trim().toLowerCase();
         if (!groups[key]) {
             groups[key] = { streetName: m.street.trim(), coords: [] };
         }
@@ -1185,7 +1220,7 @@ async function updateRoadSegments() {
     // Passo immediato: crea subito le linee sulla mappa (cache o coordinate dirette)
     groupKeys.forEach(key => {
         const group = groups[key];
-        const cacheKey = `${group.streetName.toLowerCase()}_${group.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        const cacheKey = `${normalizeStreetKey(group.streetName) || group.streetName.toLowerCase()}_${group.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
         const initialCoords = streetGeomCache[cacheKey] || group.coords;
 
         if (!activeSegments[key]) {
