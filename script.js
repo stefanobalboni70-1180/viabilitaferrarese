@@ -2303,6 +2303,9 @@ async function geocodeAddressQuery(query) {
     } catch (e) {
         console.warn("Geocoding error:", e);
     }
+    return null;
+}
+
 // Calcola la distanza minima in metri tra un punto P e un segmento stradale AB (coordinate geografiche)
 function distPointToSegmentMeters(pLat, pLng, lat1, lng1, lat2, lng2) {
     const latMid = (lat1 + lat2) / 2;
