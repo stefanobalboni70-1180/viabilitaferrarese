@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v5');
+    const cached = localStorage.getItem('ferrara_street_cache_v6');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v5', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v6', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1136,21 +1136,26 @@ function normalizeStreetKey(name) {
     return s.replace(/[^a-z0-9]/g, '');
 }
 
-// Helper per scaricare il tracciato e gli step da endpoint OSRM
-async function fetchOsrmRouteWithSteps(url, isReverse = false) {
+function isMajorHighway(streetName) {
+    if (!streetName) return false;
+    const s = streetName.toLowerCase();
+    return s.includes('statale') ||
+           s.includes('ss16') ||
+           s.includes('ss309') ||
+           s.includes('ss64') ||
+           s.includes('tangenziale') ||
+           s.includes('raccordo') ||
+           s.includes('autostrad');
+}
+
+// Helper per scaricare il tracciato da endpoint OSRM
+async function fetchOsrmRoute(url) {
     try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
+        const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                if (isReverse) coords = coords.reverse();
-                return {
-                    coords: coords,
-                    distance: route.distance || 0,
-                    steps: (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : []
-                };
+                return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
             }
         }
     } catch (e) { }
@@ -1160,54 +1165,33 @@ async function fetchOsrmRouteWithSteps(url, isReverse = false) {
 // Calcola il percorso reale tra due punti massimizzando la fedeltà alla strada richiesta
 // (evita che strade locali come Via Ruffetta vengano deviate erroneamente su provinciali/SP4)
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
-    const normTarget = normalizeStreetKey(targetStreetName);
+    const isHighway = isMajorHighway(targetStreetName);
 
-    // Esegui query concorrenti sui diversi motori e profili
-    const candidatesPromises = [
-        fetchOsrmRouteWithSteps(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`),
-        fetchOsrmRouteWithSteps(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`),
-        fetchOsrmRouteWithSteps(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`),
-        fetchOsrmRouteWithSteps(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, true),
-        fetchOsrmRouteWithSteps(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, true),
-        fetchOsrmRouteWithSteps(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`)
-    ];
+    // Per le statali e tangenziali usiamo prima il profilo car;
+    // Per tutte le vie cittadine, rurali e locali (es. Via Ruffetta) usiamo prima il profilo bike/local
+    // per garantire che il tracciato segua fedelmente la via senza deviare su provinciali o tangenziali
+    const endpoints = isHighway
+        ? [
+            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
+            `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
+            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`,
+            `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`
+        ]
+        : [
+            `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
+            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
+            `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`,
+            `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`
+        ];
 
-    const results = (await Promise.all(candidatesPromises)).filter(r => r && r.coords && r.coords.length >= 2);
-
-    if (results.length === 0) {
-        return [[lat1, lng1], [lat2, lng2]];
-    }
-
-    if (normTarget && normTarget.length >= 3) {
-        let bestCandidate = null;
-        let maxMatchedDist = -1;
-        let bestRatio = -1;
-
-        for (const candidate of results) {
-            let matchedDist = 0;
-            for (const step of candidate.steps) {
-                const normStep = normalizeStreetKey(step.name || '');
-                if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
-                    matchedDist += step.distance;
-                }
-            }
-            const ratio = matchedDist / Math.max(candidate.distance, 1);
-
-            if (matchedDist > maxMatchedDist || (matchedDist === maxMatchedDist && ratio > bestRatio)) {
-                maxMatchedDist = matchedDist;
-                bestRatio = ratio;
-                bestCandidate = candidate;
-            }
-        }
-
-        if (bestCandidate && maxMatchedDist > 0) {
-            return bestCandidate.coords;
+    for (const url of endpoints) {
+        const coords = await fetchOsrmRoute(url);
+        if (coords && coords.length >= 2) {
+            return coords;
         }
     }
 
-    // Se non ci sono nomi corrispondenti, usa il percorso più diretto/corto
-    results.sort((a, b) => a.distance - b.distance);
-    return results[0].coords;
+    return [[lat1, lng1], [lat2, lng2]];
 }
 
 // Recupera la geometria reale dell'intera tratta stradale
