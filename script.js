@@ -1106,7 +1106,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v13');
+    const cached = localStorage.getItem('ferrara_street_cache_v14');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -1114,7 +1114,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v13', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v14', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -1122,15 +1122,17 @@ function saveStreetGeomCache() {
 function normalizeStreetKey(name) {
     if (!name || typeof name !== 'string') return '';
     let s = name.toLowerCase().trim();
+    // Normalizza abbreviazioni di strade statali e provinciali
     s = s.replace(/\bs\.?s\.?\s*16\b/g, 'ss16');
     s = s.replace(/\bs\.?s\.?\s*309\b/g, 'ss309');
     s = s.replace(/\bs\.?s\.?\s*64\b/g, 'ss64');
     s = s.replace(/\bs\.?p\.?\s*/g, 'sp');
+    // Rimuovi prefissi generici
     s = s.replace(/^(strada statale|strada provinciale|strada|via|viale|corso|piazza|piazzale|vicolo|largo|borgo)\s+/g, '');
+    // Riconoscimento speciale per arterie principali e statali
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
-    s = s.split(/[,(]/)[0].trim();
     return s.replace(/[^a-z0-9]/g, '');
 }
 
@@ -1160,62 +1162,95 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Helper per scaricare le coordinate da endpoint OSRM
-async function fetchOsrmCoords(url, isReverse = false) {
+// Helper per scaricare il tracciato da endpoint OSRM
+async function fetchOsrmRoute(url, isReverse = false) {
     try {
-        let signal;
-        if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-            signal = AbortSignal.timeout(4000);
-        }
-        const response = await fetch(url, signal ? { signal } : {});
+        const response = await fetch(url);
         if (response.ok) {
             const data = await response.json();
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
-                if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length >= 2) {
-                    let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                    if (isReverse) coords = coords.slice().reverse();
-                    return coords;
-                }
+                let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                if (isReverse) coords = coords.slice().reverse();
+                return {
+                    coords: coords,
+                    distance: route.distance || 0,
+                    steps: (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : []
+                };
             }
         }
     } catch (e) { }
     return null;
 }
 
-// Calcola il percorso reale tra due punti seguendo fedelmente ogni curva della strada (stile v2.8)
+// Calcola il percorso reale tra due punti (anche su rampe a senso unico, svincoli e curve strette)
+// e garantisce che non si devii su provinciali (SP4) o altre strade
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
+    const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const isHighway = isMajorHighway(targetStreetName);
     const isRamp = targetStreetName.toLowerCase().includes('ramp') || targetStreetName.toLowerCase().includes('svincolo') || targetStreetName.includes('/');
+    const normTarget = normalizeStreetKey(targetStreetName);
 
-    let urls = [];
-    if (isHighway || isRamp) {
-        // Per statali e rampe: prova guida diretta avanti/retro, poi bici
-        urls = [
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false }
+    // Endpoints in ordine di priorità:
+    // Per rampe e svincoli: testiamo car e bike in entrambi i sensi
+    const endpoints = (isHighway || isRamp)
+        ? [
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
+        ]
+        : [
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
         ];
-    } else {
-        // Per vie ordinarie, locali e rurali (come Via Ruffetta, Via Scandiana, ecc.):
-        // Il motore routed-bike e routed-foot (come nella v2.8) segue rigorosamente ogni curva della carreggiata locale
-        // senza mai deviare su superstrade (SP4)
-        urls = [
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full`, rev: true },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full`, rev: false }
-        ];
+
+    let bestCoords = null;
+    let maxMatchedDist = -1;
+    let bestDistDiff = Infinity;
+
+    for (const ep of endpoints) {
+        const res = await fetchOsrmRoute(ep.url, ep.rev);
+        if (res && res.coords && res.coords.length >= 2) {
+            let matchedDist = 0;
+            if (normTarget && normTarget.length >= 3 && res.steps && res.steps.length > 0) {
+                for (const step of res.steps) {
+                    const normStep = normalizeStreetKey(step.name || '');
+                    if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
+                        matchedDist += step.distance;
+                    }
+                }
+            }
+
+            const distDiff = Math.abs(res.distance - directDist);
+
+            // Per vie ordinarie con nome specifico (es. Via Ruffetta): priorità a matchedDist
+            if (!isRamp && normTarget && matchedDist > maxMatchedDist) {
+                maxMatchedDist = matchedDist;
+                bestCoords = res.coords;
+                if (matchedDist >= directDist * 0.7 && res.coords.length > 2) {
+                    return res.coords;
+                }
+            } else if (distDiff < bestDistDiff && res.coords.length > 2) {
+                // Per rampe/svincoli e curve: scegli il percorso diretto senza giri a vuoto
+                bestDistDiff = distDiff;
+                bestCoords = res.coords;
+                if (res.distance <= directDist * 2.2) {
+                    return res.coords;
+                }
+            }
+        }
     }
 
-    for (const item of urls) {
-        const coords = await fetchOsrmCoords(item.url, item.rev);
-        if (coords && coords.length > 2) {
-            return coords;
-        }
+    if (bestCoords && bestCoords.length >= 2) {
+        return bestCoords;
     }
 
     return [[lat1, lng1], [lat2, lng2]];
@@ -1278,8 +1313,6 @@ async function updateRoadSegments() {
             key = normKey || m.street.trim().toLowerCase();
             displayName = m.street.trim();
         } else {
-            // Marker senza nome via esplicito (es. rampa di raccordo o svincolo):
-            // inseriscilo subito tra i singleMarkers per il collegamento automatico
             singleMarkers.push(m);
             return;
         }
@@ -1315,15 +1348,13 @@ async function updateRoadSegments() {
     });
 
     // 3. Collega eventuali marker singoli vicini tra loro (es. estremità di rampe/svincoli tra SS16 e RA8)
-    // Ordina singleMarkers cronologicamente per rispettare l'ordine di inserimento (coppie 1-2, 3-4...)
     singleMarkers.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
-
     const usedSingle = new Set();
     for (let i = 0; i < singleMarkers.length; i++) {
         if (usedSingle.has(i)) continue;
         const m1 = singleMarkers[i];
         let bestJ = -1;
-        let minDist = 3000; // Massimo 3 km per collegare due punti di una rampa/svincolo
+        let minDist = 2500; // Massimo 2.5 km per collegare due punti di una rampa/svincolo
 
         for (let j = i + 1; j < singleMarkers.length; j++) {
             if (usedSingle.has(j)) continue;
