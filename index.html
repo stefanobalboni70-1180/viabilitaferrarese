@@ -24,15 +24,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.5.3">
+    <link rel="stylesheet" href="style.css?v=3.6.0">
 </head>
 <body>
     
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.5.3</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.0</span></h1>
             <div class="header-actions">
+                <button id="nav-btn" class="nav-btn" title="Navigazione Soccorso 118">🧭 Naviga</button>
                 <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
                 <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
                     🔔 Segnalazioni <span id="reports-badge" class="badge">0</span>
@@ -315,6 +316,103 @@
         </div>
     </div>
 
+    <!-- Drawer di Navigazione 118 -->
+    <div id="nav-panel" class="nav-drawer hidden">
+        <div class="nav-drawer-header">
+            <div class="nav-title-box">
+                <span class="nav-icon-badge">🧭</span>
+                <div>
+                    <h3>Navigatore 118 Ferrara</h3>
+                    <p class="nav-sub">Esclusione strade interrotte & transito ZTL ammesso</p>
+                </div>
+            </div>
+            <button id="close-nav-btn" class="close-btn" title="Chiudi Navigatore">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+
+        <div class="nav-drawer-body">
+            <!-- Punto di Partenza -->
+            <div class="nav-input-group">
+                <label class="nav-label"><span class="point-badge start">A</span> Partenza</label>
+                <div class="nav-input-wrapper">
+                    <input type="text" id="nav-start-input" placeholder="Partenza (GPS o inserisci via...)" />
+                    <button id="nav-start-gps-btn" class="nav-inline-btn" title="Usa posizione GPS">📍 GPS</button>
+                    <button id="nav-start-map-btn" class="nav-inline-btn" title="Scegli su mappa">🗺️ Mappa</button>
+                </div>
+            </div>
+
+            <!-- Punto di Arrivo -->
+            <div class="nav-input-group">
+                <label class="nav-label"><span class="point-badge dest">B</span> Destinazione</label>
+                <div class="nav-input-wrapper">
+                    <input type="text" id="nav-dest-input" placeholder="Destinazione (es. Via Garibaldi, Ferrara)..." />
+                    <button id="nav-dest-map-btn" class="nav-inline-btn" title="Scegli su mappa">🗺️ Mappa</button>
+                </div>
+            </div>
+
+            <button id="nav-calc-btn" class="primary-btn nav-calc-btn">
+                <span>🔍 Calcola Percorsi</span>
+            </button>
+
+            <!-- Banner di Allerta se la Destinazione è in una strada chiusa / area manifestazione -->
+            <div id="nav-dest-alert" class="nav-alert-box hidden">
+                <div class="nav-alert-icon">⚠️</div>
+                <div class="nav-alert-text">
+                    <strong>ATTENZIONE: Destinazione in area interrotta!</strong>
+                    <p id="nav-dest-alert-msg">Il luogo di arrivo si trova all'interno o a ridosso di una chiusura stradale o manifestazione attiva.</p>
+                </div>
+            </div>
+
+            <!-- Schede Opzioni Percorso -->
+            <div id="nav-routes-container" class="nav-routes-container hidden">
+                <div class="nav-routes-header">
+                    <span class="nav-routes-label">Opzioni di percorso (seleziona per visualizzare):</span>
+                </div>
+                <div class="nav-cards-list" id="nav-cards-list">
+                    <!-- Popolato dinamicamente -->
+                </div>
+
+                <!-- Lista svolte passo-passo -->
+                <div class="nav-steps-box" id="nav-steps-box">
+                    <button id="nav-toggle-steps-btn" class="nav-toggle-steps-btn">
+                        <span>📜 Indicazioni di svolta (<span id="nav-steps-count">0</span>)</span>
+                        <span id="nav-steps-chevron">▼</span>
+                    </button>
+                    <div id="nav-steps-list" class="nav-steps-list hidden"></div>
+                </div>
+
+                <div class="nav-actions-row">
+                    <button id="nav-start-guidance-btn" class="primary-btn nav-start-guidance-btn">
+                        <span>▶️ Avvia Guida Turn-by-Turn</span>
+                    </button>
+                    <button id="nav-clear-btn" class="nav-clear-btn" title="Cancella percorso">
+                        <span>❌ Azzera</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD di Navigazione Turn-by-Turn Mobile -->
+    <div id="nav-hud" class="nav-hud hidden">
+        <div class="nav-hud-top">
+            <div class="nav-hud-maneuver-icon" id="hud-maneuver-icon">⬆️</div>
+            <div class="nav-hud-maneuver-info">
+                <div class="hud-dist" id="hud-next-dist">Tra 250 m</div>
+                <div class="hud-street" id="hud-next-street">Prosegui dritto</div>
+            </div>
+        </div>
+        <div class="nav-hud-bottom">
+            <div class="hud-stats">
+                <span class="hud-time" id="hud-time-remain">-- min</span>
+                <span class="hud-dist-total" id="hud-dist-remain">-- km</span>
+                <span class="hud-badge-ztl">🛡️ ZTL 118 Ammessa</span>
+            </div>
+            <button id="hud-stop-btn" class="hud-stop-btn">Termina</button>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div id="toast" class="toast-box hidden"></div>
 
@@ -327,6 +425,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.5.3"></script>
+    <script src="script.js?v=3.6.0"></script>
 </body>
 </html>

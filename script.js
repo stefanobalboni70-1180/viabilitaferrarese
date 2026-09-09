@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.5.3';
+const APP_VERSION = '3.6.0';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -253,8 +253,18 @@ function initMap() {
         openMarkerModal(e.latlng);
     });
 
-    // Evento click sulla mappa (per selezione punto da parte dell'utente)
+    // Evento click sulla mappa (per selezione punto da parte dell'utente o per navigazione)
     map.on('click', async function (e) {
+        if (navPickerMode) {
+            const mode = navPickerMode;
+            navPickerMode = null;
+            if (pickerBanner) pickerBanner.classList.add('hidden');
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            await handleNavMapPicked(mode, lat, lng);
+            return;
+        }
+
         if (isPickingPointOnMap) {
             isPickingPointOnMap = false;
             if (pickerBanner) pickerBanner.classList.add('hidden');
@@ -2120,11 +2130,736 @@ window.rejectReport = function (reportId) {
     showToast("Segnalazione scartata.", "normal", 3000);
 };
 
+// =======================================================
+// MODULO NAVIGATORE SOCCORSO 118 (MOBILE & DESKTOP)
+// - Calcolo percorsi con proposta di 2 opzioni (se presenti)
+// - Esclusione automatica strade interrotte / sagre / mercati
+// - Allerta visivo immediato se la destinazione è in area chiusa
+// - Transito ZTL ammesso e valorizzato per massima celerità
+// - Guida Turn-by-Turn con tracciamento GPS veicolo
+// =======================================================
+
+let navStartPoint = null; // { lat, lng, label }
+let navDestPoint = null;  // { lat, lng, label }
+let navPickerMode = null; // 'start' | 'dest' | null
+let navRoutes = [];       // Array di percorsi
+let activeNavRouteIdx = 0;
+let navRouteLayers = [];
+let navMarkerStart = null;
+let navMarkerDest = null;
+let guidanceActive = false;
+let guidanceWatchId = null;
+let vehicleMarker = null;
+
+// Inizializza i listener del Navigatore
+function initNavigationModule() {
+    const navBtn = document.getElementById('nav-btn');
+    const closeNavBtn = document.getElementById('close-nav-btn');
+    const navStartGpsBtn = document.getElementById('nav-start-gps-btn');
+    const navStartMapBtn = document.getElementById('nav-start-map-btn');
+    const navDestMapBtn = document.getElementById('nav-dest-map-btn');
+    const navCalcBtn = document.getElementById('nav-calc-btn');
+    const navToggleStepsBtn = document.getElementById('nav-toggle-steps-btn');
+    const navStartGuidanceBtn = document.getElementById('nav-start-guidance-btn');
+    const navClearBtn = document.getElementById('nav-clear-btn');
+    const hudStopBtn = document.getElementById('hud-stop-btn');
+    const navStartInput = document.getElementById('nav-start-input');
+    const navDestInput = document.getElementById('nav-dest-input');
+
+    if (navBtn) navBtn.addEventListener('click', toggleNavPanel);
+    if (closeNavBtn) closeNavBtn.addEventListener('click', closeNavPanel);
+    if (navStartGpsBtn) navStartGpsBtn.addEventListener('click', setNavStartToGps);
+    if (navStartMapBtn) navStartMapBtn.addEventListener('click', () => startNavMapPick('start'));
+    if (navDestMapBtn) navDestMapBtn.addEventListener('click', () => startNavMapPick('dest'));
+    if (navCalcBtn) navCalcBtn.addEventListener('click', handleCalculateNav);
+    if (navToggleStepsBtn) navToggleStepsBtn.addEventListener('click', toggleNavSteps);
+    if (navStartGuidanceBtn) navStartGuidanceBtn.addEventListener('click', startTurnByTurnGuidance);
+    if (navClearBtn) navClearBtn.addEventListener('click', clearNavRoutes);
+    if (hudStopBtn) hudStopBtn.addEventListener('click', stopTurnByTurnGuidance);
+
+    if (navStartInput) {
+        navStartInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleCalculateNav();
+        });
+    }
+    if (navDestInput) {
+        navDestInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleCalculateNav();
+        });
+    }
+}
+
+function toggleNavPanel() {
+    const navPanel = document.getElementById('nav-panel');
+    if (!navPanel) return;
+    if (navPanel.classList.contains('hidden')) {
+        openNavPanel();
+    } else {
+        closeNavPanel();
+    }
+}
+
+function openNavPanel() {
+    const navPanel = document.getElementById('nav-panel');
+    if (!navPanel) return;
+    navPanel.classList.remove('hidden');
+
+    // Se la partenza non è impostata, imposta automaticamente il GPS
+    if (!navStartPoint) {
+        setNavStartToGps(false);
+    }
+}
+
+function closeNavPanel() {
+    const navPanel = document.getElementById('nav-panel');
+    if (navPanel) navPanel.classList.add('hidden');
+    navPickerMode = null;
+    const pickerBanner = document.getElementById('picker-banner');
+    if (pickerBanner) pickerBanner.classList.add('hidden');
+}
+
+// Imposta la partenza sulla posizione GPS attuale
+function setNavStartToGps(showToastMsg = true) {
+    const startInput = document.getElementById('nav-start-input');
+    if (startInput) startInput.value = "Rilevamento GPS in corso...";
+
+    if (!navigator.geolocation) {
+        if (startInput) startInput.value = "";
+        if (showToastMsg) showToast("Geolocalizzazione non supportata dal browser.", "error");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            navStartPoint = { lat, lng, label: "Posizione GPS attuale" };
+            if (startInput) startInput.value = "📍 La mia posizione";
+            if (showToastMsg) showToast("📍 Posizione GPS impostata come partenza.", "success");
+        },
+        (err) => {
+            console.warn("GPS error:", err.message);
+            // Se fallisce, prova a usare il centro mappa Ferrara
+            const center = map.getCenter();
+            navStartPoint = { lat: center.lat, lng: center.lng, label: "Centro Mappa" };
+            if (startInput) startInput.value = "📍 Centro mappa Ferrara";
+            if (showToastMsg) showToast("Impossibile rilevare GPS. Impostato centro mappa.", "normal");
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+    );
+}
+
+// Avvia la selezione su mappa per partenza o arrivo
+function startNavMapPick(mode) {
+    navPickerMode = mode;
+    const pickerBanner = document.getElementById('picker-banner');
+    const bannerText = pickerBanner ? pickerBanner.querySelector('.picker-banner-text') : null;
+    if (bannerText) {
+        bannerText.textContent = mode === 'start'
+            ? 'Tocca la mappa per indicare il punto di PARTENZA'
+            : 'Tocca la mappa per indicare la DESTINAZIONE';
+    }
+    if (pickerBanner) pickerBanner.classList.remove('hidden');
+    showToast(mode === 'start' ? "Tocca la mappa per scegliere la Partenza" : "Tocca la mappa per scegliere la Destinazione", "normal", 3000);
+}
+
+// Gestisce il punto cliccato su mappa
+async function handleNavMapPicked(mode, lat, lng) {
+    const street = await reverseGeocode(lat, lng);
+    const label = street ? `${street}, Ferrara` : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+    if (mode === 'start') {
+        navStartPoint = { lat, lng, label };
+        const startInput = document.getElementById('nav-start-input');
+        if (startInput) startInput.value = label;
+        showToast(`📍 Partenza impostata: ${street || 'Punto mappa'}`, "success");
+    } else {
+        navDestPoint = { lat, lng, label };
+        const destInput = document.getElementById('nav-dest-input');
+        if (destInput) destInput.value = label;
+        showToast(`🏁 Destinazione impostata: ${street || 'Punto mappa'}`, "success");
+    }
+
+    openNavPanel();
+}
+
+// Geocodifica un testo di indirizzo
+async function geocodeAddressQuery(query) {
+    if (!query || query.trim() === '') return null;
+    const clean = query.replace(/^📍\s*/, '').trim();
+    try {
+        const searchQuery = encodeURIComponent(clean.includes('Ferrara') ? clean : `${clean}, Ferrara`);
+        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.length > 0) {
+                return {
+                    lat: parseFloat(data[0].lat),
+                    lng: parseFloat(data[0].lon),
+                    label: data[0].display_name.split(',')[0]
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("Geocoding error:", e);
+    }
+    return null;
+}
+
+// Rileva tutti gli ostacoli e le strade chiuse attive al momento
+function getActiveNavigationObstacles() {
+    const pointObstacles = [];
+    const polylineObstacles = [];
+
+    markersData.forEach(m => {
+        if (!isMarkerVisible(m)) return;
+        if (getMarkerScheduleStatus(m) !== 'active') return;
+
+        // Ostacoli che bloccano il transito
+        if (['chiusa', 'sagra', 'mercato', 'lavori'].includes(m.type)) {
+            pointObstacles.push({
+                lat: m.lat,
+                lng: m.lng,
+                type: m.type,
+                street: m.street || 'Tratto stradale',
+                note: m.note || ''
+            });
+        }
+    });
+
+    // Tratti rossi continui attivi
+    Object.keys(activeSegments).forEach(key => {
+        const polyline = activeSegments[key];
+        if (polyline && polyline.getLatLngs) {
+            const lls = polyline.getLatLngs();
+            if (Array.isArray(lls) && lls.length > 0) {
+                polylineObstacles.push({
+                    coords: lls.map(ll => [ll.lat, ll.lng]),
+                    name: key
+                });
+            }
+        }
+    });
+
+    return { pointObstacles, polylineObstacles };
+}
+
+// Verifica se la destinazione è in un'area chiusa/interrotta
+function checkDestinationObstacle(destLat, destLng, obstacles) {
+    for (const po of obstacles.pointObstacles) {
+        const d = calculateDistanceMeters(destLat, destLng, po.lat, po.lng);
+        if (d < 80) {
+            return {
+                isBlocked: true,
+                street: po.street,
+                type: po.type,
+                note: po.note
+            };
+        }
+    }
+
+    for (const seg of obstacles.polylineObstacles) {
+        for (let i = 0; i < seg.coords.length; i++) {
+            const [cLat, cLng] = seg.coords[i];
+            const d = calculateDistanceMeters(destLat, destLng, cLat, cLng);
+            if (d < 60) {
+                return {
+                    isBlocked: true,
+                    street: seg.name || 'Strada chiusa',
+                    type: 'chiusa',
+                    note: 'Tratto interrotto'
+                };
+            }
+        }
+    }
+
+    return { isBlocked: false };
+}
+
+// Verifica se un percorso interseca ostacoli attivi
+function evaluateRouteObstacles(routeCoords, obstacles) {
+    let intersects = false;
+    let reasons = [];
+
+    for (const po of obstacles.pointObstacles) {
+        for (let i = 0; i < routeCoords.length; i++) {
+            const [rLat, rLng] = routeCoords[i];
+            const d = calculateDistanceMeters(rLat, rLng, po.lat, po.lng);
+            if (d < 35) {
+                intersects = true;
+                const rText = `${po.type === 'sagra' ? 'Sagra' : (po.type === 'mercato' ? 'Mercato' : 'Chiusura')} su ${po.street}`;
+                if (!reasons.includes(rText)) reasons.push(rText);
+                break;
+            }
+        }
+    }
+
+    return {
+        intersects: intersects,
+        reasons: reasons
+    };
+}
+
+// Formatta i passi di svolta turn-by-turn
+function formatManeuverSteps(rawSteps) {
+    return rawSteps.map(step => {
+        const type = step.maneuver ? step.maneuver.type : '';
+        const modifier = step.maneuver ? step.maneuver.modifier : '';
+        const street = step.name || 'Strada';
+        const dist = Math.round(step.distance);
+
+        let icon = '⬆️';
+        let text = `Prosegui su ${street}`;
+
+        if (type === 'depart') {
+            icon = '🏁';
+            text = `Parti in direzione di ${street}`;
+        } else if (type === 'arrive') {
+            icon = '📍';
+            text = `Sei arrivato a destinazione (${street})`;
+        } else if (modifier && modifier.includes('right')) {
+            icon = '↱';
+            text = `Svolta a destra su ${street}`;
+        } else if (modifier && modifier.includes('left')) {
+            icon = '↰';
+            text = `Svolta a sinistra su ${street}`;
+        } else if (modifier && modifier.includes('slight right')) {
+            icon = '↗️';
+            text = `Tieni la destra verso ${street}`;
+        } else if (modifier && modifier.includes('slight left')) {
+            icon = '↖️';
+            text = `Tieni la sinistra verso ${street}`;
+        } else if (modifier && modifier.includes('sharp right')) {
+            icon = '↪️';
+            text = `Curva a destra su ${street}`;
+        } else if (modifier && modifier.includes('sharp left')) {
+            icon = '↩️';
+            text = `Curva a sinistra su ${street}`;
+        } else if (type && (type.includes('rotary') || type.includes('roundabout'))) {
+            icon = '🔄';
+            text = `Alla rotonda prendi l'uscita verso ${street}`;
+        }
+
+        return {
+            icon,
+            text,
+            distText: dist >= 1000 ? `${(dist / 1000).toFixed(1)} km` : `${dist} m`,
+            distMeters: dist,
+            street,
+            location: step.maneuver && step.maneuver.location ? [step.maneuver.location[1], step.maneuver.location[0]] : null
+        };
+    });
+}
+
+// Calcola i percorsi di emergenza (proponendo fino a 2 opzioni distinte)
+async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
+    const endpoints = [
+        `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`,
+        `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`
+    ];
+
+    let rawRoutes = [];
+    for (const u of endpoints) {
+        try {
+            const resp = await fetch(u);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    rawRoutes = data.routes;
+                    break;
+                }
+            }
+        } catch (e) { }
+    }
+
+    // Se OSRM ha restituito 1 sola opzione, proviamo a generare un'alternativa per offrire 2 scelte
+    if (rawRoutes.length === 1) {
+        try {
+            const altResp = await fetch(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`);
+            if (altResp.ok) {
+                const altData = await altResp.json();
+                if (altData.code === 'Ok' && altData.routes && altData.routes.length > 0) {
+                    rawRoutes.push(altData.routes[0]);
+                }
+            }
+        } catch (e) { }
+    }
+
+    const obstacles = getActiveNavigationObstacles();
+
+    const processedRoutes = rawRoutes.map((r, idx) => {
+        const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+        const distanceKm = (r.distance / 1000).toFixed(1);
+        const durationMin = Math.max(1, Math.round(r.duration / 60));
+        const obsCheck = evaluateRouteObstacles(coords, obstacles);
+        const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps : [];
+
+        return {
+            index: idx,
+            title: idx === 0 ? "Percorso 1 (Consigliato)" : `Percorso ${idx + 1} (Alternativo)`,
+            coords: coords,
+            distanceKm: distanceKm,
+            durationMin: durationMin,
+            intersectsBlock: obsCheck.intersects,
+            blockReasons: obsCheck.reasons,
+            steps: formatManeuverSteps(steps),
+            rawSteps: steps
+        };
+    });
+
+    // Ordina: prima i percorsi liberi da ostacoli, poi per tempo
+    processedRoutes.sort((a, b) => {
+        if (a.intersectsBlock !== b.intersectsBlock) {
+            return a.intersectsBlock ? 1 : -1;
+        }
+        return a.durationMin - b.durationMin;
+    });
+
+    // Rinomina coerentemente dopo il sorting
+    processedRoutes.forEach((r, i) => {
+        r.title = i === 0 ? "Percorso 1 (Più Veloce / Consigliato)" : `Percorso ${i + 1} (Alternativo)`;
+    });
+
+    return {
+        routes: processedRoutes.slice(0, 2),
+        obstacles: obstacles
+    };
+}
+
+// Azione al click su "Calcola Percorsi"
+async function handleCalculateNav() {
+    const startInput = document.getElementById('nav-start-input');
+    const destInput = document.getElementById('nav-dest-input');
+    const calcBtn = document.getElementById('nav-calc-btn');
+
+    const startText = startInput ? startInput.value.trim() : '';
+    const destText = destInput ? destInput.value.trim() : '';
+
+    if (!destText) {
+        showToast("Inserisci o seleziona una destinazione.", "error");
+        return;
+    }
+
+    if (calcBtn) {
+        calcBtn.disabled = true;
+        calcBtn.innerHTML = "<span>⏳ Calcolo percorsi in corso...</span>";
+    }
+
+    try {
+        // Se startPoint non è geocodificato o è cambiato il testo
+        if (!navStartPoint || (startText && !startText.includes("📍") && startText !== navStartPoint.label)) {
+            const geo = await geocodeAddressQuery(startText);
+            if (geo) {
+                navStartPoint = geo;
+            } else {
+                const center = map.getCenter();
+                navStartPoint = { lat: center.lat, lng: center.lng, label: "Partenza" };
+            }
+        }
+
+        // Se destPoint non è geocodificato o è cambiato il testo
+        if (!navDestPoint || (destText && destText !== navDestPoint.label)) {
+            const geoDest = await geocodeAddressQuery(destText);
+            if (geoDest) {
+                navDestPoint = geoDest;
+            } else {
+                showToast("Impossibile trovare l'indirizzo di destinazione specificato.", "error");
+                if (calcBtn) {
+                    calcBtn.disabled = false;
+                    calcBtn.innerHTML = "<span>🔍 Calcola Percorsi</span>";
+                }
+                return;
+            }
+        }
+
+        const res = await calculateEmergencyRoutes(
+            navStartPoint.lat, navStartPoint.lng,
+            navDestPoint.lat, navDestPoint.lng
+        );
+
+        if (!res.routes || res.routes.length === 0) {
+            showToast("Nessun percorso stradale trovato per la destinazione richiesta.", "error");
+            if (calcBtn) {
+                calcBtn.disabled = false;
+                calcBtn.innerHTML = "<span>🔍 Calcola Percorsi</span>";
+            }
+            return;
+        }
+
+        navRoutes = res.routes;
+        activeNavRouteIdx = 0;
+
+        // Controlla allerta se la destinazione è in area chiusa
+        const destCheck = checkDestinationObstacle(navDestPoint.lat, navDestPoint.lng, res.obstacles);
+        const alertBox = document.getElementById('nav-dest-alert');
+        const alertMsg = document.getElementById('nav-dest-alert-msg');
+        if (destCheck.isBlocked) {
+            const reasonName = destCheck.type === 'sagra' ? 'Sagra / Manifestazione' : (destCheck.type === 'mercato' ? 'Mercato rionale' : 'Strada Chiusa');
+            if (alertMsg) alertMsg.textContent = `La destinazione richiesta si trova all'interno o a ridosso di una chiusura attiva (${reasonName} su ${destCheck.street}).`;
+            if (alertBox) alertBox.classList.remove('hidden');
+        } else {
+            if (alertBox) alertBox.classList.add('hidden');
+        }
+
+        renderNavRoutes(navRoutes);
+
+    } catch (e) {
+        console.error("Errore calcolo navigazione:", e);
+        showToast("Errore durante il calcolo dei percorsi. Riprova.", "error");
+    } finally {
+        if (calcBtn) {
+            calcBtn.disabled = false;
+            calcBtn.innerHTML = "<span>🔍 Calcola Percorsi</span>";
+        }
+    }
+}
+
+// Disegna i percorsi sulla mappa e compila le schede
+function renderNavRoutes(routes) {
+    // Pulisci layer precedenti
+    navRouteLayers.forEach(l => map.removeLayer(l));
+    navRouteLayers = [];
+    if (navMarkerStart) { map.removeLayer(navMarkerStart); navMarkerStart = null; }
+    if (navMarkerDest) { map.removeLayer(navMarkerDest); navMarkerDest = null; }
+
+    const routesContainer = document.getElementById('nav-routes-container');
+    const cardsList = document.getElementById('nav-cards-list');
+    if (routesContainer) routesContainer.classList.remove('hidden');
+    if (cardsList) cardsList.innerHTML = '';
+
+    // Marker Partenza (A)
+    const iconStart = L.divIcon({
+        className: '',
+        html: '<div style="background:#10b981; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.4);">A</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+    navMarkerStart = L.marker([navStartPoint.lat, navStartPoint.lng], { icon: iconStart, zIndexOffset: 1200 }).addTo(map);
+
+    // Marker Destinazione (B)
+    const iconDest = L.divIcon({
+        className: '',
+        html: '<div style="background:#ef4444; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.4);">B</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+    navMarkerDest = L.marker([navDestPoint.lat, navDestPoint.lng], { icon: iconDest, zIndexOffset: 1200 }).addTo(map);
+
+    let allBounds = L.latLngBounds([[navStartPoint.lat, navStartPoint.lng], [navDestPoint.lat, navDestPoint.lng]]);
+
+    routes.forEach((route, idx) => {
+        const isActive = idx === activeNavRouteIdx;
+
+        // Stile polyline
+        const color = isActive ? '#2563eb' : '#8b5cf6';
+        const weight = isActive ? 7 : 5;
+        const opacity = isActive ? 0.95 : 0.65;
+        const dashArray = isActive ? null : '6, 8';
+
+        const polyline = L.polyline(route.coords, {
+            color: color,
+            weight: weight,
+            opacity: opacity,
+            dashArray: dashArray,
+            lineJoin: 'round',
+            lineCap: 'round'
+        }).addTo(map);
+
+        polyline.on('click', () => selectNavRoute(idx));
+        navRouteLayers.push(polyline);
+
+        route.coords.forEach(c => allBounds.extend(c));
+
+        // Crea card per la lista
+        const card = document.createElement('div');
+        card.className = `nav-route-card ${isActive ? 'active' : ''}`;
+        card.innerHTML = `
+            <div class="nav-card-left">
+                <span class="nav-card-title">${route.title}</span>
+                <span class="nav-card-dist">📏 ${route.distanceKm} km &bull; ⏱️ ${route.durationMin} min</span>
+                <div class="nav-card-badges">
+                    ${idx === 0 ? '<span class="nav-badge-pill fastest">⚡ Più Veloce</span>' : ''}
+                    <span class="nav-badge-pill ztl">🛡️ ZTL Ammessa</span>
+                    ${!route.intersectsBlock ? '<span class="nav-badge-pill clear">🟢 Viabilità Libera</span>' : '<span class="nav-badge-pill" style="background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid #ef4444;">⚠️ Possibile ostacolo</span>'}
+                </div>
+            </div>
+            <div class="nav-card-time">${route.durationMin} min</div>
+        `;
+        card.addEventListener('click', () => selectNavRoute(idx));
+        if (cardsList) cardsList.appendChild(card);
+    });
+
+    renderNavSteps(routes[activeNavRouteIdx]);
+
+    map.fitBounds(allBounds, { padding: [50, 50], maxZoom: 16 });
+}
+
+// Seleziona un'opzione di percorso
+function selectNavRoute(idx) {
+    if (idx < 0 || idx >= navRoutes.length) return;
+    activeNavRouteIdx = idx;
+
+    navRouteLayers.forEach((l, i) => {
+        const isActive = i === activeNavRouteIdx;
+        l.setStyle({
+            color: isActive ? '#2563eb' : '#8b5cf6',
+            weight: isActive ? 7 : 5,
+            opacity: isActive ? 0.95 : 0.65,
+            dashArray: isActive ? null : '6, 8'
+        });
+        if (isActive) l.bringToFront();
+    });
+
+    const cards = document.querySelectorAll('.nav-route-card');
+    cards.forEach((c, i) => {
+        if (i === activeNavRouteIdx) c.classList.add('active');
+        else c.classList.remove('active');
+    });
+
+    renderNavSteps(navRoutes[activeNavRouteIdx]);
+}
+
+// Popola la lista delle indicazioni di svolta
+function renderNavSteps(route) {
+    const stepsList = document.getElementById('nav-steps-list');
+    const stepsCount = document.getElementById('nav-steps-count');
+    if (!stepsList || !route) return;
+
+    stepsList.innerHTML = '';
+    const steps = route.steps || [];
+    if (stepsCount) stepsCount.textContent = steps.length.toString();
+
+    steps.forEach((s) => {
+        const item = document.createElement('div');
+        item.className = 'nav-step-item';
+        item.innerHTML = `
+            <div class="nav-step-icon">${s.icon}</div>
+            <div class="nav-step-info">
+                <div>${escapeHtml(s.text)}</div>
+                <div class="nav-step-dist">${s.distText}</div>
+            </div>
+        `;
+        stepsList.appendChild(item);
+    });
+}
+
+function toggleNavSteps() {
+    const stepsList = document.getElementById('nav-steps-list');
+    const chevron = document.getElementById('nav-steps-chevron');
+    if (!stepsList) return;
+    const isHidden = stepsList.classList.contains('hidden');
+    if (isHidden) {
+        stepsList.classList.remove('hidden');
+        if (chevron) chevron.textContent = '▲';
+    } else {
+        stepsList.classList.add('hidden');
+        if (chevron) chevron.textContent = '▼';
+    }
+}
+
+// Azzera i percorsi calcolati
+function clearNavRoutes() {
+    navRouteLayers.forEach(l => map.removeLayer(l));
+    navRouteLayers = [];
+    if (navMarkerStart) { map.removeLayer(navMarkerStart); navMarkerStart = null; }
+    if (navMarkerDest) { map.removeLayer(navMarkerDest); navMarkerDest = null; }
+    navRoutes = [];
+
+    const routesContainer = document.getElementById('nav-routes-container');
+    const alertBox = document.getElementById('nav-dest-alert');
+    if (routesContainer) routesContainer.classList.add('hidden');
+    if (alertBox) alertBox.classList.add('hidden');
+
+    const destInput = document.getElementById('nav-dest-input');
+    if (destInput) destInput.value = '';
+    navDestPoint = null;
+}
+
+// Avvia la guida Turn-by-Turn a tutto schermo con tracking GPS
+function startTurnByTurnGuidance() {
+    if (!navRoutes || navRoutes.length === 0) return;
+    const activeRoute = navRoutes[activeNavRouteIdx];
+    if (!activeRoute) return;
+
+    guidanceActive = true;
+    const navPanel = document.getElementById('nav-panel');
+    const navHud = document.getElementById('nav-hud');
+    if (navPanel) navPanel.classList.add('hidden');
+    if (navHud) navHud.classList.remove('hidden');
+
+    if (!vehicleMarker) {
+        const vehicleIcon = L.divIcon({
+            className: '',
+            html: '<div style="background:#0284c7; color:#fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; border:3px solid #fff; box-shadow:0 0 16px rgba(2,132,199,0.8);">🚑</div>',
+            iconSize: [34, 34],
+            iconAnchor: [17, 17]
+        });
+        const startCoord = activeRoute.coords[0];
+        vehicleMarker = L.marker(startCoord, { icon: vehicleIcon, zIndexOffset: 3000 }).addTo(map);
+    }
+
+    updateHudDisplay(activeRoute);
+
+    if (navigator.geolocation) {
+        guidanceWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                if (vehicleMarker) vehicleMarker.setLatLng([lat, lng]);
+                map.panTo([lat, lng], { animate: true, duration: 0.6 });
+            },
+            (err) => console.warn("GPS watch error:", err.message),
+            { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
+        );
+    }
+
+    showToast("🧭 Guida turn-by-turn avviata!", "success", 3000);
+}
+
+function updateHudDisplay(route) {
+    const timeEl = document.getElementById('hud-time-remain');
+    const distEl = document.getElementById('hud-dist-remain');
+    const nextDistEl = document.getElementById('hud-next-dist');
+    const nextStreetEl = document.getElementById('hud-next-street');
+    const iconEl = document.getElementById('hud-maneuver-icon');
+
+    if (timeEl) timeEl.textContent = `${route.durationMin} min`;
+    if (distEl) distEl.textContent = `${route.distanceKm} km`;
+
+    if (route.steps && route.steps.length > 0) {
+        const nextStep = route.steps[0];
+        if (nextDistEl) nextDistEl.textContent = nextStep.distText ? `Tra ${nextStep.distText}` : 'Subito';
+        if (nextStreetEl) nextStreetEl.textContent = nextStep.text || nextStep.street;
+        if (iconEl) iconEl.textContent = nextStep.icon || '⬆️';
+    }
+}
+
+function stopTurnByTurnGuidance() {
+    guidanceActive = false;
+    if (guidanceWatchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(guidanceWatchId);
+        guidanceWatchId = null;
+    }
+    const navHud = document.getElementById('nav-hud');
+    const navPanel = document.getElementById('nav-panel');
+    if (navHud) navHud.classList.add('hidden');
+    if (navPanel) navPanel.classList.remove('hidden');
+    if (vehicleMarker) {
+        map.removeLayer(vehicleMarker);
+        vehicleMarker = null;
+    }
+    showToast("Guida terminata.", "normal", 2000);
+}
+
 // Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone
 setInterval(() => {
     refreshMarkers();
 }, 30000);
 
 // Avvia tutto quando il DOM è pronto
-document.addEventListener('DOMContentLoaded', initMap);
+document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    initNavigationModule();
+});
+
 

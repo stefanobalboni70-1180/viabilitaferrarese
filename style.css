@@ -1553,3 +1553,590 @@ h1 span.city-name {
     }
 }
 
+/* -------------------------------------------------------
+   NAVIGATORE 118 SOCCORSO FERRARA - STILI DEDICATI
+------------------------------------------------------- */
+
+/* Pulsante Naviga in Header */
+.nav-btn {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-btn:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+    box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Nav Drawer / Panel */
+.nav-drawer {
+    position: fixed;
+    top: 85px;
+    left: 20px;
+    width: 380px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 110px);
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 18px;
+    color: #f8fafc;
+    z-index: 1050;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideInLeft 0.25s ease-out;
+}
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.nav-drawer.hidden {
+    display: none !important;
+}
+
+.nav-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(30, 41, 59, 0.6);
+}
+
+.nav-title-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-icon-badge {
+    font-size: 1.5rem;
+}
+
+.nav-title-box h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #38bdf8;
+    margin: 0;
+}
+
+.nav-sub {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin: 2px 0 0 0;
+}
+
+.nav-drawer-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Input Groups */
+.nav-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.nav-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.point-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.point-badge.start { background: #10b981; }
+.point-badge.dest { background: #ef4444; }
+
+.nav-input-wrapper {
+    display: flex;
+    gap: 6px;
+}
+
+.nav-input-wrapper input {
+    flex: 1;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 0.85rem;
+    color: #f8fafc;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.nav-input-wrapper input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.nav-inline-btn {
+    background: rgba(51, 65, 85, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #f1f5f9;
+    border-radius: 10px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.nav-inline-btn:hover {
+    background: rgba(71, 85, 105, 1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.nav-calc-btn {
+    width: 100%;
+    padding: 11px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #fff;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.nav-calc-btn:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+    transform: translateY(-1px);
+}
+
+/* Alert Box Destinazione Chiusa */
+.nav-alert-box {
+    background: rgba(220, 38, 38, 0.2);
+    border: 1px solid #ef4444;
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    animation: pulseAlert 2s infinite ease-in-out;
+}
+
+@keyframes pulseAlert {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.nav-alert-box.hidden {
+    display: none !important;
+}
+
+.nav-alert-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.nav-alert-text {
+    font-size: 0.8rem;
+    color: #fca5a5;
+}
+
+.nav-alert-text strong {
+    color: #fef2f2;
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* Routes Container & Cards */
+.nav-routes-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.nav-routes-container.hidden {
+    display: none !important;
+}
+
+.nav-routes-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.nav-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nav-route-card {
+    background: rgba(30, 41, 59, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-route-card:hover {
+    background: rgba(51, 65, 85, 0.8);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+.nav-route-card.active {
+    background: rgba(2, 132, 199, 0.25);
+    border-color: #38bdf8;
+    box-shadow: 0 4px 16px rgba(2, 132, 199, 0.25);
+}
+
+.nav-card-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.nav-card-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-card-time {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #38bdf8;
+}
+
+.nav-card-dist {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.nav-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.nav-badge-pill {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.nav-badge-pill.fastest { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+.nav-badge-pill.ztl { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
+.nav-badge-pill.clear { background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); }
+
+/* Steps Box */
+.nav-steps-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.nav-toggle-steps-btn {
+    width: 100%;
+    background: none;
+    border: none;
+    color: #cbd5e1;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.nav-toggle-steps-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-steps-list {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 8px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.nav-steps-list.hidden {
+    display: none !important;
+}
+
+.nav-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: #cbd5e1;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.nav-step-icon {
+    font-size: 0.95rem;
+    line-height: 1.2;
+    min-width: 18px;
+    text-align: center;
+}
+
+.nav-step-info {
+    flex: 1;
+}
+
+.nav-step-dist {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 1px;
+}
+
+/* Action Rows */
+.nav-actions-row {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-start-guidance-btn {
+    flex: 1;
+    padding: 11px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.nav-start-guidance-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+}
+
+.nav-clear-btn {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-clear-btn:hover {
+    background: rgba(239, 68, 68, 0.35);
+    color: #fff;
+}
+
+/* HUD Turn-by-Turn Mobile Mode */
+.nav-hud {
+    position: fixed;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 92%;
+    max-width: 480px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    animation: fadeInDown 0.3s ease-out;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translate(-50%, -20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.nav-hud.hidden {
+    display: none !important;
+}
+
+.nav-hud-top {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 2px solid #38bdf8;
+    border-radius: 16px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+}
+
+.nav-hud-maneuver-icon {
+    font-size: 2.2rem;
+    background: rgba(56, 189, 248, 0.15);
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-hud-maneuver-info {
+    flex: 1;
+}
+
+.hud-dist {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #38bdf8;
+}
+
+.hud-street {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+}
+
+.nav-hud-bottom {
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    pointer-events: auto;
+}
+
+.hud-stats {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hud-time {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #10b981;
+}
+
+.hud-dist-total {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.hud-badge-ztl {
+    font-size: 0.72rem;
+    background: rgba(139, 92, 246, 0.25);
+    color: #c084fc;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.hud-stop-btn {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.hud-stop-btn:hover {
+    background: #dc2626;
+}
+
+/* Adattamento Mobile Nav Drawer */
+@media (max-width: 600px) {
+    .nav-drawer {
+        top: 75px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+        max-width: none;
+        max-height: calc(100vh - 90px);
+    }
+
+    .nav-btn {
+        padding: 5px 10px;
+        font-size: 0.78rem;
+    }
+
+    .nav-hud {
+        width: 95%;
+        top: 10px;
+    }
+}
+
+
