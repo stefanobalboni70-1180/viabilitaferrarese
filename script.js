@@ -2879,11 +2879,22 @@ function formatManeuverSteps(rawSteps) {
 }
 
 // -------------------------------------------------------
-// STRADE STRETTE, VICOLI MEDIEVALI E PERCORSI NON CONFACENTI
-// AI VEICOLI DI EMERGENZA (Ambulanza Tipo A 118: largh. 2.30m, alt. 2.80m)
+// ASSI AUTORIZZATI DI SCORRIMENTO 118 IN ZTL & CENTRO STORICO
+// (Sempre consentiti per il transito rapido del mezzo di soccorso)
 // -------------------------------------------------------
+const AUTHORIZED_EMERGENCY_CORRIDORS = [
+    'corso martiri della liberta', 'martiri della liberta', 'corso martiri', 'martiri',
+    'largo castello', 'piazza castello', 'piazza cattedrale', 'piazza repubblica', 'piazza savonarola',
+    'corso porta reno', 'porta reno', 'piazza travaglio', 'via kennedy', 'kennedy',
+    'corso giovecca', 'giovecca', 'viale cavour', 'cavour',
+    'corso ercole i d\'este', 'ercole i d\'este',
+    'corso porta mare', 'porta mare', 'corso biagio rossetti', 'biagio rossetti', 'corso porta po', 'porta po',
+    'corso isonzo', 'isonzo', 'via darsena', 'darsena', 'via bologna', 'bologna'
+];
+
+// Strade e vicoli medievali angusti o percorsi ciclopedonali non carrabili
 const NARROW_AND_UNSUITABLE_STREETS = [
-    // Vicoli e strade medievali a sagoma ridotta / curve a 90° cieche
+    // Vicoli e strade medievali a sagoma ridotta / curve cieche
     'via delle volte', 'capo delle volte', 'delle volte',
     'via delle vecchie', 'via colomba', 'via della luna', 'via del granchio',
     'via zemola', 'via voltacasalo', 'via fassolo', 'via cammello', 'via brasavola',
@@ -2893,15 +2904,14 @@ const NARROW_AND_UNSUITABLE_STREETS = [
     'vicolo colombara', 'vicolo boccacanale', 'vicolo del carbone', 'vicolo zenzalo',
     'vicolo san paolo', 'vicolo del follo', 'vicolo lupi', 'vicolo agnello', 'vicolo torto',
     'vicolo ',
-    // Tratti pedonali angusti o con ostacoli/arredi fissi
+    // Tratti pedonali angusti non carrabili
     'via san romano', 'via mazzini', 'via contrari', 'via fondobanchetto',
     'via coperta', 'via gusmaria', 'via del turco', 'via carlo mayr',
     'via delle scotte', 'via gorgadello', 'via canonica',
-    // Piste ciclabili e percorsi ciclo-pedonali non carrabili
+    // Piste ciclabili e percorsi sterrati/pedonali esclusivi
     'pista ciclabile', 'ciclopedonale', 'ciclabile', 'percorso ciclopedonale', 'pista ciclopedonale',
     'sottomura', 'sopramura', 'sottomura est', 'sottomura ovest', 'sottomura sud', 'sottomura nord',
-    'parco urbano', 'percorso pedonale', 'pedonale', 'scalinata', 'sentiero', 'passerella',
-    'tracciato ciclabile', 'area pedonale', 'footway', 'cycleway', 'path', 'steps'
+    'parco urbano', 'scalinata', 'sentiero', 'passerella', 'tracciato ciclabile', 'footway', 'cycleway', 'steps'
 ];
 
 // Verifica se un percorso contiene strade troppo strette o non confacenti ai mezzi di soccorso 118
@@ -2911,6 +2921,10 @@ function isRouteSuitableForEmergency(steps, destLat = null, destLng = null) {
         const step = steps[i];
         const rawName = (step.name || '').trim().toLowerCase();
         if (!rawName) continue;
+
+        // Se è un asse primario autorizzato 118 (es. Corso Martiri della Libertà, Porta Reno, Giovecca, Cavour), è sempre valido
+        const isAuthorizedCorridor = AUTHORIZED_EMERGENCY_CORRIDORS.some(auth => rawName.includes(auth));
+        if (isAuthorizedCorridor) continue;
 
         // Se è l'ultimo passo o la destinazione finale, l'accesso di prossimità è consentito
         const isFinalStep = (i === steps.length - 1) || (step.maneuver && step.maneuver.type === 'arrive');
@@ -3333,6 +3347,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
         { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
         // Grandi Assi Emergenza Centro 118 (strade larghe e corsie preferenziali bus/soccorso)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6190,44.8345;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Martiri della Libertà / Porta Reno' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6250,44.8365;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Giovecca' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6140,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Viale Cavour' },
         // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna (senza deviazioni a destra per Mulinetto)
