@@ -2854,10 +2854,11 @@ function formatManeuverSteps(rawSteps) {
     });
 }
 
-// Calcola fino a 3 differenti scelte di percorso:
-// - Esclude automaticamente interruzioni e mercati/sagre
-// - Calcola la DEVIAZIONE PIÙ CORTA (attraverso vie ZTL come Via Borso, Via Guarini, Via Ariosto)
-// - Se la destinazione è dentro l'area chiusa, consente l'accesso prioritario
+// Calcola fino a 3 differenti scelte di percorso garantendo:
+// - Percorso più veloce prioritario
+// - Alternativa garantita che EVITA la ZTL qualora il percorso principale usi la ZTL
+// - Alternativa garantita che EVITA i mercati settimanali/rionali qualora presenti
+// - Deviazioni più corte e rapide attorno a ostacoli
 async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const obstacles = getActiveNavigationObstacles(destLat, destLng);
 
@@ -2900,6 +2901,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         return {
             index: idx,
             isDetour: false,
+            isZtlRoute: !!r._isZtl,
             coords: coords,
             distanceKm: distanceKm,
             distanceRaw: r.distance,
@@ -2930,14 +2932,17 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         );
 
         if (detourRoutes && detourRoutes.length > 0) {
+            detourRoutes.forEach(dr => {
+                dr.isZtlRoute = dr.isZtlRoute || false;
+            });
             processedRoutes.push(...detourRoutes);
         }
     }
 
-    // Ordina:
-    // 1. Percorsi liberi da ostacoli
-    // 2. Tempo più rapido
-    // 3. Minore distanza (deviazioni brevi)
+    // Ordina i percorsi:
+    // 1. Liberi da blocchi
+    // 2. Più veloci
+    // 3. Minore distanza
     processedRoutes.sort((a, b) => {
         if (a.intersectsBlock !== b.intersectsBlock) {
             return a.intersectsBlock ? 1 : -1;
@@ -2948,46 +2953,106 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         return (a.distanceRaw || parseFloat(a.distanceKm)) - (b.distanceRaw || parseFloat(b.distanceKm));
     });
 
-    // Rimuovi duplicati geometrici ravvicinati
-    const uniqueRoutes = [];
-    for (const r of processedRoutes) {
-        const isDuplicate = uniqueRoutes.some(u =>
-            Math.abs(parseFloat(u.distanceKm) - parseFloat(r.distanceKm)) < 0.15 &&
-            Math.abs(u.durationMin - r.durationMin) <= 1 &&
-            u.intersectsBlock === r.intersectsBlock
-        );
-        if (!isDuplicate) {
-            uniqueRoutes.push(r);
+    // Filtra percorsi liberi da ostacoli
+    const freeRoutes = processedRoutes.filter(r => !r.intersectsBlock);
+    const pool = freeRoutes.length > 0 ? freeRoutes : processedRoutes;
+
+    const ztlCandidates = pool.filter(r => r.isZtlRoute);
+    const noZtlCandidates = pool.filter(r => !r.isZtlRoute);
+
+    const marketObstacles = (obstacles.pointObstacles || []).filter(po => po.type === 'mercato');
+    const hasMarket = marketObstacles.length > 0;
+
+    ztlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
+    noZtlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
+
+    const selected3 = [];
+
+    // 1. Slot 1: Il percorso più veloce in assoluto
+    const fastest = pool[0];
+    if (fastest) selected3.push(fastest);
+
+    // 2. Slot 2: Se il più veloce usa la ZTL, proponi OBBLIGATORIAMENTE un'alternativa che la EVITI
+    if (fastest && fastest.isZtlRoute && noZtlCandidates.length > 0) {
+        const bestNoZtl = noZtlCandidates[0];
+        if (!selected3.includes(bestNoZtl)) {
+            bestNoZtl.isNoZtlAlternative = true;
+            selected3.push(bestNoZtl);
+        }
+    } else if (fastest && !fastest.isZtlRoute && ztlCandidates.length > 0) {
+        // Se il più veloce è fuori ZTL, proponi anche la scorciatoia ZTL come alternativa rapida 118
+        const bestZtl = ztlCandidates[0];
+        if (!selected3.includes(bestZtl)) {
+            selected3.push(bestZtl);
         }
     }
 
-    // Restituisci fino a 3 percorsi differenziati
-    const finalRoutes = (uniqueRoutes.length > 0 ? uniqueRoutes : processedRoutes).slice(0, 3);
-
-    // Titoli e descrizioni per i 3 percorsi
-    finalRoutes.forEach((r, i) => {
-        const cfg = ROUTE_CONFIGS[i] || ROUTE_CONFIGS[0];
-        if (i === 0) {
-            r.title = r.isDetour
-                ? "Percorso 1 (Più Veloce con Deviazione)"
-                : "Percorso 1 (Più Veloce / Consigliato)";
-        } else if (i === 1) {
-            r.title = r.isDetour
-                ? "Percorso 2 (Alternativa con Deviazione)"
-                : "Percorso 2 (Alternativa 1)";
-        } else {
-            r.title = r.isDetour
-                ? "Percorso 3 (Alternativa con Deviazione)"
-                : "Percorso 3 (Alternativa 2)";
+    // 3. Slot 3: Se c'è un mercato attivo, assicurati che un'opzione sia "Evita Mercato"
+    if (hasMarket) {
+        const marketAvoiding = pool.find(r => !selected3.includes(r) && !r.collidedObstacles?.some(co => co.type === 'mercato'));
+        if (marketAvoiding) {
+            marketAvoiding.avoidsMarket = true;
+            selected3.push(marketAvoiding);
         }
+    }
+
+    // Riempi gli slot mancanti fino a 3 con percorsi geometricamente distinti
+    for (const r of pool) {
+        if (selected3.length >= 3) break;
+        const isDuplicate = selected3.some(s =>
+            Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.15 &&
+            Math.abs(s.durationMin - r.durationMin) <= 1
+        );
+        if (!isDuplicate && !selected3.includes(r)) {
+            selected3.push(r);
+        }
+    }
+
+    for (const r of processedRoutes) {
+        if (selected3.length >= 3) break;
+        if (!selected3.includes(r)) {
+            selected3.push(r);
+        }
+    }
+
+    // Assegna titoli e badge semantici chiari ai 3 percorsi
+    selected3.forEach((r, i) => {
+        const cfg = ROUTE_CONFIGS[i] || ROUTE_CONFIGS[0];
         r.color = cfg.color;
         r.badgeClass = cfg.badgeClass;
-        r.badgeText = cfg.badgeText;
         r.dotColor = cfg.dotColor;
+
+        if (i === 0) {
+            if (r.isZtlRoute) {
+                r.title = "Percorso 1 (Più Veloce - Transito ZTL 118)";
+                r.badgeText = "⚡ Più Veloce (ZTL)";
+            } else if (r.isDetour) {
+                r.title = "Percorso 1 (Più Veloce con Deviazione)";
+                r.badgeText = "⚡ Più Veloce";
+            } else {
+                r.title = "Percorso 1 (Più Veloce / Consigliato)";
+                r.badgeText = "⚡ Più Veloce";
+            }
+        } else if (r.isNoZtlAlternative || (!r.isZtlRoute && fastest && fastest.isZtlRoute)) {
+            r.title = `Percorso ${i + 1} (Evita ZTL / Fuori ZTL)`;
+            r.badgeText = "🚫 Evita ZTL";
+        } else if (r.avoidsMarket || (hasMarket && !r.collidedObstacles?.some(co => co.type === 'mercato'))) {
+            r.title = `Percorso ${i + 1} (Evita Area Mercato)`;
+            r.badgeText = "🛒 Evita Mercato";
+        } else if (r.isZtlRoute) {
+            r.title = `Percorso ${i + 1} (Transito ZTL 118)`;
+            r.badgeText = "🛡️ Transito ZTL";
+        } else if (r.isDetour) {
+            r.title = `Percorso ${i + 1} (Alternativo con Deviazione)`;
+            r.badgeText = `🔄 Alternativa ${i}`;
+        } else {
+            r.title = `Percorso ${i + 1} (Alternativa)`;
+            r.badgeText = `🌿 Alternativa ${i}`;
+        }
     });
 
     return {
-        routes: finalRoutes,
+        routes: selected3,
         obstacles: obstacles
     };
 }
@@ -3135,7 +3200,14 @@ function renderNavRoutes(routes) {
         
         let badgesHtml = '';
         badgesHtml += `<span class="nav-badge-pill ${cfg.badgeClass}">${cfg.badgeText}</span>`;
-        badgesHtml += '<span class="nav-badge-pill ztl">🛡️ ZTL Ammessa</span>';
+        if (route.isZtlRoute) {
+            badgesHtml += '<span class="nav-badge-pill ztl">⚡ Transito ZTL 118</span>';
+        } else {
+            badgesHtml += '<span class="nav-badge-pill no-ztl">🚫 Fuori ZTL</span>';
+        }
+        if (route.avoidsMarket) {
+            badgesHtml += '<span class="nav-badge-pill avoid-market">🛒 Evita Mercato</span>';
+        }
         if (route.isDetour) {
             badgesHtml += '<span class="nav-badge-pill detour">🔄 Deviazione Attiva</span>';
             badgesHtml += '<span class="nav-badge-pill avoided">🟢 Ostacoli Evitati</span>';
@@ -3144,7 +3216,13 @@ function renderNavRoutes(routes) {
         }
 
         let detourNoteHtml = '';
-        if (route.isDetour) {
+        if (route.isZtlRoute) {
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#c084fc;">⚡ Transito ZTL autorizzato per mezzi 118 (passaggio rapido).</div>`;
+        } else if (route.isNoZtlAlternative) {
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#38bdf8;">🚗 Percorso su viabilità ordinaria: aggira completamente la ZTL.</div>`;
+        } else if (route.avoidsMarket) {
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#fb923c;">🛒 Area mercato evitata: tragitto alternativo attorno all'evento mercatale.</div>`;
+        } else if (route.isDetour) {
             detourNoteHtml = `<div class="nav-card-detour-note">🔄 Deviazione applicata: aggiramento interruzioni per arrivo rapido.</div>`;
         }
 
@@ -3491,6 +3569,21 @@ function updateHudDynamic(step, distToManeuver, lat, lng, route) {
 
     if (nextStreetEl) nextStreetEl.textContent = step.text || step.street;
     if (iconEl) iconEl.textContent = step.icon || '⬆️';
+
+    const ztlBadge = document.getElementById('hud-badge-ztl');
+    if (ztlBadge) {
+        if (route.isZtlRoute) {
+            ztlBadge.textContent = '🛡️ ZTL 118 Ammessa';
+            ztlBadge.style.color = '#c084fc';
+            ztlBadge.style.background = 'rgba(139, 92, 246, 0.25)';
+            ztlBadge.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+        } else {
+            ztlBadge.textContent = '🚗 Fuori ZTL';
+            ztlBadge.style.color = '#38bdf8';
+            ztlBadge.style.background = 'rgba(14, 165, 233, 0.25)';
+            ztlBadge.style.borderColor = 'rgba(14, 165, 233, 0.4)';
+        }
+    }
 }
 
 function updateHudForArrival(distToDest) {
