@@ -2139,10 +2139,99 @@ window.rejectReport = function (reportId) {
 // - Guida Turn-by-Turn con tracciamento GPS veicolo
 // =======================================================
 
+// =======================================================
+// MODULO NAVIGATORE 118 CON DEVIAZIONI DI EMERGENZA,
+// GUIDA VOCALE FEMMINILE E 3 SCELTE DI PERCORSO (v3.6.3)
+// =======================================================
+
+// --- MODULO SINTESI VOCALE NAVIGATORE (Voce Femminile & Doppio Avviso) ---
+const VoiceNavigator = {
+    enabled: true,
+    synth: (typeof window !== 'undefined' && 'speechSynthesis' in window) ? window.speechSynthesis : null,
+    preferredVoice: null,
+    init() {
+        try {
+            const saved = localStorage.getItem('nav_voice_enabled');
+            if (saved !== null) {
+                this.enabled = saved === 'true';
+            }
+        } catch (e) { }
+        this.loadVoices();
+        if (this.synth && this.synth.onvoiceschanged !== undefined) {
+            this.synth.onvoiceschanged = () => this.loadVoices();
+        }
+    },
+    loadVoices() {
+        if (!this.synth) return;
+        const voices = this.synth.getVoices() || [];
+        const italianVoices = voices.filter(v => v.lang && (v.lang.startsWith('it') || v.lang.toLowerCase().includes('ita')));
+
+        // Cerca con priorità voci femminili italiane
+        const femaleKeywords = ['alice', 'elsa', 'federica', 'chiara', 'giulia', 'elena', 'cosimo', 'female', 'donna', 'google italiano', 'natural'];
+        let selected = italianVoices.find(v => femaleKeywords.some(kw => v.name.toLowerCase().includes(kw)));
+        if (!selected && italianVoices.length > 0) {
+            selected = italianVoices[0];
+        }
+        this.preferredVoice = selected || null;
+    },
+    speak(text, priority = false) {
+        if (!this.enabled || !this.synth || !text) return;
+        try {
+            if (priority || this.synth.speaking) {
+                this.synth.cancel();
+            }
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'it-IT';
+            if (this.preferredVoice) {
+                utter.voice = this.preferredVoice;
+            }
+            // Timbro e intonazione femminile chiara e squillante
+            utter.pitch = 1.15;
+            utter.rate = 1.02;
+            utter.volume = 1.0;
+            this.synth.speak(utter);
+        } catch (e) {
+            console.warn("Speech synthesis error:", e);
+        }
+    },
+    stop() {
+        if (this.synth) {
+            try { this.synth.cancel(); } catch (e) { }
+        }
+    },
+    toggleMute() {
+        this.enabled = !this.enabled;
+        try {
+            localStorage.setItem('nav_voice_enabled', this.enabled ? 'true' : 'false');
+        } catch (e) { }
+        this.updateButtonState();
+        if (this.enabled) {
+            this.speak("Indicazioni vocali attivate", true);
+        } else {
+            this.stop();
+        }
+        return this.enabled;
+    },
+    updateButtonState() {
+        const btn = document.getElementById('hud-voice-btn');
+        if (btn) {
+            if (this.enabled) {
+                btn.textContent = '🔊';
+                btn.classList.remove('muted');
+                btn.title = "Voce attiva (tocca per silenziare)";
+            } else {
+                btn.textContent = '🔇';
+                btn.classList.add('muted');
+                btn.title = "Voce silenziata (tocca per attivare)";
+            }
+        }
+    }
+};
+
 let navStartPoint = null; // { lat, lng, label }
 let navDestPoint = null;  // { lat, lng, label }
 let navPickerMode = null; // 'start' | 'dest' | null
-let navRoutes = [];       // Array di percorsi
+let navRoutes = [];       // Array fino a 3 percorsi
 let activeNavRouteIdx = 0;
 let navRouteLayers = [];
 let navMarkerStart = null;
@@ -2150,6 +2239,27 @@ let navMarkerDest = null;
 let guidanceActive = false;
 let guidanceWatchId = null;
 let vehicleMarker = null;
+
+// Configurazione grafica e semantica per i 3 percorsi
+const ROUTE_CONFIGS = [
+    { color: '#2563eb', altColor: '#1d4ed8', name: 'Percorso 1 (Consigliato)', dotColor: '#2563eb', badgeClass: 'fastest', badgeText: '⚡ Più Veloce', titleFallback: 'Percorso 1 (Più Veloce)' },
+    { color: '#059669', altColor: '#047857', name: 'Percorso 2 (Alternativa 1)', dotColor: '#059669', badgeClass: 'alt1', badgeText: '🌿 Alternativa 1', titleFallback: 'Percorso 2 (Alternativa 1)' },
+    { color: '#7c3aed', altColor: '#6d28d9', name: 'Percorso 3 (Alternativa 2)', dotColor: '#7c3aed', badgeClass: 'alt2', badgeText: '🟣 Alternativa 2', titleFallback: 'Percorso 3 (Alternativa 2)' }
+];
+
+// Stato della sessione di guida Turn-by-Turn attiva
+let guidanceState = {
+    active: false,
+    route: null,
+    currentStepIdx: 0,
+    announced100m: new Set(),
+    announcedImmediate: new Set(),
+    lastPosition: null,
+    isRerouting: false,
+    lastRerouteTime: 0,
+    offRouteStreak: 0,
+    arrivedAnnounced: false
+};
 
 // Inizializza i listener del Navigatore
 function initNavigationModule() {
@@ -2163,6 +2273,7 @@ function initNavigationModule() {
     const navStartGuidanceBtn = document.getElementById('nav-start-guidance-btn');
     const navClearBtn = document.getElementById('nav-clear-btn');
     const hudStopBtn = document.getElementById('hud-stop-btn');
+    const hudVoiceBtn = document.getElementById('hud-voice-btn');
     const navStartInput = document.getElementById('nav-start-input');
     const navDestInput = document.getElementById('nav-dest-input');
 
@@ -2176,6 +2287,7 @@ function initNavigationModule() {
     if (navStartGuidanceBtn) navStartGuidanceBtn.addEventListener('click', startTurnByTurnGuidance);
     if (navClearBtn) navClearBtn.addEventListener('click', clearNavRoutes);
     if (hudStopBtn) hudStopBtn.addEventListener('click', stopTurnByTurnGuidance);
+    if (hudVoiceBtn) hudVoiceBtn.addEventListener('click', () => VoiceNavigator.toggleMute());
 
     if (navStartInput) {
         navStartInput.addEventListener('keypress', (e) => {
@@ -2187,6 +2299,9 @@ function initNavigationModule() {
             if (e.key === 'Enter') handleCalculateNav();
         });
     }
+
+    VoiceNavigator.init();
+    VoiceNavigator.updateButtonState();
 }
 
 function toggleNavPanel() {
@@ -2204,7 +2319,6 @@ function openNavPanel() {
     if (!navPanel) return;
     navPanel.classList.remove('hidden');
 
-    // Se la partenza non è impostata, imposta automaticamente il GPS
     if (!navStartPoint) {
         setNavStartToGps(false);
     }
@@ -2212,7 +2326,8 @@ function openNavPanel() {
 
 function closeNavPanel() {
     const navPanel = document.getElementById('nav-panel');
-    if (navPanel) navPanel.classList.add('hidden');
+    if (!navPanel) return;
+    navPanel.classList.add('hidden');
     navPickerMode = null;
     const pickerBanner = document.getElementById('picker-banner');
     if (pickerBanner) pickerBanner.classList.add('hidden');
@@ -2239,9 +2354,8 @@ function setNavStartToGps(showToastMsg = true) {
         },
         (err) => {
             console.warn("GPS error:", err.message);
-            // Se fallisce, prova a usare il centro mappa Ferrara
             const center = map.getCenter();
-            navStartPoint = { lat: center.lat, lng: center.lng, label: "Centro Mappa" };
+            navStartPoint = { lat, lng: center.lng, label: "Centro Mappa" };
             if (startInput) startInput.value = "📍 Centro mappa Ferrara";
             if (showToastMsg) showToast("Impossibile rilevare GPS. Impostato centro mappa.", "normal");
         },
@@ -2353,18 +2467,41 @@ function distPointToPolylineMeters(pLat, pLng, coords) {
     return minDist;
 }
 
+// Calcola la distanza chilometrica residua lungo il percorso a partire dalla posizione del mezzo
+function calcRemainingDistanceKm(pLat, pLng, coords) {
+    if (!coords || coords.length === 0) return "0.0";
+    if (coords.length === 1) return (calculateDistanceMeters(pLat, pLng, coords[0][0], coords[0][1]) / 1000).toFixed(1);
+
+    let closestSegIdx = 0;
+    let minDist = Infinity;
+    for (let i = 0; i < coords.length - 1; i++) {
+        const d = distPointToSegmentMeters(pLat, pLng, coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1]);
+        if (d < minDist) {
+            minDist = d;
+            closestSegIdx = i;
+        }
+    }
+
+    let totalMeters = calculateDistanceMeters(pLat, pLng, coords[closestSegIdx + 1][0], coords[closestSegIdx + 1][1]);
+    for (let i = closestSegIdx + 1; i < coords.length - 1; i++) {
+        totalMeters += calculateDistanceMeters(coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1]);
+    }
+
+    return (totalMeters / 1000).toFixed(1);
+}
+
 // Rileva tutti gli ostacoli e le strade chiuse attive al momento
-// Se destLat e destLng sono forniti, contrassegna come "isDestinationTarget" gli ostacoli situati sul punto di arrivo
+// NOTA IMPORTANTE: 'semaforo' corrisponde al Senso Unico Alternato e NON è un blocco/interruzione (non richiede deviazione)
 function getActiveNavigationObstacles(destLat = null, destLng = null) {
     const pointObstacles = [];
     const polylineObstacles = [];
+    // Tipi bloccanti da aggirare obbligatoriamente (escluso 'semaforo' = senso unico alternato)
     const BLOCKING_TYPES = ['chiusa', 'lavori', 'ponte', 'mercato', 'sagra', 'incidente'];
 
     markersData.forEach(m => {
         if (!isMarkerVisible(m)) return;
         if (getMarkerScheduleStatus(m) !== 'active') return;
 
-        // Ostacoli che bloccano il transito o devono essere evitati
         if (BLOCKING_TYPES.includes(m.type)) {
             let isDestinationTarget = false;
             if (destLat !== null && destLng !== null) {
@@ -2446,7 +2583,6 @@ function checkDestinationObstacle(destLat, destLng, obstacles) {
 }
 
 // Verifica se un percorso interseca ostacoli attivi da evitare
-// (Ignora gli ostacoli che coincidono con la destinazione stessa dell'intervento 118)
 function evaluateRouteObstacles(routeCoords, obstacles) {
     let intersects = false;
     let reasons = [];
@@ -2456,8 +2592,7 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
     const avoidablePolys = (obstacles.polylineObstacles || []).filter(po => !po.isDestinationTarget);
 
     for (const po of avoidablePoints) {
-        // Raggio di rilevamento ostacolo geometrico su tutta la carreggiata
-        const threshold = (po.type === 'sagra' || po.type === 'mercato') ? 65 : 45;
+        const threshold = (po.type === 'sagra' || po.type === 'mercato') ? 60 : 42;
         const d = distPointToPolylineMeters(po.lat, po.lng, routeCoords);
 
         if (d < threshold) {
@@ -2476,7 +2611,7 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
     for (const poly of avoidablePolys) {
         for (const [pLat, pLng] of poly.coords) {
             const d = distPointToPolylineMeters(pLat, pLng, routeCoords);
-            if (d < 45) {
+            if (d < 40) {
                 intersects = true;
                 const rText = `Tratto chiuso (${poly.name || 'strada'})`;
                 if (!reasons.includes(rText)) reasons.push(rText);
@@ -2493,36 +2628,31 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
     };
 }
 
-// Genera automaticamente percorsi con DEVIAZIONE RAPIDA per aggirare le interruzioni (strada chiusa, lavori, ponti, mercati, fiere)
-// Utilizza micro-waypoint sulle vie limitrofe (es. Via Borso, Via Guarini, Via Ariosto) e profili con transito ZTL 118
+// Genera automaticamente DEVIAZIONI PIÙ BREVI E IMMEDIATE attorno ai blocchi
+// Utilizza micro-raggi stretti (a partire da 35m) per imboccare subito la prima via limitrofa
 async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obstacles, collidedObstacles, directCoords = []) {
     const candidateDetours = [];
     const testedWaypoints = [];
 
-    // Raccoglie i punti di blocco unici da aggirare
     const uniqueObstacles = [];
     for (const obs of collidedObstacles) {
-        const already = uniqueObstacles.some(u => calculateDistanceMeters(u.lat, u.lng, obs.lat, obs.lng) < 50);
+        const already = uniqueObstacles.some(u => calculateDistanceMeters(u.lat, u.lng, obs.lat, obs.lng) < 45);
         if (!already) uniqueObstacles.push(obs);
     }
 
-    // Calcolo realistico tempo di percorrenza per mezzo di soccorso 118 (velocità media urbana ~36 km/h)
     function calcEmergencyDuration(distanceMeters, osrmCarDuration = null) {
         const distKm = distanceMeters / 1000;
         if (osrmCarDuration && osrmCarDuration > 0) {
-            // Se car OSRM è disponibile, usa il tempo car (o accelerato per emergenza)
             const carMin = Math.round(osrmCarDuration / 60);
             return Math.max(1, Math.min(carMin, Math.round((distKm / 40) * 60)));
         }
         return Math.max(1, Math.round((distKm / 36) * 60));
     }
 
-    // Per ogni ostacolo sul percorso, calcola punti di passaggio alternativi a corto raggio (vie adiacenti)
     for (const obs of uniqueObstacles) {
         const obsLat = obs.lat;
         const obsLng = obs.lng;
 
-        // Trova la direzione del percorso attorno all'ostacolo se disponibile
         let dLat = destLat - startLat;
         let dLng = destLng - startLng;
 
@@ -2536,15 +2666,14 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
                     closestIdx = i;
                 }
             }
-            const preIdx = Math.max(0, closestIdx - 4);
-            const postIdx = Math.min(directCoords.length - 1, closestIdx + 4);
+            const preIdx = Math.max(0, closestIdx - 3);
+            const postIdx = Math.min(directCoords.length - 1, closestIdx + 3);
             if (preIdx !== postIdx) {
                 dLat = directCoords[postIdx][0] - directCoords[preIdx][0];
                 dLng = directCoords[postIdx][1] - directCoords[preIdx][1];
             }
         }
 
-        // Calcola vettori perpendicolari (destra e sinistra)
         const latMeters = dLat * 111000;
         const lngMeters = dLng * 111000 * Math.cos(obsLat * Math.PI / 180);
         const len = Math.sqrt(latMeters * latMeters + lngMeters * lngMeters) || 1;
@@ -2554,13 +2683,12 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
         const perp2Lat = lngMeters / len;
         const perp2Lng = -latMeters / len;
 
-        // Distanze di deviazione a partire da micro-distanze (per trovare subito la prima via parallela es. Via Borso/Guarini/Ariosto)
-        const lateralOffsets = [70, 140, 220, 350, 550, 850, 1300];
-        const radialOffsets = [80, 160, 280, 450, 700, 1100];
+        // Raggi stretti e immediati per minimizzare l'allungamento del percorso
+        const lateralOffsets = [35, 65, 110, 160, 240, 360, 520, 750, 1100];
+        const radialOffsets = [45, 85, 140, 220, 340, 550, 850];
 
         const waypointsToTry = [];
 
-        // Deviazioni perpendicolari (destra e sinistra immediate)
         for (const off of lateralOffsets) {
             const w1Lat = obsLat + (perp1Lat * off) / 111000;
             const w1Lng = obsLng + (perp1Lng * off) / (111000 * Math.cos(obsLat * Math.PI / 180));
@@ -2571,7 +2699,6 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
             waypointsToTry.push({ lat: w2Lat, lng: w2Lng, offset: off });
         }
 
-        // Deviazioni radiali (Nord, Sud, Est, Ovest per isolati urbani)
         for (const off of radialOffsets) {
             const dDegLat = off / 111000;
             const dDegLng = off / (111000 * Math.cos(obsLat * Math.PI / 180));
@@ -2581,23 +2708,20 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
             waypointsToTry.push({ lat: obsLat, lng: obsLng - dDegLng, offset: off });
         }
 
-        // Prova i waypoint generati
         for (const wp of waypointsToTry) {
-            // Verifica che il waypoint stesso non sia dentro un ostacolo
             let wpCollides = false;
             for (const po of (obstacles.pointObstacles || [])) {
-                if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 60) {
+                if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 50) {
                     wpCollides = true;
                     break;
                 }
             }
             if (wpCollides) continue;
 
-            const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 45);
+            const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 35);
             if (alreadyTested) continue;
             testedWaypoints.push(wp);
 
-            // Prova con routing ZTL (bicycle / emergency network) e con routing car
             const routerEndpoints = [
                 { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: true },
                 { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: false }
@@ -2613,7 +2737,6 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
                             const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
                             const check = evaluateRouteObstacles(rCoords, obstacles);
 
-                            // Se la deviazione evita completamente tutti gli ostacoli
                             if (!check.intersects) {
                                 const rawSteps = [];
                                 if (r.legs) {
@@ -2640,80 +2763,104 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
                                     rawSteps: rawSteps
                                 });
 
-                                // Se abbiamo già trovato diverse deviazioni valide, procediamo con le migliori
-                                if (candidateDetours.length >= 6) break;
+                                if (candidateDetours.length >= 8) break;
                             }
                         }
                     }
                 } catch (e) { }
             }
 
-            if (candidateDetours.length >= 6) break;
+            if (candidateDetours.length >= 8) break;
         }
     }
 
     return candidateDetours;
 }
 
-// Formatta i passi di svolta turn-by-turn
+// Formatta i passi di svolta turn-by-turn con istruzioni vocali (anticipate ed immediate)
 function formatManeuverSteps(rawSteps) {
     return rawSteps.map(step => {
         const type = step.maneuver ? step.maneuver.type : '';
         const modifier = step.maneuver ? step.maneuver.modifier : '';
-        const street = step.name || 'Strada';
+        const street = step.name ? step.name.trim() : '';
+        const streetLabel = street || 'la strada';
+        const streetVoice = street ? `in ${street}` : 'sulla strada';
         const dist = Math.round(step.distance);
 
         let icon = '⬆️';
-        let text = `Prosegui su ${street}`;
+        let text = street ? `Prosegui su ${street}` : 'Prosegui dritto';
+        let actionAdvance = street ? `continua dritto su ${street}` : 'continua dritto';
+        let actionImmediate = street ? `prosegui dritto su ${street}` : 'prosegui dritto';
 
         if (type === 'depart') {
             icon = '🏁';
-            text = `Parti in direzione di ${street}`;
+            text = street ? `Parti su ${street}` : 'Parti lungo il percorso';
+            actionAdvance = street ? `parti su ${street}` : 'parti lungo il percorso';
+            actionImmediate = street ? `parti in direzione di ${street}` : 'parti';
         } else if (type === 'arrive') {
             icon = '📍';
-            text = `Sei arrivato a destinazione (${street})`;
-        } else if (modifier && modifier.includes('right')) {
-            icon = '↱';
-            text = `Svolta a destra su ${street}`;
-        } else if (modifier && modifier.includes('left')) {
-            icon = '↰';
-            text = `Svolta a sinistra su ${street}`;
-        } else if (modifier && modifier.includes('slight right')) {
-            icon = '↗️';
-            text = `Tieni la destra verso ${street}`;
-        } else if (modifier && modifier.includes('slight left')) {
-            icon = '↖️';
-            text = `Tieni la sinistra verso ${street}`;
+            text = `Arrivo a destinazione ${street ? `(${street})` : ''}`;
+            actionAdvance = `sei quasi arrivato a destinazione ${streetVoice}`;
+            actionImmediate = `sei arrivato a destinazione!`;
         } else if (modifier && modifier.includes('sharp right')) {
             icon = '↪️';
-            text = `Curva a destra su ${street}`;
+            text = `Curva a destra su ${streetLabel}`;
+            actionAdvance = `curva a destra ${streetVoice}`;
+            actionImmediate = `curva a destra ${streetVoice}`;
         } else if (modifier && modifier.includes('sharp left')) {
             icon = '↩️';
-            text = `Curva a sinistra su ${street}`;
+            text = `Curva a sinistra su ${streetLabel}`;
+            actionAdvance = `curva a sinistra ${streetVoice}`;
+            actionImmediate = `curva a sinistra ${streetVoice}`;
+        } else if (modifier && modifier.includes('slight right')) {
+            icon = '↗️';
+            text = `Tieni la destra verso ${streetLabel}`;
+            actionAdvance = `tieni la destra verso ${streetLabel}`;
+            actionImmediate = `tieni la destra ${streetVoice}`;
+        } else if (modifier && modifier.includes('slight left')) {
+            icon = '↖️';
+            text = `Tieni la sinistra verso ${streetLabel}`;
+            actionAdvance = `tieni la sinistra verso ${streetLabel}`;
+            actionImmediate = `tieni la sinistra ${streetVoice}`;
+        } else if (modifier && modifier.includes('right')) {
+            icon = '↱';
+            text = `Svolta a destra su ${streetLabel}`;
+            actionAdvance = `svolta a destra ${streetVoice}`;
+            actionImmediate = `svolta a destra ${streetVoice}`;
+        } else if (modifier && modifier.includes('left')) {
+            icon = '↰';
+            text = `Svolta a sinistra su ${streetLabel}`;
+            actionAdvance = `svolta a sinistra ${streetVoice}`;
+            actionImmediate = `svolta a sinistra ${streetVoice}`;
         } else if (type && (type.includes('rotary') || type.includes('roundabout'))) {
             icon = '🔄';
-            text = `Alla rotonda prendi l'uscita verso ${street}`;
+            const exitNum = step.maneuver && step.maneuver.exit ? step.maneuver.exit : '';
+            const exitText = exitNum ? `la ${exitNum}ª uscita` : "l'uscita";
+            text = `Alla rotonda prendi ${exitText} verso ${streetLabel}`;
+            actionAdvance = `alla rotonda prendi ${exitText} verso ${streetLabel}`;
+            actionImmediate = `ora prendi ${exitText} verso ${streetLabel}`;
         }
 
         return {
             icon,
             text,
+            actionAdvance,
+            actionImmediate,
             distText: dist >= 1000 ? `${(dist / 1000).toFixed(1)} km` : `${dist} m`,
             distMeters: dist,
-            street,
+            street: street || 'Strada',
             location: step.maneuver && step.maneuver.location ? [step.maneuver.location[1], step.maneuver.location[0]] : null
         };
     });
 }
 
-// Calcola i percorsi di emergenza:
-// - Esclude automaticamente interruzioni (strada chiusa, lavori, ponti) e mercati/fiere
-// - Calcola la DEVIAZIONE PIÙ VELOCE E CORTA (anche attraverso vie ZTL come Via Borso, Via Guarini, Via Ariosto)
-// - Se la destinazione è dentro l'area chiusa/evento (necessità di intervenire lì), consente l'accesso diretto e allerta l'equipaggio
+// Calcola fino a 3 differenti scelte di percorso:
+// - Esclude automaticamente interruzioni e mercati/sagre
+// - Calcola la DEVIAZIONE PIÙ CORTA (attraverso vie ZTL come Via Borso, Via Guarini, Via Ariosto)
+// - Se la destinazione è dentro l'area chiusa, consente l'accesso prioritario
 async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const obstacles = getActiveNavigationObstacles(destLat, destLng);
 
-    // Endpoints per percorsi primari (Car + ZTL Emergency)
     const endpoints = [
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isZtl: false },
         { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isZtl: false },
@@ -2742,7 +2889,6 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         
         let durationMin;
         if (r._isZtl) {
-            // Velocità media emergenza 118 in ZTL/centro (~36 km/h)
             durationMin = Math.max(1, Math.round(((r.distance / 1000) / 36) * 60));
         } else {
             durationMin = Math.max(1, Math.round(r.duration / 60));
@@ -2766,7 +2912,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         };
     });
 
-    // Se i percorsi diretti incontrano ostacoli da evitare, calcola le DEVIAZIONI PIÙ BREVI E RAPIDE
+    // Se i percorsi diretti incontrano ostacoli, calcola le deviazioni più corte
     const blockedRoutes = processedRoutes.filter(r => r.intersectsBlock);
     if (blockedRoutes.length > 0) {
         const allCollided = [];
@@ -2788,10 +2934,10 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Filtra e ordina:
-    // 1. Percorsi liberi da ostacoli (inclusi quelli con deviazione attiva) hanno priorità assoluta
-    // 2. Tempo di percorrenza stimato più veloce
-    // 3. Minore distanza (favorisce la deviazione breve attraverso vie adiacenti es. Via Borso/Guarini/Ariosto rispetto a lunghi giri)
+    // Ordina:
+    // 1. Percorsi liberi da ostacoli
+    // 2. Tempo più rapido
+    // 3. Minore distanza (deviazioni brevi)
     processedRoutes.sort((a, b) => {
         if (a.intersectsBlock !== b.intersectsBlock) {
             return a.intersectsBlock ? 1 : -1;
@@ -2802,11 +2948,11 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         return (a.distanceRaw || parseFloat(a.distanceKm)) - (b.distanceRaw || parseFloat(b.distanceKm));
     });
 
-    // Rimuovi duplicati geometricamente identici
+    // Rimuovi duplicati geometrici ravvicinati
     const uniqueRoutes = [];
     for (const r of processedRoutes) {
         const isDuplicate = uniqueRoutes.some(u =>
-            Math.abs(parseFloat(u.distanceKm) - parseFloat(r.distanceKm)) < 0.1 &&
+            Math.abs(parseFloat(u.distanceKm) - parseFloat(r.distanceKm)) < 0.15 &&
             Math.abs(u.durationMin - r.durationMin) <= 1 &&
             u.intersectsBlock === r.intersectsBlock
         );
@@ -2815,19 +2961,29 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    const finalRoutes = (uniqueRoutes.length > 0 ? uniqueRoutes : processedRoutes).slice(0, 2);
+    // Restituisci fino a 3 percorsi differenziati
+    const finalRoutes = (uniqueRoutes.length > 0 ? uniqueRoutes : processedRoutes).slice(0, 3);
 
-    // Titoli coerenti
+    // Titoli e descrizioni per i 3 percorsi
     finalRoutes.forEach((r, i) => {
+        const cfg = ROUTE_CONFIGS[i] || ROUTE_CONFIGS[0];
         if (i === 0) {
             r.title = r.isDetour
                 ? "Percorso 1 (Più Veloce con Deviazione)"
                 : "Percorso 1 (Più Veloce / Consigliato)";
+        } else if (i === 1) {
+            r.title = r.isDetour
+                ? "Percorso 2 (Alternativa con Deviazione)"
+                : "Percorso 2 (Alternativa 1)";
         } else {
             r.title = r.isDetour
-                ? "Percorso 2 (Alternativo con Deviazione)"
-                : `Percorso ${i + 1} (Alternativo)`;
+                ? "Percorso 3 (Alternativa con Deviazione)"
+                : "Percorso 3 (Alternativa 2)";
         }
+        r.color = cfg.color;
+        r.badgeClass = cfg.badgeClass;
+        r.badgeText = cfg.badgeText;
+        r.dotColor = cfg.dotColor;
     });
 
     return {
@@ -2856,7 +3012,6 @@ async function handleCalculateNav() {
     }
 
     try {
-        // Se startPoint non è geocodificato o è cambiato il testo
         if (!navStartPoint || (startText && !startText.includes("📍") && startText !== navStartPoint.label)) {
             const geo = await geocodeAddressQuery(startText);
             if (geo) {
@@ -2867,7 +3022,6 @@ async function handleCalculateNav() {
             }
         }
 
-        // Se destPoint non è geocodificato o è cambiato il testo
         if (!navDestPoint || (destText && destText !== navDestPoint.label)) {
             const geoDest = await geocodeAddressQuery(destText);
             if (geoDest) {
@@ -2899,7 +3053,6 @@ async function handleCalculateNav() {
         navRoutes = res.routes;
         activeNavRouteIdx = 0;
 
-        // Controlla allerta se la destinazione è in area chiusa
         const destCheck = checkDestinationObstacle(navDestPoint.lat, navDestPoint.lng, res.obstacles);
         const alertBox = document.getElementById('nav-dest-alert');
         const alertMsg = document.getElementById('nav-dest-alert-msg');
@@ -2927,9 +3080,8 @@ async function handleCalculateNav() {
     }
 }
 
-// Disegna i percorsi sulla mappa e compila le schede
+// Disegna fino a 3 percorsi differenziati sulla mappa e compila le schede colorate
 function renderNavRoutes(routes) {
-    // Pulisci layer precedenti
     navRouteLayers.forEach(l => map.removeLayer(l));
     navRouteLayers = [];
     if (navMarkerStart) { map.removeLayer(navMarkerStart); navMarkerStart = null; }
@@ -2940,7 +3092,6 @@ function renderNavRoutes(routes) {
     if (routesContainer) routesContainer.classList.remove('hidden');
     if (cardsList) cardsList.innerHTML = '';
 
-    // Marker Partenza (A)
     const iconStart = L.divIcon({
         className: '',
         html: '<div style="background:#10b981; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.4);">A</div>',
@@ -2949,7 +3100,6 @@ function renderNavRoutes(routes) {
     });
     navMarkerStart = L.marker([navStartPoint.lat, navStartPoint.lng], { icon: iconStart, zIndexOffset: 1200 }).addTo(map);
 
-    // Marker Destinazione (B)
     const iconDest = L.divIcon({
         className: '',
         html: '<div style="background:#ef4444; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:14px; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.4);">B</div>',
@@ -2962,58 +3112,55 @@ function renderNavRoutes(routes) {
 
     routes.forEach((route, idx) => {
         const isActive = idx === activeNavRouteIdx;
-
-        // Stile polyline
-        const color = isActive ? '#2563eb' : '#8b5cf6';
-        const weight = isActive ? 7 : 5;
-        const opacity = isActive ? 0.95 : 0.65;
-        const dashArray = isActive ? null : '6, 8';
+        const cfg = ROUTE_CONFIGS[idx] || ROUTE_CONFIGS[0];
 
         const polyline = L.polyline(route.coords, {
-            color: color,
-            weight: weight,
-            opacity: opacity,
-            dashArray: dashArray,
+            color: cfg.color,
+            weight: isActive ? 8 : 5,
+            opacity: isActive ? 0.95 : 0.65,
+            dashArray: isActive ? null : '6, 8',
             lineJoin: 'round',
             lineCap: 'round'
         }).addTo(map);
+
+        if (isActive) polyline.bringToFront();
 
         polyline.on('click', () => selectNavRoute(idx));
         navRouteLayers.push(polyline);
 
         route.coords.forEach(c => allBounds.extend(c));
 
-        // Crea card per la lista
         const card = document.createElement('div');
         card.className = `nav-route-card ${isActive ? 'active' : ''}`;
         
         let badgesHtml = '';
-        if (idx === 0) badgesHtml += '<span class="nav-badge-pill fastest">⚡ Più Veloce</span>';
+        badgesHtml += `<span class="nav-badge-pill ${cfg.badgeClass}">${cfg.badgeText}</span>`;
         badgesHtml += '<span class="nav-badge-pill ztl">🛡️ ZTL Ammessa</span>';
         if (route.isDetour) {
             badgesHtml += '<span class="nav-badge-pill detour">🔄 Deviazione Attiva</span>';
             badgesHtml += '<span class="nav-badge-pill avoided">🟢 Ostacoli Evitati</span>';
         } else if (!route.intersectsBlock) {
             badgesHtml += '<span class="nav-badge-pill clear">🟢 Viabilità Libera</span>';
-        } else {
-            badgesHtml += '<span class="nav-badge-pill" style="background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid #ef4444;">⚠️ Possibile ostacolo</span>';
         }
 
         let detourNoteHtml = '';
         if (route.isDetour) {
-            detourNoteHtml = `<div class="nav-card-detour-note">🔄 Deviazione applicata: aggiramento interruzioni per arrivo prioritario al target.</div>`;
+            detourNoteHtml = `<div class="nav-card-detour-note">🔄 Deviazione applicata: aggiramento interruzioni per arrivo rapido.</div>`;
         }
 
         card.innerHTML = `
             <div class="nav-card-left">
-                <span class="nav-card-title">${escapeHtml(route.title)}</span>
+                <span class="nav-card-title">
+                    <span class="nav-card-color-dot" style="background:${cfg.dotColor};"></span>
+                    ${escapeHtml(route.title)}
+                </span>
                 <span class="nav-card-dist">📏 ${route.distanceKm} km &bull; ⏱️ ${route.durationMin} min</span>
                 <div class="nav-card-badges">
                     ${badgesHtml}
                 </div>
                 ${detourNoteHtml}
             </div>
-            <div class="nav-card-time">${route.durationMin} min</div>
+            <div class="nav-card-time" style="color:${cfg.color};">${route.durationMin} min</div>
         `;
         card.addEventListener('click', () => selectNavRoute(idx));
         if (cardsList) cardsList.appendChild(card);
@@ -3024,16 +3171,17 @@ function renderNavRoutes(routes) {
     map.fitBounds(allBounds, { padding: [50, 50], maxZoom: 16 });
 }
 
-// Seleziona un'opzione di percorso
+// Seleziona una delle 3 opzioni di percorso
 function selectNavRoute(idx) {
     if (idx < 0 || idx >= navRoutes.length) return;
     activeNavRouteIdx = idx;
 
     navRouteLayers.forEach((l, i) => {
         const isActive = i === activeNavRouteIdx;
+        const cfg = ROUTE_CONFIGS[i] || ROUTE_CONFIGS[0];
         l.setStyle({
-            color: isActive ? '#2563eb' : '#8b5cf6',
-            weight: isActive ? 7 : 5,
+            color: cfg.color,
+            weight: isActive ? 8 : 5,
             opacity: isActive ? 0.95 : 0.65,
             dashArray: isActive ? null : '6, 8'
         });
@@ -3123,18 +3271,34 @@ function clearNavRoutes() {
     navDestPoint = null;
 }
 
-// Avvia la guida Turn-by-Turn a tutto schermo con tracking GPS
+// Avvia la guida Turn-by-Turn a tutto schermo con tracking GPS e guida vocale
 function startTurnByTurnGuidance() {
     if (!navRoutes || navRoutes.length === 0) return;
     const activeRoute = navRoutes[activeNavRouteIdx];
     if (!activeRoute) return;
 
     guidanceActive = true;
+    guidanceState = {
+        active: true,
+        route: activeRoute,
+        currentStepIdx: 0,
+        announced100m: new Set(),
+        announcedImmediate: new Set(),
+        lastPosition: null,
+        isRerouting: false,
+        lastRerouteTime: 0,
+        offRouteStreak: 0,
+        arrivedAnnounced: false
+    };
+
     const navPanel = document.getElementById('nav-panel');
     const navHud = document.getElementById('nav-hud');
     if (navPanel) navPanel.classList.add('hidden');
     if (navHud) navHud.classList.remove('hidden');
 
+    VoiceNavigator.updateButtonState();
+
+    const startCoord = activeRoute.coords[0];
     if (!vehicleMarker) {
         const vehicleIcon = L.divIcon({
             className: '',
@@ -3142,48 +3306,210 @@ function startTurnByTurnGuidance() {
             iconSize: [34, 34],
             iconAnchor: [17, 17]
         });
-        const startCoord = activeRoute.coords[0];
         vehicleMarker = L.marker(startCoord, { icon: vehicleIcon, zIndexOffset: 3000 }).addTo(map);
+    } else {
+        vehicleMarker.setLatLng(startCoord);
     }
 
-    updateHudDisplay(activeRoute);
+    map.setView(startCoord, 17, { animate: true });
+
+    // Annuncio vocale iniziale di partenza
+    if (activeRoute.steps && activeRoute.steps.length > 0) {
+        const s0 = activeRoute.steps[0];
+        VoiceNavigator.speak(`Guida avviata. ${s0.actionAdvance || s0.text}`);
+    }
+
+    // Aggiornamento iniziale display
+    if (activeRoute.steps && activeRoute.steps.length > 0) {
+        updateHudDynamic(activeRoute.steps[0], activeRoute.steps[0].distMeters || 0, startCoord[0], startCoord[1], activeRoute);
+    }
 
     if (navigator.geolocation) {
         guidanceWatchId = navigator.geolocation.watchPosition(
             (pos) => {
+                if (!guidanceActive) return;
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
-                if (vehicleMarker) vehicleMarker.setLatLng([lat, lng]);
-                map.panTo([lat, lng], { animate: true, duration: 0.6 });
+                handleGuidanceGpsUpdate(lat, lng, pos.coords.heading, pos.coords.speed);
             },
             (err) => console.warn("GPS watch error:", err.message),
-            { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
+            { enableHighAccuracy: true, maximumAge: 1500, timeout: 8000 }
         );
     }
 
-    showToast("🧭 Guida turn-by-turn avviata!", "success", 3000);
+    showToast("🧭 Guida Turn-by-Turn avviata con voce!", "success", 3000);
 }
 
-function updateHudDisplay(route) {
+// Elaborazione di ogni singolo impulso GPS durante la guida
+function handleGuidanceGpsUpdate(lat, lng, heading = null, speed = null) {
+    if (!guidanceActive || !guidanceState.route) return;
+
+    if (vehicleMarker) {
+        vehicleMarker.setLatLng([lat, lng]);
+    }
+    map.panTo([lat, lng], { animate: true, duration: 0.5 });
+
+    const route = guidanceState.route;
+    const distToPolyline = distPointToPolylineMeters(lat, lng, route.coords);
+
+    // Rilevamento errore di strada e ricalcolo immediato
+    if (distToPolyline > 35) {
+        guidanceState.offRouteStreak++;
+        if ((guidanceState.offRouteStreak >= 2 || distToPolyline > 50) && !guidanceState.isRerouting) {
+            const now = Date.now();
+            if (now - guidanceState.lastRerouteTime > 4000) {
+                guidanceState.isRerouting = true;
+                guidanceState.lastRerouteTime = now;
+                VoiceNavigator.speak("Ricalcolo del percorso in corso...", true);
+                triggerOffRouteReroute(lat, lng);
+                return;
+            }
+        }
+    } else {
+        guidanceState.offRouteStreak = 0;
+    }
+
+    const steps = route.steps || [];
+    let currentIdx = guidanceState.currentStepIdx;
+
+    // Se siamo arrivati all'ultimo passo
+    if (currentIdx >= steps.length - 1 || steps.length === 0) {
+        const distToDest = navDestPoint ? calculateDistanceMeters(lat, lng, navDestPoint.lat, navDestPoint.lng) : 0;
+        if (distToDest < 30 && !guidanceState.arrivedAnnounced) {
+            guidanceState.arrivedAnnounced = true;
+            VoiceNavigator.speak("Sei arrivato a destinazione!", true);
+        }
+        updateHudForArrival(distToDest);
+        return;
+    }
+
+    const curStep = steps[currentIdx];
+    let distToManeuver = 0;
+    if (curStep.location) {
+        distToManeuver = calculateDistanceMeters(lat, lng, curStep.location[0], curStep.location[1]);
+    } else {
+        distToManeuver = curStep.distMeters || 100;
+    }
+
+    // Avanzamento allo step successivo
+    if (distToManeuver < 15 && currentIdx < steps.length - 1) {
+        guidanceState.currentStepIdx++;
+        currentIdx = guidanceState.currentStepIdx;
+    } else if (currentIdx + 1 < steps.length && steps[currentIdx + 1].location) {
+        const nextLoc = steps[currentIdx + 1].location;
+        const distNext = calculateDistanceMeters(lat, lng, nextLoc[0], nextLoc[1]);
+        if (distNext < distToManeuver && distToManeuver > 30) {
+            guidanceState.currentStepIdx++;
+            currentIdx = guidanceState.currentStepIdx;
+        }
+    }
+
+    const activeStep = steps[currentIdx];
+    if (activeStep.location) {
+        distToManeuver = calculateDistanceMeters(lat, lng, activeStep.location[0], activeStep.location[1]);
+    }
+
+    // 1) Avviso vocale in anticipo (~100 metri prima)
+    if (distToManeuver <= 115 && distToManeuver >= 45) {
+        if (!guidanceState.announced100m.has(currentIdx)) {
+            guidanceState.announced100m.add(currentIdx);
+            const msg = `Tra 100 metri ${activeStep.actionAdvance || activeStep.text}`;
+            VoiceNavigator.speak(msg);
+        }
+    }
+
+    // 2) Avviso vocale nell'immediatezza (~15-20 metri prima)
+    if (distToManeuver <= 25 && distToManeuver > 0) {
+        if (!guidanceState.announcedImmediate.has(currentIdx)) {
+            guidanceState.announcedImmediate.add(currentIdx);
+            const msg = `Ora ${activeStep.actionImmediate || activeStep.text}`;
+            VoiceNavigator.speak(msg);
+        }
+    }
+
+    // Aggiornamento display HUD
+    updateHudDynamic(activeStep, distToManeuver, lat, lng, route);
+}
+
+// Ricalcolo automatico e istantaneo in caso di fuori rotta
+async function triggerOffRouteReroute(currentLat, currentLng) {
+    if (!navDestPoint) {
+        guidanceState.isRerouting = false;
+        return;
+    }
+    try {
+        const res = await calculateEmergencyRoutes(currentLat, currentLng, navDestPoint.lat, navDestPoint.lng);
+        if (res && res.routes && res.routes.length > 0) {
+            navRoutes = res.routes;
+            activeNavRouteIdx = 0;
+            const newActiveRoute = navRoutes[0];
+
+            renderNavRoutes(navRoutes);
+
+            guidanceState.route = newActiveRoute;
+            guidanceState.currentStepIdx = 0;
+            guidanceState.announced100m = new Set();
+            guidanceState.announcedImmediate = new Set();
+            guidanceState.offRouteStreak = 0;
+
+            if (newActiveRoute.steps && newActiveRoute.steps.length > 0) {
+                const firstStep = newActiveRoute.steps[0];
+                updateHudDynamic(firstStep, firstStep.distMeters || 0, currentLat, currentLng, newActiveRoute);
+                VoiceNavigator.speak(`Percorso ricalcolato. ${firstStep.actionAdvance || firstStep.text}`);
+            }
+        }
+    } catch (e) {
+        console.warn("Reroute error:", e);
+    } finally {
+        guidanceState.isRerouting = false;
+    }
+}
+
+// Aggiorna l'HUD in tempo reale con avanzamento dei metri, tempo e km
+function updateHudDynamic(step, distToManeuver, lat, lng, route) {
     const timeEl = document.getElementById('hud-time-remain');
     const distEl = document.getElementById('hud-dist-remain');
     const nextDistEl = document.getElementById('hud-next-dist');
     const nextStreetEl = document.getElementById('hud-next-street');
     const iconEl = document.getElementById('hud-maneuver-icon');
 
-    if (timeEl) timeEl.textContent = `${route.durationMin} min`;
-    if (distEl) distEl.textContent = `${route.distanceKm} km`;
+    const remainingKm = calcRemainingDistanceKm(lat, lng, route.coords);
+    const remainingMin = Math.max(1, Math.round((parseFloat(remainingKm) / 36) * 60));
 
-    if (route.steps && route.steps.length > 0) {
-        const nextStep = route.steps[0];
-        if (nextDistEl) nextDistEl.textContent = nextStep.distText ? `Tra ${nextStep.distText}` : 'Subito';
-        if (nextStreetEl) nextStreetEl.textContent = nextStep.text || nextStep.street;
-        if (iconEl) iconEl.textContent = nextStep.icon || '⬆️';
+    if (timeEl) timeEl.textContent = `${remainingMin} min`;
+    if (distEl) distEl.textContent = `${remainingKm} km`;
+
+    if (nextDistEl) {
+        if (distToManeuver < 15) {
+            nextDistEl.textContent = 'Ora';
+        } else if (distToManeuver >= 1000) {
+            nextDistEl.textContent = `Tra ${(distToManeuver / 1000).toFixed(1)} km`;
+        } else {
+            nextDistEl.textContent = `Tra ${Math.round(distToManeuver)} m`;
+        }
     }
+
+    if (nextStreetEl) nextStreetEl.textContent = step.text || step.street;
+    if (iconEl) iconEl.textContent = step.icon || '⬆️';
+}
+
+function updateHudForArrival(distToDest) {
+    const timeEl = document.getElementById('hud-time-remain');
+    const distEl = document.getElementById('hud-dist-remain');
+    const nextDistEl = document.getElementById('hud-next-dist');
+    const nextStreetEl = document.getElementById('hud-next-street');
+    const iconEl = document.getElementById('hud-maneuver-icon');
+
+    if (timeEl) timeEl.textContent = `0 min`;
+    if (distEl) distEl.textContent = `0 km`;
+    if (nextDistEl) nextDistEl.textContent = distToDest < 10 ? 'Arrivato' : `${Math.round(distToDest)} m`;
+    if (nextStreetEl) nextStreetEl.textContent = 'Destinazione raggiunta';
+    if (iconEl) iconEl.textContent = '🏁';
 }
 
 function stopTurnByTurnGuidance() {
     guidanceActive = false;
+    VoiceNavigator.stop();
     if (guidanceWatchId !== null && navigator.geolocation) {
         navigator.geolocation.clearWatch(guidanceWatchId);
         guidanceWatchId = null;
