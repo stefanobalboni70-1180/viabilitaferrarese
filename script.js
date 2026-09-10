@@ -3349,7 +3349,30 @@ function clearNavRoutes() {
     navDestPoint = null;
 }
 
-// Avvia la guida Turn-by-Turn a tutto schermo con tracking GPS e guida vocale
+
+// Calcola l'angolo di direzione (bearing geografico in gradi da 0 a 360) tra due punti
+function calcBearingDegrees(lat1, lng1, lat2, lng2) {
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const y = Math.sin(dLng) * Math.cos(lat2 * Math.PI / 180);
+    const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+              Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLng);
+    let brng = Math.atan2(y, x) * 180 / Math.PI;
+    return (brng + 360) % 360;
+}
+
+// Applica la rotazione della mappa verso la direzione di marcia (Heading-Up) e orienta la bussola
+function applyHeadingUpMapRotation(headingDeg) {
+    const mapEl = document.getElementById('map');
+    const needleEl = document.getElementById('hud-compass-needle');
+    if (mapEl) {
+        mapEl.style.transform = `rotate(${-headingDeg}deg)`;
+    }
+    if (needleEl) {
+        needleEl.style.transform = `rotate(${-headingDeg}deg)`;
+    }
+}
+
+// Avvia la guida Turn-by-Turn a tutto schermo con tracking GPS, guida vocale e rotazione mappa
 function startTurnByTurnGuidance() {
     if (!navRoutes || navRoutes.length === 0) return;
     const activeRoute = navRoutes[activeNavRouteIdx];
@@ -3363,6 +3386,7 @@ function startTurnByTurnGuidance() {
         announced100m: new Set(),
         announcedImmediate: new Set(),
         lastPosition: null,
+        currentHeading: 0,
         isRerouting: false,
         lastRerouteTime: 0,
         offRouteStreak: 0,
@@ -3371,18 +3395,35 @@ function startTurnByTurnGuidance() {
 
     const navPanel = document.getElementById('nav-panel');
     const navHud = document.getElementById('nav-hud');
+    const mapEl = document.getElementById('map');
     if (navPanel) navPanel.classList.add('hidden');
     if (navHud) navHud.classList.remove('hidden');
+    if (mapEl) mapEl.classList.add('guidance-heading-up');
 
     VoiceNavigator.updateButtonState();
 
     const startCoord = activeRoute.coords[0];
+
+    // Calcola l'orientamento iniziale verso il primo segmento della rotta
+    let initialHeading = 0;
+    if (activeRoute.coords && activeRoute.coords.length >= 2) {
+        initialHeading = calcBearingDegrees(
+            activeRoute.coords[0][0], activeRoute.coords[0][1],
+            activeRoute.coords[1][0], activeRoute.coords[1][1]
+        );
+    }
+    guidanceState.currentHeading = initialHeading;
+    applyHeadingUpMapRotation(initialHeading);
+
     if (!vehicleMarker) {
         const vehicleIcon = L.divIcon({
             className: '',
-            html: '<div style="background:#0284c7; color:#fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; border:3px solid #fff; box-shadow:0 0 16px rgba(2,132,199,0.8);">🚑</div>',
-            iconSize: [34, 34],
-            iconAnchor: [17, 17]
+            html: '<div style="position:relative; width:44px; height:44px; display:flex; align-items:center; justify-content:center;">' +
+                  '<div style="position:absolute; top:-6px; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:11px solid #38bdf8; filter:drop-shadow(0 0 6px #38bdf8);"></div>' +
+                  '<div style="background:#0284c7; color:#fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.15rem; border:3px solid #fff; box-shadow:0 0 16px rgba(2,132,199,0.9);">🚑</div>' +
+                  '</div>',
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
         });
         vehicleMarker = L.marker(startCoord, { icon: vehicleIcon, zIndexOffset: 3000 }).addTo(map);
     } else {
@@ -3415,10 +3456,10 @@ function startTurnByTurnGuidance() {
         );
     }
 
-    showToast("🧭 Guida Turn-by-Turn avviata con voce!", "success", 3000);
+    showToast("🧭 Guida Turn-by-Turn avviata (Mappa orientata alla marcia)!", "success", 3000);
 }
 
-// Elaborazione di ogni singolo impulso GPS durante la guida
+// Elaborazione di ogni singolo impulso GPS durante la guida con rotazione mappa
 function handleGuidanceGpsUpdate(lat, lng, heading = null, speed = null) {
     if (!guidanceActive || !guidanceState.route) return;
 
@@ -3486,6 +3527,25 @@ function handleGuidanceGpsUpdate(lat, lng, heading = null, speed = null) {
     if (activeStep.location) {
         distToManeuver = calculateDistanceMeters(lat, lng, activeStep.location[0], activeStep.location[1]);
     }
+
+    // Calcolo rotazione dinamica della mappa in direzione di marcia
+    let targetHeading = guidanceState.currentHeading;
+    if (heading !== null && !isNaN(heading) && heading >= 0 && (speed === null || speed > 0.8)) {
+        targetHeading = heading;
+    } else if (guidanceState.lastPosition) {
+        const dMoved = calculateDistanceMeters(guidanceState.lastPosition.lat, guidanceState.lastPosition.lng, lat, lng);
+        if (dMoved >= 2.5) {
+            targetHeading = calcBearingDegrees(guidanceState.lastPosition.lat, guidanceState.lastPosition.lng, lat, lng);
+        } else if (activeStep && activeStep.location) {
+            targetHeading = calcBearingDegrees(lat, lng, activeStep.location[0], activeStep.location[1]);
+        }
+    } else if (activeStep && activeStep.location) {
+        targetHeading = calcBearingDegrees(lat, lng, activeStep.location[0], activeStep.location[1]);
+    }
+
+    guidanceState.lastPosition = { lat, lng };
+    guidanceState.currentHeading = targetHeading;
+    applyHeadingUpMapRotation(targetHeading);
 
     // 1) Avviso vocale in anticipo (~100 metri prima)
     if (distToManeuver <= 115 && distToManeuver >= 45) {
@@ -3609,8 +3669,17 @@ function stopTurnByTurnGuidance() {
     }
     const navHud = document.getElementById('nav-hud');
     const navPanel = document.getElementById('nav-panel');
+    const mapEl = document.getElementById('map');
+    const needleEl = document.getElementById('hud-compass-needle');
     if (navHud) navHud.classList.add('hidden');
     if (navPanel) navPanel.classList.remove('hidden');
+    if (mapEl) {
+        mapEl.classList.remove('guidance-heading-up');
+        mapEl.style.transform = 'none';
+    }
+    if (needleEl) {
+        needleEl.style.transform = 'none';
+    }
     if (vehicleMarker) {
         map.removeLayer(vehicleMarker);
         vehicleMarker = null;
