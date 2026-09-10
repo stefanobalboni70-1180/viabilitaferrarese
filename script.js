@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.3';
+const APP_VERSION = '3.6.5';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2495,8 +2495,26 @@ function calcRemainingDistanceKm(pLat, pLng, coords) {
 function getActiveNavigationObstacles(destLat = null, destLng = null) {
     const pointObstacles = [];
     const polylineObstacles = [];
-    // Tipi bloccanti da aggirare obbligatoriamente (escluso 'semaforo' = senso unico alternato)
+    // Tipi bloccanti da aggirare obbligatoriamente (interruzioni stradali, ponti crollati/interrotti, sagome basse, mercati, sagre)
     const BLOCKING_TYPES = ['chiusa', 'lavori', 'ponte', 'mercato', 'sagra', 'incidente'];
+
+    // 1. Aggiungi restrizioni di sagoma/altezza provinciali (se l'altezza o larghezza utile è inferiore alle specifiche dell'ambulanza 118)
+    if (typeof PROVINCIAL_CLEARANCE_RESTRICTIONS !== 'undefined' && Array.isArray(PROVINCIAL_CLEARANCE_RESTRICTIONS)) {
+        PROVINCIAL_CLEARANCE_RESTRICTIONS.forEach(clr => {
+            const heightIncompatible = clr.maxHeight && clr.maxHeight < AMBULANCE_SPECS.maxHeightMeters;
+            const widthIncompatible = clr.maxWidth && clr.maxWidth < AMBULANCE_SPECS.maxWidthMeters;
+            if (heightIncompatible || widthIncompatible) {
+                pointObstacles.push({
+                    lat: clr.lat,
+                    lng: clr.lng,
+                    type: 'sagoma',
+                    street: clr.name,
+                    note: `Limite sagoma/altezza: ${clr.maxHeight ? clr.maxHeight + 'm alt. ' : ''}${clr.maxWidth ? clr.maxWidth + 'm largh.' : ''} (Ambulanza richiede min ${AMBULANCE_SPECS.maxHeightMeters}m x ${AMBULANCE_SPECS.maxWidthMeters}m)`,
+                    isDestinationTarget: false
+                });
+            }
+        });
+    }
 
     markersData.forEach(m => {
         if (!isMarkerVisible(m)) return;
@@ -2598,6 +2616,7 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
         if (d < threshold) {
             intersects = true;
             const typeLabel = po.type === 'ponte' ? 'Ponte interrotto' :
+                              po.type === 'sagoma' ? 'Limite sagoma/altezza (Incompatibile con ambulanza)' :
                               po.type === 'lavori' ? 'Lavori in corso' :
                               po.type === 'chiusa' ? 'Strada chiusa' :
                               po.type === 'mercato' ? 'Mercato' :
@@ -2854,19 +2873,439 @@ function formatManeuverSteps(rawSteps) {
     });
 }
 
+// -------------------------------------------------------
+// SPECIFICHE MEZZI DI SOCCORSO 118 & LIMITI DI SAGOMA / ALTEZZA
+// (Standard Ambulanza Tipo A / MSA / MSB)
+// -------------------------------------------------------
+const AMBULANCE_SPECS = {
+    maxHeightMeters: 2.80, // Altezza massima con barra lampeggianti e antenne (m)
+    maxWidthMeters: 2.30,  // Larghezza minima utile con specchietti retrovisori (m)
+    maxWeightTons: 3.8,    // Massa a pieno carico (t)
+    canUseBusLanes: true,  // Autorizzazione corsie preferenziali Bus / Taxi TPER
+    respectsOneWays: true, // Rispetto rigoroso dei sensi unici e direzioni di marcia ordinarie
+    canUseFastTransit: true // Priorità di transito su tangenziali e arterie di scorrimento veloce
+};
+
+// Punti noti con limiti di sagoma/altezza o varchi angusti nel territorio provinciale
+const PROVINCIAL_CLEARANCE_RESTRICTIONS = [
+    {
+        id: 'sottopasso_poletti',
+        name: 'Sottopasso Ferroviario Via Poletti / Porta Catena',
+        lat: 44.8465,
+        lng: 11.6035,
+        maxHeight: 2.50, // Inferiore a 2.80m -> Inaccessibile ad ambulanze rialzate
+        maxWidth: 2.80,
+        type: 'sagoma_bassa'
+    },
+    {
+        id: 'arco_storico_angusto',
+        name: 'Varco Storico Volto del Cavallo / Piazzetta Municipale',
+        lat: 44.8362,
+        lng: 11.6190,
+        maxHeight: 2.60,
+        maxWidth: 2.10, // Varco troppo stretto per ambulanza con specchietti
+        type: 'varco_stretto'
+    }
+];
+
+// Corsie preferenziali Bus & Taxi autorizzate per il 118 a Ferrara e provincia
+const BUS_PREFERENTIAL_CORRIDORS = [
+    { name: 'Corso Giovecca (Corsia Bus)', lat: 44.8365, lng: 11.6250, radius: 450 },
+    { name: 'Viale Cavour (Corsia Riservata Bus/Taxi)', lat: 44.8385, lng: 11.6140, radius: 550 },
+    { name: 'Corso Porta Reno (Corsia Bus)', lat: 44.8320, lng: 11.6190, radius: 350 },
+    { name: 'Via Kennedy (Corsia Preferenziale)', lat: 44.8270, lng: 11.6190, radius: 250 },
+    { name: 'Via Bologna (Corsia Bus Chiesuol del Fosso)', lat: 44.8080, lng: 11.6000, radius: 600 }
+];
+
+// Arterie e direttrici di scorrimento veloce (Tangenziali e Superstrade)
+const FAST_TRANSIT_AXES = [
+    { name: 'Tangenziale Ovest Ferrara (SS16 / Via Ferraresi)', lat: 44.8190, lng: 11.5900, radius: 2500 },
+    { name: 'Tangenziale Est / Raccordo Sud (SS16 / Via Caldirolo)', lat: 44.8280, lng: 11.6450, radius: 2500 },
+    { name: 'Raccordo Autostradale Ferrara-Porto Garibaldi (RA8)', lat: 44.7920, lng: 11.6700, radius: 6000 },
+    { name: 'SS64 Porrettana (Direttrice Sud)', lat: 44.7650, lng: 11.5800, radius: 3500 },
+    { name: 'Circonvallazione Isonzo / Po / Porta Mare', lat: 44.8410, lng: 11.6150, radius: 1800 }
+];
+
+// -------------------------------------------------------
+// DEFINIZIONE GEOMETRICA ZTL PER TUTTA LA PROVINCIA DI FERRARA
+// (Ferrara, Cento, Comacchio, Argenta, Bondeno, Portomaggiore, Copparo, Codigoro)
+// -------------------------------------------------------
+
+const PROVINCE_ZTL_REGIONS = [
+    {
+        id: 'ferrara_main',
+        name: 'Ferrara - Centro Storico ZTL',
+        polygon: [
+            [44.8435, 11.6110], // Corso Porta Po / Barriere
+            [44.8438, 11.6165], // Corso Biagio Rossetti ovest
+            [44.8430, 11.6210], // Quadrivio degli Angeli (Corso Ercole I d'Este)
+            [44.8420, 11.6260], // Corso Porta Mare ovest
+            [44.8410, 11.6315], // Corso Porta Mare / Via Borgo dei Leoni
+            [44.8395, 11.6360], // Corso Porta Mare / Mura est
+            [44.8365, 11.6355], // Piazzale Medaglie d'Oro / Corso Giovecca est
+            [44.8325, 11.6325], // Viale Alfonso I d'Este nord
+            [44.8290, 11.6285], // Baluardo di San Rocco / Via Alfonso I d'Este sud
+            [44.8268, 11.6235], // Porta San Pietro / Via Quartieri
+            [44.8265, 11.6195], // Porta Paola / Piazza Travaglio / Via Kennedy
+            [44.8272, 11.6150], // Via Darsena / Corso Porta Reno sud
+            [44.8288, 11.6120], // Via Darsena / Corso Isonzo
+            [44.8335, 11.6105], // Corso Isonzo centro
+            [44.8375, 11.6108], // Corso Isonzo / Viale Cavour
+            [44.8415, 11.6110]  // Corso Porta Po
+        ],
+        isCore: false
+    },
+    {
+        id: 'ferrara_core',
+        name: 'Ferrara - Nucleo Pedonale / ZTL A',
+        polygon: [
+            [44.8390, 11.6175], // Largo Castello nord-ovest
+            [44.8390, 11.6225], // Corso Giovecca / Castello est
+            [44.8365, 11.6245], // Via Terranuova / Savonarola
+            [44.8320, 11.6235], // Via Saraceno / Via Carlo Mayr
+            [44.8280, 11.6205], // Piazza Travaglio / Porta Reno sud
+            [44.8285, 11.6165], // Via Piangipane / Baluardi ovest
+            [44.8330, 11.6155], // Via Garibaldi ovest
+            [44.8375, 11.6160]  // Viale Cavour / Largo Castello ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'cento',
+        name: 'Cento - Centro Storico ZTL',
+        polygon: [
+            [44.7310, 11.2860], // Via XXV Aprile nord
+            [44.7315, 11.2925], // Circonvallazione est
+            [44.7285, 11.2950], // Porta Bologna / Guercino
+            [44.7250, 11.2940], // Via Cremonino sud
+            [44.7240, 11.2880], // Via IV Novembre sud
+            [44.7270, 11.2845]  // Viale Bonzagni ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'comacchio',
+        name: 'Comacchio - Centro Storico Trepponti / Canali',
+        polygon: [
+            [44.6970, 12.1780], // Via Cavour nord
+            [44.6975, 12.1860], // Piazza Folegatti est
+            [44.6925, 12.1870], // Via Sambertolo sud-est
+            [44.6910, 12.1810], // Trepponti / Via Pescheria
+            [44.6935, 12.1765]  // Via Fogli ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'argenta',
+        name: 'Argenta - Centro Storico ZTL',
+        polygon: [
+            [44.6175, 11.8320], // Piazza Garibaldi nord
+            [44.6170, 11.8400], // Via Don Minzoni est
+            [44.6120, 11.8390], // Via Mazzini sud
+            [44.6125, 11.8310]  // Via Matteotti ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'bondeno',
+        name: 'Bondeno - Centro Storico ZTL',
+        polygon: [
+            [44.8920, 11.4120], // Piazza Garibaldi nord-ovest
+            [44.8925, 11.4220], // Viale Repubblica est
+            [44.8860, 11.4210], // Via Teodoro Bonati sud
+            [44.8855, 11.4130]  // Borgo Fornasini ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'portomaggiore',
+        name: 'Portomaggiore - Centro Storico ZTL',
+        polygon: [
+            [44.7000, 11.8000], // Piazza Umberto I nord
+            [44.7005, 11.8080], // Corso Vittorio Emanuele II est
+            [44.6950, 11.8075], // Piazza Repubblica sud
+            [44.6945, 11.7995]  // Via Bernagozzi ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'copparo',
+        name: 'Copparo - Centro Storico ZTL',
+        polygon: [
+            [44.8960, 11.7200], // Piazza del Popolo nord
+            [44.8965, 11.7280], // Piazza Libertà / Via Roma est
+            [44.8900, 11.7275], // Via Cavour sud
+            [44.8895, 11.7195]  // Via Garibaldi ovest
+        ],
+        isCore: true
+    },
+    {
+        id: 'codigoro',
+        name: 'Codigoro - Centro Storico ZTL',
+        polygon: [
+            [44.8340, 12.1080], // Piazza Matteotti nord
+            [44.8345, 12.1160], // Riviera Cavallotti est
+            [44.8280, 12.1150], // Viale IV Novembre sud
+            [44.8275, 12.1070]  // Viale Resistenza ovest
+        ],
+        isCore: true
+    }
+];
+
+// Algoritmo Ray-Casting per verificare se un punto geografico ricade all'interno di un poligono
+function isPointInPolygon(lat, lng, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+        const intersect = ((yi > lng) !== (yj > lng)) &&
+            (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// Rileva tutte le aree mercatali attualmente attive (trattate dinamicamente come ZTL / Aree Pedonali)
+function getActiveMarketZones() {
+    const marketZones = [];
+    markersData.forEach(m => {
+        if (!isMarkerVisible(m)) return;
+        if (getMarkerScheduleStatus(m) !== 'active') return;
+        if (m.type === 'mercato') {
+            marketZones.push({
+                lat: m.lat,
+                lng: m.lng,
+                name: m.street || 'Mercato settimanale',
+                note: m.note || '',
+                radius: 75 // Raggio di 75m attorno al punto di mercato
+            });
+        }
+    });
+
+    // Segmenti continui di mercato
+    Object.keys(activeSegments).forEach(key => {
+        const polyline = activeSegments[key];
+        if (polyline && polyline.getLatLngs) {
+            const isMarketSeg = markersData.some(m => m.type === 'mercato' && m.street && key.includes(normalizeStreetKey(m.street)));
+            if (isMarketSeg) {
+                const lls = polyline.getLatLngs();
+                if (Array.isArray(lls)) {
+                    lls.forEach(ll => {
+                        marketZones.push({
+                            lat: ll.lat,
+                            lng: ll.lng,
+                            name: key,
+                            note: 'Tratto stradale mercatale',
+                            radius: 60
+                        });
+                    });
+                }
+            }
+        }
+    });
+
+    return marketZones;
+}
+
+// Valuta se una sequenza di coordinate attraversa ZTL provinciali o Aree Mercatali attive
+function evaluateRouteZtl(coords, startLat = null, destLat = null, startLng = null, destLng = null) {
+    if (!coords || coords.length === 0) {
+        return { isZtl: false, traversesActiveMarket: false, ztlMeters: 0, marketNames: [], ztlNames: [] };
+    }
+
+    const activeMarkets = getActiveMarketZones();
+    let ztlMeters = 0;
+    let coreZtlMeters = 0;
+    let marketMeters = 0;
+    let totalMeters = 0;
+    const traversedZtlNames = new Set();
+    const traversedMarketNames = new Set();
+
+    let startInCore = false;
+    let destInCore = false;
+    let startInZtl = false;
+    let destInZtl = false;
+    let startInMarket = false;
+    let destInMarket = false;
+
+    if (startLat !== null && startLng !== null) {
+        for (const reg of PROVINCE_ZTL_REGIONS) {
+            if (isPointInPolygon(startLat, startLng, reg.polygon)) {
+                startInZtl = true;
+                if (reg.isCore) startInCore = true;
+            }
+        }
+        for (const mz of activeMarkets) {
+            if (calculateDistanceMeters(startLat, startLng, mz.lat, mz.lng) < mz.radius) {
+                startInMarket = true;
+            }
+        }
+    }
+
+    if (destLat !== null && destLng !== null) {
+        for (const reg of PROVINCE_ZTL_REGIONS) {
+            if (isPointInPolygon(destLat, destLng, reg.polygon)) {
+                destInZtl = true;
+                if (reg.isCore) destInCore = true;
+            }
+        }
+        for (const mz of activeMarkets) {
+            if (calculateDistanceMeters(destLat, destLng, mz.lat, mz.lng) < mz.radius) {
+                destInMarket = true;
+            }
+        }
+    }
+
+    for (let i = 0; i < coords.length - 1; i++) {
+        const p1 = coords[i];
+        const p2 = coords[i + 1];
+        const segLen = calculateDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
+        totalMeters += segLen;
+        const midLat = (p1[0] + p2[0]) / 2;
+        const midLng = (p1[1] + p2[1]) / 2;
+
+        // Verifica poligoni ZTL provinciali
+        for (const reg of PROVINCE_ZTL_REGIONS) {
+            if (isPointInPolygon(midLat, midLng, reg.polygon)) {
+                ztlMeters += segLen;
+                if (reg.isCore) coreZtlMeters += segLen;
+                traversedZtlNames.add(reg.name);
+            }
+        }
+
+        // Verifica transito in aree mercatali attive (trattate dinamicamente come ZTL)
+        for (const mz of activeMarkets) {
+            const d = distPointToSegmentMeters(mz.lat, mz.lng, p1[0], p1[1], p2[0], p2[1]);
+            if (d < mz.radius) {
+                marketMeters += segLen;
+                traversedMarketNames.add(mz.name);
+            }
+        }
+    }
+
+    const traversesActiveMarket = (startInMarket || destInMarket) ? marketMeters > 90 : marketMeters > 40;
+    
+    let isZtl = false;
+    if (traversesActiveMarket) {
+        isZtl = true;
+    } else if (startInCore || destInCore) {
+        isZtl = coreZtlMeters > 130;
+    } else if (startInZtl || destInZtl) {
+        isZtl = ztlMeters > 250 || coreZtlMeters > 80;
+    } else {
+        isZtl = ztlMeters > 100 || coreZtlMeters > 40;
+    }
+
+    return {
+        isZtl,
+        traversesActiveMarket,
+        ztlMeters,
+        coreZtlMeters,
+        marketMeters,
+        totalMeters,
+        ztlNames: Array.from(traversedZtlNames),
+        marketNames: Array.from(traversedMarketNames)
+    };
+}
+
+// Valuta l'utilizzo di corsie preferenziali Bus/Taxi e direttrici di scorrimento veloce
+function evaluateSpecialFeatures(coords) {
+    if (!coords || coords.length === 0) {
+        return { usesBusLane: false, usesFastTransit: false, busLaneNames: [], fastTransitNames: [] };
+    }
+
+    const busLaneNames = new Set();
+    const fastTransitNames = new Set();
+
+    for (let i = 0; i < coords.length - 1; i++) {
+        const p1 = coords[i];
+        const p2 = coords[i + 1];
+
+        // Verifica corsie preferenziali Bus & Taxi
+        if (typeof BUS_PREFERENTIAL_CORRIDORS !== 'undefined') {
+            for (const bl of BUS_PREFERENTIAL_CORRIDORS) {
+                const d = distPointToSegmentMeters(bl.lat, bl.lng, p1[0], p1[1], p2[0], p2[1]);
+                if (d < 45) {
+                    busLaneNames.add(bl.name);
+                }
+            }
+        }
+
+        // Verifica arterie e raccordi di scorrimento veloce
+        if (typeof FAST_TRANSIT_AXES !== 'undefined') {
+            for (const ft of FAST_TRANSIT_AXES) {
+                const d = distPointToSegmentMeters(ft.lat, ft.lng, p1[0], p1[1], p2[0], p2[1]);
+                if (d < 95) {
+                    fastTransitNames.add(ft.name);
+                }
+            }
+        }
+    }
+
+    return {
+        usesBusLane: busLaneNames.size > 0,
+        usesFastTransit: fastTransitNames.size > 0,
+        busLaneNames: Array.from(busLaneNames),
+        fastTransitNames: Array.from(fastTransitNames)
+    };
+}
+
 // Calcola fino a 3 differenti scelte di percorso garantendo:
-// - Percorso più veloce prioritario
-// - Alternativa garantita che EVITA la ZTL qualora il percorso principale usi la ZTL
-// - Alternativa garantita che EVITA i mercati settimanali/rionali qualora presenti
-// - Deviazioni più corte e rapide attorno a ostacoli
+// - Percorso più veloce prioritario (con transito ZTL / Mercati 118 consentito, corsie preferenziali bus/taxi)
+// - Alternativa garantita che EVITA la ZTL e i MERCATI ATTIVI su viabilità ordinaria
+// - Rispetto rigoroso dei sensi unici e direzioni di marcia ordinarie
+// - Rispetto limiti di sagoma e altezza per mezzi di soccorso (Ambulanze Tipo A 118)
+// - Utilizzo autorizzato di corsie preferenziali Bus/Taxi e scorrimento veloce
+// - Deviazioni più corte e rapide attorno a ostacoli (strade chiuse / ponti interrotti)
 async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const obstacles = getActiveNavigationObstacles(destLat, destLng);
+    const activeMarkets = getActiveMarketZones();
 
+    function calcEmergencyDuration(distanceMeters, osrmCarDuration = null) {
+        const distKm = distanceMeters / 1000;
+        if (osrmCarDuration && osrmCarDuration > 0) {
+            const carMin = Math.round(osrmCarDuration / 60);
+            return Math.max(1, Math.min(carMin, Math.round((distKm / 40) * 60)));
+        }
+        return Math.max(1, Math.round((distKm / 36) * 60));
+    }
+
+    // Endpoints di routing:
+    // 1. Profilo bicicletta/pedonale (permette scorciatoie 118 autorizzate in ZTL provinciali / aree mercatali)
+    // 2. Profilo auto diretto (viabilità ordinaria / sensi unici rigorosamente rispettati)
+    // 3. Bypass dedicati su arterie a scorrimento veloce e anelli di circonvallazione (Tangenziale Ovest, Est, Baluardi)
+    // 4. Bypass perimetrali automatici generati per centri storici provinciali o mercati
     const endpoints = [
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isZtl: false },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isZtl: false },
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: true }
+        // Scorciatoia ZTL 118 diretta
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: true },
+        // Rotte auto dirette (rispetto rigoroso dei sensi unici ordinari)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
+        // Bypass Circonvallazione / Scorrimento Veloce Ovest (Viale IV Novembre / Viale Po / Stazione -> Via Ferraresi / Darsena Ovest -> Via Bologna)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6020,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6080,44.8235;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Sud-Ovest' },
+        // Bypass Scorrimento Veloce Est (Via Caldirolo / Tangenziale Est / Piazzale Medaglie d'Oro / Viale Alfonso I d'Este)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale / Circonvallazione Est' },
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' }
     ];
+
+    // Se il tragitto o uno dei punti è nei pressi di un mercato o di una ZTL provinciale, genera bypass dinamici
+    const midLat = (startLat + destLat) / 2;
+    const midLng = (startLng + destLng) / 2;
+    activeMarkets.forEach((mz, mIdx) => {
+        const d = calculateDistanceMeters(midLat, midLng, mz.lat, mz.lng);
+        if (d < 5000 && endpoints.length < 12) {
+            // Offset perimetrale di 300m per aggirare l'area mercatale
+            const offLat = mz.lat + 0.003;
+            const offLng = mz.lng + 0.003;
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${offLng.toFixed(5)},${offLat.toFixed(5)};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: true,
+                isBike: false,
+                bypassName: `Aggiramento Mercato ${mz.name}`
+            });
+        }
+    });
 
     let rawRoutes = [];
     for (const ep of endpoints) {
@@ -2876,7 +3315,9 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 const data = await resp.json();
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                     data.routes.forEach(r => {
-                        r._isZtl = ep.isZtl;
+                        r._isBypass = ep.isBypass;
+                        r._isBike = ep.isBike;
+                        r._bypassName = ep.bypassName;
                         rawRoutes.push(r);
                     });
                 }
@@ -2887,12 +3328,21 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     let processedRoutes = rawRoutes.map((r, idx) => {
         const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
         const distanceKm = (r.distance / 1000).toFixed(1);
-        
+
+        // Valutazione geometrica reale del transito in ZTL e Aree Mercatali
+        const ztlEval = evaluateRouteZtl(coords, startLat, destLat, startLng, destLng);
+        const isZtlRoute = ztlEval.isZtl;
+
+        // Valutazione preferenziali Bus/Taxi e Scorrimento Veloce
+        const specEval = evaluateSpecialFeatures(coords);
+
         let durationMin;
-        if (r._isZtl) {
-            durationMin = Math.max(1, Math.round(((r.distance / 1000) / 36) * 60));
+        if (isZtlRoute && r._isBike) {
+            // Velocità d'emergenza mezzo 118 in ZTL / Aree Pedonali
+            durationMin = calcEmergencyDuration(r.distance, null);
         } else {
-            durationMin = Math.max(1, Math.round(r.duration / 60));
+            // Tempo calcolato dal router per veicoli su viabilità ordinaria
+            durationMin = calcEmergencyDuration(r.distance, r.duration);
         }
 
         const obsCheck = evaluateRouteObstacles(coords, obstacles);
@@ -2901,7 +3351,15 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         return {
             index: idx,
             isDetour: false,
-            isZtlRoute: !!r._isZtl,
+            isZtlRoute: isZtlRoute,
+            traversesActiveMarket: ztlEval.traversesActiveMarket,
+            ztlMetrics: ztlEval,
+            usesBusLane: specEval.usesBusLane,
+            busLaneNames: specEval.busLaneNames,
+            usesFastTransit: specEval.usesFastTransit,
+            fastTransitNames: specEval.fastTransitNames,
+            isBypass: !!r._isBypass,
+            bypassName: r._bypassName || null,
             coords: coords,
             distanceKm: distanceKm,
             distanceRaw: r.distance,
@@ -2933,7 +3391,15 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
         if (detourRoutes && detourRoutes.length > 0) {
             detourRoutes.forEach(dr => {
-                dr.isZtlRoute = dr.isZtlRoute || false;
+                const ztlEval = evaluateRouteZtl(dr.coords, startLat, destLat, startLng, destLng);
+                const specEval = evaluateSpecialFeatures(dr.coords);
+                dr.isZtlRoute = ztlEval.isZtl;
+                dr.traversesActiveMarket = ztlEval.traversesActiveMarket;
+                dr.ztlMetrics = ztlEval;
+                dr.usesBusLane = specEval.usesBusLane;
+                dr.busLaneNames = specEval.busLaneNames;
+                dr.usesFastTransit = specEval.usesFastTransit;
+                dr.fastTransitNames = specEval.fastTransitNames;
             });
             processedRoutes.push(...detourRoutes);
         }
@@ -2960,8 +3426,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const ztlCandidates = pool.filter(r => r.isZtlRoute);
     const noZtlCandidates = pool.filter(r => !r.isZtlRoute);
 
-    const marketObstacles = (obstacles.pointObstacles || []).filter(po => po.type === 'mercato');
-    const hasMarket = marketObstacles.length > 0;
+    const hasMarket = activeMarkets.length > 0;
 
     ztlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
     noZtlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
@@ -2972,7 +3437,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const fastest = pool[0];
     if (fastest) selected3.push(fastest);
 
-    // 2. Slot 2: Se il più veloce usa la ZTL, proponi OBBLIGATORIAMENTE un'alternativa che la EVITI
+    // 2. Slot 2: Se il più veloce usa la ZTL o attraversa un'area mercato attiva, proponi OBBLIGATORIAMENTE un'alternativa reale Fuori ZTL (su viabilità ordinaria / circonvallazione)
     if (fastest && fastest.isZtlRoute && noZtlCandidates.length > 0) {
         const bestNoZtl = noZtlCandidates[0];
         if (!selected3.includes(bestNoZtl)) {
@@ -2989,10 +3454,25 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
     // 3. Slot 3: Se c'è un mercato attivo, assicurati che un'opzione sia "Evita Mercato"
     if (hasMarket) {
-        const marketAvoiding = pool.find(r => !selected3.includes(r) && !r.collidedObstacles?.some(co => co.type === 'mercato'));
+        const marketAvoiding = pool.find(r => !selected3.includes(r) && !r.traversesActiveMarket);
         if (marketAvoiding) {
             marketAvoiding.avoidsMarket = true;
             selected3.push(marketAvoiding);
+        }
+    }
+
+    // Se il percorso 1 è in ZTL e abbiamo aggiunto il percorso 2 Fuori ZTL, prova ad aggiungere come percorso 3 un'altra opzione Fuori ZTL distinta (es. Circonvallazione Est vs Ovest o Scorrimento Veloce)
+    if (fastest && fastest.isZtlRoute && selected3.length < 3) {
+        for (const r of noZtlCandidates) {
+            if (selected3.length >= 3) break;
+            const isDuplicate = selected3.some(s =>
+                Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.25 &&
+                Math.abs(s.durationMin - r.durationMin) <= 1
+            );
+            if (!isDuplicate && !selected3.includes(r)) {
+                r.isNoZtlAlternative = true;
+                selected3.push(r);
+            }
         }
     }
 
@@ -3000,7 +3480,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     for (const r of pool) {
         if (selected3.length >= 3) break;
         const isDuplicate = selected3.some(s =>
-            Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.15 &&
+            Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.2 &&
             Math.abs(s.durationMin - r.durationMin) <= 1
         );
         if (!isDuplicate && !selected3.includes(r)) {
@@ -3015,7 +3495,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Assegna titoli e badge semantici chiari ai 3 percorsi
+    // Assegna titoli e badge semantici chiari e fedeli ai 3 percorsi
     selected3.forEach((r, i) => {
         const cfg = ROUTE_CONFIGS[i] || ROUTE_CONFIGS[0];
         r.color = cfg.color;
@@ -3023,22 +3503,28 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         r.dotColor = cfg.dotColor;
 
         if (i === 0) {
-            if (r.isZtlRoute) {
+            if (r.traversesActiveMarket) {
+                r.title = "Percorso 1 (Più Veloce - Transito Area Mercato 118)";
+                r.badgeText = "⚡ Più Veloce (Mercato)";
+            } else if (r.isZtlRoute) {
                 r.title = "Percorso 1 (Più Veloce - Transito ZTL 118)";
                 r.badgeText = "⚡ Più Veloce (ZTL)";
             } else if (r.isDetour) {
                 r.title = "Percorso 1 (Più Veloce con Deviazione)";
                 r.badgeText = "⚡ Più Veloce";
             } else {
-                r.title = "Percorso 1 (Più Veloce / Consigliato)";
+                r.title = "Percorso 1 (Più Veloce / Viabilità Ordinaria)";
                 r.badgeText = "⚡ Più Veloce";
             }
         } else if (r.isNoZtlAlternative || (!r.isZtlRoute && fastest && fastest.isZtlRoute)) {
-            r.title = `Percorso ${i + 1} (Evita ZTL / Fuori ZTL)`;
-            r.badgeText = "🚫 Evita ZTL";
-        } else if (r.avoidsMarket || (hasMarket && !r.collidedObstacles?.some(co => co.type === 'mercato'))) {
+            r.title = `Percorso ${i + 1} (Transito Fuori ZTL / Viabilità Ordinaria)`;
+            r.badgeText = "🚫 Fuori ZTL";
+        } else if (r.avoidsMarket || (hasMarket && !r.traversesActiveMarket)) {
             r.title = `Percorso ${i + 1} (Evita Area Mercato)`;
             r.badgeText = "🛒 Evita Mercato";
+        } else if (r.traversesActiveMarket) {
+            r.title = `Percorso ${i + 1} (Transito Area Mercato 118)`;
+            r.badgeText = "🛒 Transito Mercato";
         } else if (r.isZtlRoute) {
             r.title = `Percorso ${i + 1} (Transito ZTL 118)`;
             r.badgeText = "🛡️ Transito ZTL";
@@ -3200,10 +3686,18 @@ function renderNavRoutes(routes) {
         
         let badgesHtml = '';
         badgesHtml += `<span class="nav-badge-pill ${cfg.badgeClass}">${cfg.badgeText}</span>`;
-        if (route.isZtlRoute) {
+        if (route.traversesActiveMarket) {
+            badgesHtml += '<span class="nav-badge-pill avoid-market">🛒 Transito Area Mercato</span>';
+        } else if (route.isZtlRoute) {
             badgesHtml += '<span class="nav-badge-pill ztl">⚡ Transito ZTL 118</span>';
         } else {
-            badgesHtml += '<span class="nav-badge-pill no-ztl">🚫 Fuori ZTL</span>';
+            badgesHtml += '<span class="nav-badge-pill no-ztl">🚗 Fuori ZTL / Fuori Mercato</span>';
+        }
+        if (route.usesBusLane) {
+            badgesHtml += '<span class="nav-badge-pill" style="background:rgba(234,179,8,0.25); color:#facc15; border:1px solid rgba(234,179,8,0.4);">🚌 Corsia Bus/Taxi</span>';
+        }
+        if (route.usesFastTransit) {
+            badgesHtml += '<span class="nav-badge-pill" style="background:rgba(99,102,241,0.25); color:#818cf8; border:1px solid rgba(99,102,241,0.4);">⚡ Scorrimento Veloce</span>';
         }
         if (route.avoidsMarket) {
             badgesHtml += '<span class="nav-badge-pill avoid-market">🛒 Evita Mercato</span>';
@@ -3216,10 +3710,15 @@ function renderNavRoutes(routes) {
         }
 
         let detourNoteHtml = '';
-        if (route.isZtlRoute) {
-            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#c084fc;">⚡ Transito ZTL autorizzato per mezzi 118 (passaggio rapido).</div>`;
-        } else if (route.isNoZtlAlternative) {
-            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#38bdf8;">🚗 Percorso su viabilità ordinaria: aggira completamente la ZTL.</div>`;
+        if (route.traversesActiveMarket) {
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#fb923c;">🛒 Transito in area mercato attiva (bancarelle/pedoni: passaggio consentito 118 con cautela).</div>`;
+        } else if (route.isZtlRoute) {
+            const ztlNameStr = (route.ztlMetrics && route.ztlMetrics.ztlNames && route.ztlMetrics.ztlNames.length > 0)
+                ? ` (${route.ztlMetrics.ztlNames[0]})`
+                : '';
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#c084fc;">⚡ Transito ZTL 118 autorizzato${ztlNameStr} (passaggio rapido attraverso il centro storico).</div>`;
+        } else if (route.isNoZtlAlternative || !route.isZtlRoute) {
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#38bdf8;">🚗 Percorso su viabilità ordinaria: aggira completamente la ZTL, il centro storico e le aree mercatali.</div>`;
         } else if (route.avoidsMarket) {
             detourNoteHtml = `<div class="nav-card-detour-note" style="color:#fb923c;">🛒 Area mercato evitata: tragitto alternativo attorno all'evento mercatale.</div>`;
         } else if (route.isDetour) {
@@ -3576,7 +4075,12 @@ function updateHudDynamic(step, distToManeuver, lat, lng, route) {
 
     const ztlBadge = document.getElementById('hud-badge-ztl');
     if (ztlBadge) {
-        if (route.isZtlRoute) {
+        if (route.traversesActiveMarket) {
+            ztlBadge.textContent = '🛒 Area Mercato (118)';
+            ztlBadge.style.color = '#fb923c';
+            ztlBadge.style.background = 'rgba(249, 115, 22, 0.25)';
+            ztlBadge.style.borderColor = 'rgba(249, 115, 22, 0.4)';
+        } else if (route.isZtlRoute) {
             ztlBadge.textContent = '🛡️ ZTL 118 Ammessa';
             ztlBadge.style.color = '#c084fc';
             ztlBadge.style.background = 'rgba(139, 92, 246, 0.25)';
