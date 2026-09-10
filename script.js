@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.6';
+const APP_VERSION = '3.6.7';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -89,6 +89,1528 @@ function initFirebase() {
         isFirebaseOnline = false;
     }
 }
+
+// --- DATABASE MERCATI SETTIMANALI DELLA PROVINCIA DI FERRARA E LIMITROFI (118) ---
+// Configurazione completa con programmazione ricorrente e coppie per evidenziare il tratto stradale / piazza
+const DEFAULT_WEEKLY_MARKETS = [
+    // 1. FERRARA - Centro (Lunedì) - Piazza Travaglio / Baluardi
+    {
+        id: 'mkt_fe_lun_1',
+        lat: 44.83155,
+        lng: 11.62145,
+        type: 'mercato',
+        street: 'Piazza Travaglio / Baluardi, Ferrara',
+        segmentId: 'mercato_fe_lun',
+        note: 'Mercato settimanale del Lunedì - Area Piazza Travaglio e Porta Reno',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:30' }
+    },
+    {
+        id: 'mkt_fe_lun_2',
+        lat: 44.83020,
+        lng: 11.62250,
+        type: 'mercato',
+        street: 'Piazza Travaglio / Baluardi, Ferrara',
+        segmentId: 'mercato_fe_lun',
+        note: 'Mercato settimanale del Lunedì - Baluardo di San Lorenzo',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:30' }
+    },
+
+    // 2. FERRARA - Centro (Venerdì) - Piazza Travaglio / Via Kennedy / Baluardi
+    {
+        id: 'mkt_fe_ven_1',
+        lat: 44.83155,
+        lng: 11.62145,
+        type: 'mercato',
+        street: 'Piazza Travaglio / Via Kennedy, Ferrara',
+        segmentId: 'mercato_fe_ven',
+        note: 'Mercato settimanale del Venerdì - Area mercatale centrale',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:30' }
+    },
+    {
+        id: 'mkt_fe_ven_2',
+        lat: 44.83080,
+        lng: 11.61860,
+        type: 'mercato',
+        street: 'Piazza Travaglio / Via Kennedy, Ferrara',
+        segmentId: 'mercato_fe_ven',
+        note: 'Mercato settimanale del Venerdì - Via Kennedy e Baluardi',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:30' }
+    },
+
+    // 3. FERRARA - Barco (Martedì)
+    {
+        id: 'mkt_fe_barco_1',
+        lat: 44.85880,
+        lng: 11.60920,
+        type: 'mercato',
+        street: 'Via Barche / Via Bentivoglio, Ferrara (Barco)',
+        segmentId: 'mercato_fe_barco',
+        note: 'Mercato rionale di Barco (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fe_barco_2',
+        lat: 44.86010,
+        lng: 11.60780,
+        type: 'mercato',
+        street: 'Via Barche / Via Bentivoglio, Ferrara (Barco)',
+        segmentId: 'mercato_fe_barco',
+        note: 'Mercato rionale di Barco (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 4. FERRARA - Doro (Mercoledì)
+    {
+        id: 'mkt_fe_doro_1',
+        lat: 44.85020,
+        lng: 11.59750,
+        type: 'mercato',
+        street: 'Via Andrea Costa / Via Doro, Ferrara',
+        segmentId: 'mercato_fe_doro',
+        note: 'Mercato rionale Doro (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fe_doro_2',
+        lat: 44.84890,
+        lng: 11.59910,
+        type: 'mercato',
+        street: 'Via Andrea Costa / Via Doro, Ferrara',
+        segmentId: 'mercato_fe_doro',
+        note: 'Mercato rionale Doro (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 5. FERRARA - Foro Boario (Giovedì)
+    {
+        id: 'mkt_fe_foroboario_1',
+        lat: 44.82110,
+        lng: 11.61380,
+        type: 'mercato',
+        street: 'Via Foro Boario, Ferrara',
+        segmentId: 'mercato_fe_foroboario',
+        note: 'Mercato rionale Foro Boario (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fe_foroboario_2',
+        lat: 44.81940,
+        lng: 11.61520,
+        type: 'mercato',
+        street: 'Via Foro Boario, Ferrara',
+        segmentId: 'mercato_fe_foroboario',
+        note: 'Mercato rionale Foro Boario (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 6. FERRARA - Pontelagoscuro (Sabato)
+    {
+        id: 'mkt_fe_pontelagoscuro_1',
+        lat: 44.88120,
+        lng: 11.60680,
+        type: 'mercato',
+        street: 'Piazza Bruno Buozzi, Pontelagoscuro',
+        segmentId: 'mercato_fe_pontelagoscuro',
+        note: 'Mercato di Pontelagoscuro (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fe_pontelagoscuro_2',
+        lat: 44.88240,
+        lng: 11.60810,
+        type: 'mercato',
+        street: 'Piazza Bruno Buozzi, Pontelagoscuro',
+        segmentId: 'mercato_fe_pontelagoscuro',
+        note: 'Mercato di Pontelagoscuro (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 7. FERRARA - San Martino (Sabato)
+    {
+        id: 'mkt_fe_sanmartino_1',
+        lat: 44.78560,
+        lng: 11.63720,
+        type: 'mercato',
+        street: 'Piazza Umberto I, San Martino',
+        segmentId: 'mercato_fe_sanmartino',
+        note: 'Mercato di San Martino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fe_sanmartino_2',
+        lat: 44.78680,
+        lng: 11.63850,
+        type: 'mercato',
+        street: 'Piazza Umberto I, San Martino',
+        segmentId: 'mercato_fe_sanmartino',
+        note: 'Mercato di San Martino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 8. FERRARA - Porotto (Domenica)
+    {
+        id: 'mkt_fe_porotto_1',
+        lat: 44.84580,
+        lng: 11.54350,
+        type: 'mercato',
+        street: 'Via Ladino / Piazza Giovanni da Porotto, Porotto',
+        segmentId: 'mercato_fe_porotto',
+        note: 'Mercato di Porotto (Domenica)',
+        schedule: { mode: 'recurring', days: [0], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fe_porotto_2',
+        lat: 44.84470,
+        lng: 11.54480,
+        type: 'mercato',
+        street: 'Via Ladino / Piazza Giovanni da Porotto, Porotto',
+        segmentId: 'mercato_fe_porotto',
+        note: 'Mercato di Porotto (Domenica)',
+        schedule: { mode: 'recurring', days: [0], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 9. CENTO - Centro (Giovedì)
+    {
+        id: 'mkt_cento_centro_1',
+        lat: 44.72950,
+        lng: 11.28910,
+        type: 'mercato',
+        street: 'Piazza Guercino / Corso Guercino, Cento',
+        segmentId: 'mercato_cento_centro',
+        note: 'Mercato settimanale di Cento (Giovedì) - Centro storico chiuso',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_cento_centro_2',
+        lat: 44.72780,
+        lng: 11.29120,
+        type: 'mercato',
+        street: 'Piazza Guercino / Corso Guercino, Cento',
+        segmentId: 'mercato_cento_centro',
+        note: 'Mercato settimanale di Cento (Giovedì) - Centro storico chiuso',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 10. CENTO - Renazzo (Martedì)
+    {
+        id: 'mkt_cento_renazzo_1',
+        lat: 44.74950,
+        lng: 11.23920,
+        type: 'mercato',
+        street: 'Piazza Ferraresi, Renazzo',
+        segmentId: 'mercato_cento_renazzo',
+        note: 'Mercato settimanale di Renazzo (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_cento_renazzo_2',
+        lat: 44.75080,
+        lng: 11.23780,
+        type: 'mercato',
+        street: 'Piazza Ferraresi, Renazzo',
+        segmentId: 'mercato_cento_renazzo',
+        note: 'Mercato settimanale di Renazzo (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 11. CENTO - Casumaro (Sabato)
+    {
+        id: 'mkt_cento_casumaro_1',
+        lat: 44.79240,
+        lng: 11.27210,
+        type: 'mercato',
+        street: 'Piazza Don Rino Gallerani, Casumaro',
+        segmentId: 'mercato_cento_casumaro',
+        note: 'Mercato settimanale di Casumaro (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_cento_casumaro_2',
+        lat: 44.79120,
+        lng: 11.27350,
+        type: 'mercato',
+        street: 'Piazza Don Rino Gallerani, Casumaro',
+        segmentId: 'mercato_cento_casumaro',
+        note: 'Mercato settimanale di Casumaro (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 12. COMACCHIO - Centro (Mercoledì)
+    {
+        id: 'mkt_comacchio_centro_1',
+        lat: 44.69380,
+        lng: 12.18250,
+        type: 'mercato',
+        street: 'Piazza Folegatti / Via Muratori, Comacchio',
+        segmentId: 'mercato_comacchio_centro',
+        note: 'Mercato settimanale di Comacchio (Mercoledì) - Centro storico',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_comacchio_centro_2',
+        lat: 44.69490,
+        lng: 12.18520,
+        type: 'mercato',
+        street: 'Piazza Folegatti / Via Muratori, Comacchio',
+        segmentId: 'mercato_comacchio_centro',
+        note: 'Mercato settimanale di Comacchio (Mercoledì) - Centro storico',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 13. COMACCHIO - Lido di Spina (Lunedì)
+    {
+        id: 'mkt_lido_spina_1',
+        lat: 44.64620,
+        lng: 12.24780,
+        type: 'mercato',
+        street: 'Viale Leonardo da Vinci, Lido di Spina',
+        segmentId: 'mercato_lido_spina',
+        note: 'Mercato estivo Lido di Spina (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_lido_spina_2',
+        lat: 44.64850,
+        lng: 12.24920,
+        type: 'mercato',
+        street: 'Viale Leonardo da Vinci, Lido di Spina',
+        segmentId: 'mercato_lido_spina',
+        note: 'Mercato estivo Lido di Spina (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 14. COMACCHIO - Lido degli Estensi (Martedì)
+    {
+        id: 'mkt_lido_estensi_1',
+        lat: 44.66520,
+        lng: 12.24250,
+        type: 'mercato',
+        street: 'Viale dei Castagni / Viale Carducci, Lido degli Estensi',
+        segmentId: 'mercato_lido_estensi',
+        note: 'Mercato Lido degli Estensi (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_lido_estensi_2',
+        lat: 44.66780,
+        lng: 12.24410,
+        type: 'mercato',
+        street: 'Viale dei Castagni / Viale Carducci, Lido degli Estensi',
+        segmentId: 'mercato_lido_estensi',
+        note: 'Mercato Lido degli Estensi (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 15. COMACCHIO - Porto Garibaldi (Giovedì)
+    {
+        id: 'mkt_porto_garibaldi_1',
+        lat: 44.67820,
+        lng: 12.23950,
+        type: 'mercato',
+        street: 'Viale Bonnet / Via dei Mille, Porto Garibaldi',
+        segmentId: 'mercato_porto_garibaldi',
+        note: 'Mercato settimanale Porto Garibaldi (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_porto_garibaldi_2',
+        lat: 44.68050,
+        lng: 12.24120,
+        type: 'mercato',
+        street: 'Viale Bonnet / Via dei Mille, Porto Garibaldi',
+        segmentId: 'mercato_porto_garibaldi',
+        note: 'Mercato settimanale Porto Garibaldi (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 16. COMACCHIO - Lido di Pomposa (Venerdì)
+    {
+        id: 'mkt_lido_pomposa_1',
+        lat: 44.71520,
+        lng: 12.23850,
+        type: 'mercato',
+        street: 'Viale Dolomiti, Lido di Pomposa',
+        segmentId: 'mercato_lido_pomposa',
+        note: 'Mercato Lido di Pomposa (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_lido_pomposa_2',
+        lat: 44.71800,
+        lng: 12.23980,
+        type: 'mercato',
+        street: 'Viale Dolomiti, Lido di Pomposa',
+        segmentId: 'mercato_lido_pomposa',
+        note: 'Mercato Lido di Pomposa (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 17. COMACCHIO - Lido delle Nazioni (Sabato)
+    {
+        id: 'mkt_lido_nazioni_1',
+        lat: 44.73950,
+        lng: 12.23700,
+        type: 'mercato',
+        street: 'Lungomare Italia / Viale Jugoslavia, Lido delle Nazioni',
+        segmentId: 'mercato_lido_nazioni',
+        note: 'Mercato Lido delle Nazioni (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_lido_nazioni_2',
+        lat: 44.74250,
+        lng: 12.23820,
+        type: 'mercato',
+        street: 'Lungomare Italia / Viale Jugoslavia, Lido delle Nazioni',
+        segmentId: 'mercato_lido_nazioni',
+        note: 'Mercato Lido delle Nazioni (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 18. COMACCHIO - Lido di Volano (Domenica)
+    {
+        id: 'mkt_lido_volano_1',
+        lat: 44.80250,
+        lng: 12.26100,
+        type: 'mercato',
+        street: 'Piazzale Volano / Viale dei Daini, Lido di Volano',
+        segmentId: 'mercato_lido_volano',
+        note: 'Mercato Lido di Volano (Domenica)',
+        schedule: { mode: 'recurring', days: [0], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_lido_volano_2',
+        lat: 44.80480,
+        lng: 12.26350,
+        type: 'mercato',
+        street: 'Piazzale Volano / Viale dei Daini, Lido di Volano',
+        segmentId: 'mercato_lido_volano',
+        note: 'Mercato Lido di Volano (Domenica)',
+        schedule: { mode: 'recurring', days: [0], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 19. COMACCHIO - San Giuseppe (Lunedì)
+    {
+        id: 'mkt_comacchio_sangiuseppe_1',
+        lat: 44.70820,
+        lng: 12.20250,
+        type: 'mercato',
+        street: 'Piazza Rimembranza, San Giuseppe di Comacchio',
+        segmentId: 'mercato_sangiuseppe',
+        note: 'Mercato di San Giuseppe (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_comacchio_sangiuseppe_2',
+        lat: 44.70950,
+        lng: 12.20400,
+        type: 'mercato',
+        street: 'Piazza Rimembranza, San Giuseppe di Comacchio',
+        segmentId: 'mercato_sangiuseppe',
+        note: 'Mercato di San Giuseppe (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 20. ARGENTA - Centro (Giovedì)
+    {
+        id: 'mkt_argenta_centro_1',
+        lat: 44.61350,
+        lng: 11.83420,
+        type: 'mercato',
+        street: 'Piazza Garibaldi / Piazza Mazzini, Argenta',
+        segmentId: 'mercato_argenta_centro',
+        note: 'Mercato settimanale di Argenta (Giovedì) - Centro chiuso',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_argenta_centro_2',
+        lat: 44.61510,
+        lng: 11.83600,
+        type: 'mercato',
+        street: 'Piazza Garibaldi / Piazza Mazzini, Argenta',
+        segmentId: 'mercato_argenta_centro',
+        note: 'Mercato settimanale di Argenta (Giovedì) - Centro chiuso',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 21. ARGENTA - Santa Maria Codifiume (Lunedì)
+    {
+        id: 'mkt_argenta_codifiume_1',
+        lat: 44.62250,
+        lng: 11.60250,
+        type: 'mercato',
+        street: 'Piazza San Gregorio, Santa Maria Codifiume',
+        segmentId: 'mercato_argenta_codifiume',
+        note: 'Mercato di Santa Maria Codifiume (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_argenta_codifiume_2',
+        lat: 44.62380,
+        lng: 11.60420,
+        type: 'mercato',
+        street: 'Piazza San Gregorio, Santa Maria Codifiume',
+        segmentId: 'mercato_argenta_codifiume',
+        note: 'Mercato di Santa Maria Codifiume (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 22. ARGENTA - San Nicolò (Martedì)
+    {
+        id: 'mkt_argenta_sannicolo_1',
+        lat: 44.65920,
+        lng: 11.75850,
+        type: 'mercato',
+        street: 'Piazza Giovanni XXIII, San Nicolò',
+        segmentId: 'mercato_argenta_sannicolo',
+        note: 'Mercato di San Nicolò (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_argenta_sannicolo_2',
+        lat: 44.66050,
+        lng: 11.76020,
+        type: 'mercato',
+        street: 'Piazza Giovanni XXIII, San Nicolò',
+        segmentId: 'mercato_argenta_sannicolo',
+        note: 'Mercato di San Nicolò (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 23. ARGENTA - Consandolo (Mercoledì)
+    {
+        id: 'mkt_argenta_consandolo_1',
+        lat: 44.65420,
+        lng: 11.81050,
+        type: 'mercato',
+        street: 'Piazza Sandro Pertini, Consandolo',
+        segmentId: 'mercato_argenta_consandolo',
+        note: 'Mercato di Consandolo (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_argenta_consandolo_2',
+        lat: 44.65580,
+        lng: 11.81220,
+        type: 'mercato',
+        street: 'Piazza Sandro Pertini, Consandolo',
+        segmentId: 'mercato_argenta_consandolo',
+        note: 'Mercato di Consandolo (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 24. ARGENTA - Longastrino (Sabato)
+    {
+        id: 'mkt_argenta_longastrino_1',
+        lat: 44.57350,
+        lng: 11.97520,
+        type: 'mercato',
+        street: 'Piazza Bardi, Longastrino',
+        segmentId: 'mercato_argenta_longastrino',
+        note: 'Mercato di Longastrino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_argenta_longastrino_2',
+        lat: 44.57500,
+        lng: 11.97680,
+        type: 'mercato',
+        street: 'Piazza Bardi, Longastrino',
+        segmentId: 'mercato_argenta_longastrino',
+        note: 'Mercato di Longastrino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 25. BONDENO - Centro (Martedì)
+    {
+        id: 'mkt_bondeno_centro_1',
+        lat: 44.88950,
+        lng: 11.41720,
+        type: 'mercato',
+        street: 'Piazza Garibaldi / Viale Repubblica, Bondeno',
+        segmentId: 'mercato_bondeno_centro',
+        note: 'Mercato settimanale di Bondeno (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_bondeno_centro_2',
+        lat: 44.89120,
+        lng: 11.41900,
+        type: 'mercato',
+        street: 'Piazza Garibaldi / Viale Repubblica, Bondeno',
+        segmentId: 'mercato_bondeno_centro',
+        note: 'Mercato settimanale di Bondeno (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 26. BONDENO - Scortichino (Sabato)
+    {
+        id: 'mkt_bondeno_scortichino_1',
+        lat: 44.89620,
+        lng: 11.34150,
+        type: 'mercato',
+        street: 'Piazza XXIV Maggio, Scortichino',
+        segmentId: 'mercato_bondeno_scortichino',
+        note: 'Mercato di Scortichino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_bondeno_scortichino_2',
+        lat: 44.89780,
+        lng: 11.34320,
+        type: 'mercato',
+        street: 'Piazza XXIV Maggio, Scortichino',
+        segmentId: 'mercato_bondeno_scortichino',
+        note: 'Mercato di Scortichino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 27. COPPARO - Centro (Venerdì)
+    {
+        id: 'mkt_copparo_centro_1',
+        lat: 44.89250,
+        lng: 11.72350,
+        type: 'mercato',
+        street: 'Piazza della Libertà / Piazza del Popolo, Copparo',
+        segmentId: 'mercato_copparo_centro',
+        note: 'Mercato settimanale di Copparo (Venerdì) - Centro chiuso',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_copparo_centro_2',
+        lat: 44.89420,
+        lng: 11.72580,
+        type: 'mercato',
+        street: 'Piazza della Libertà / Piazza del Popolo, Copparo',
+        segmentId: 'mercato_copparo_centro',
+        note: 'Mercato settimanale di Copparo (Venerdì) - Centro chiuso',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 28. COPPARO - Ambrogio (Lunedì)
+    {
+        id: 'mkt_copparo_ambrogio_1',
+        lat: 44.91250,
+        lng: 11.82100,
+        type: 'mercato',
+        street: 'Piazza Medaglie d\'Oro, Ambrogio',
+        segmentId: 'mercato_copparo_ambrogio',
+        note: 'Mercato di Ambrogio (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_copparo_ambrogio_2',
+        lat: 44.91380,
+        lng: 11.82250,
+        type: 'mercato',
+        street: 'Piazza Medaglie d\'Oro, Ambrogio',
+        segmentId: 'mercato_copparo_ambrogio',
+        note: 'Mercato di Ambrogio (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 29. COPPARO - Tamara (Mercoledì)
+    {
+        id: 'mkt_copparo_tamara_1',
+        lat: 44.86920,
+        lng: 11.74850,
+        type: 'mercato',
+        street: 'Piazza XX Settembre, Tamara',
+        segmentId: 'mercato_copparo_tamara',
+        note: 'Mercato di Tamara (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_copparo_tamara_2',
+        lat: 44.87050,
+        lng: 11.75020,
+        type: 'mercato',
+        street: 'Piazza XX Settembre, Tamara',
+        segmentId: 'mercato_copparo_tamara',
+        note: 'Mercato di Tamara (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 30. CODIGORO - Centro (Martedì)
+    {
+        id: 'mkt_codigoro_centro_1',
+        lat: 44.82950,
+        lng: 12.11250,
+        type: 'mercato',
+        street: 'Piazza Matteotti / Riviera Cavallotti, Codigoro',
+        segmentId: 'mercato_codigoro_centro',
+        note: 'Mercato settimanale di Codigoro (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_codigoro_centro_2',
+        lat: 44.83120,
+        lng: 12.11480,
+        type: 'mercato',
+        street: 'Piazza Matteotti / Riviera Cavallotti, Codigoro',
+        segmentId: 'mercato_codigoro_centro',
+        note: 'Mercato settimanale di Codigoro (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 31. CODIGORO - Mezzogoro (Venerdì)
+    {
+        id: 'mkt_codigoro_mezzogoro_1',
+        lat: 44.87250,
+        lng: 12.10250,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto, Mezzogoro',
+        segmentId: 'mercato_codigoro_mezzogoro',
+        note: 'Mercato di Mezzogoro (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_codigoro_mezzogoro_2',
+        lat: 44.87380,
+        lng: 12.10420,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto, Mezzogoro',
+        segmentId: 'mercato_codigoro_mezzogoro',
+        note: 'Mercato di Mezzogoro (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 32. CODIGORO - Pontelangorino (Sabato)
+    {
+        id: 'mkt_codigoro_pontelangorino_1',
+        lat: 44.77950,
+        lng: 12.14850,
+        type: 'mercato',
+        street: 'Piazza Ariostea, Pontelangorino',
+        segmentId: 'mercato_codigoro_pontelangorino',
+        note: 'Mercato di Pontelangorino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_codigoro_pontelangorino_2',
+        lat: 44.78100,
+        lng: 12.15020,
+        type: 'mercato',
+        street: 'Piazza Ariostea, Pontelangorino',
+        segmentId: 'mercato_codigoro_pontelangorino',
+        note: 'Mercato di Pontelangorino (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 33. PORTOMAGGIORE - Centro (Giovedì)
+    {
+        id: 'mkt_portomaggiore_centro_1',
+        lat: 44.69750,
+        lng: 11.80420,
+        type: 'mercato',
+        street: 'Piazza Umberto I / Piazza Repubblica, Portomaggiore',
+        segmentId: 'mercato_portomaggiore_centro',
+        note: 'Mercato settimanale di Portomaggiore (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_portomaggiore_centro_2',
+        lat: 44.69920,
+        lng: 11.80650,
+        type: 'mercato',
+        street: 'Piazza Umberto I / Piazza Repubblica, Portomaggiore',
+        segmentId: 'mercato_portomaggiore_centro',
+        note: 'Mercato settimanale di Portomaggiore (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 34. PORTOMAGGIORE - Portoverrara (Mercoledì)
+    {
+        id: 'mkt_portomaggiore_portoverrara_1',
+        lat: 44.73250,
+        lng: 11.78950,
+        type: 'mercato',
+        street: 'Piazza della Libertà, Portoverrara',
+        segmentId: 'mercato_portoverrara',
+        note: 'Mercato di Portoverrara (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_portomaggiore_portoverrara_2',
+        lat: 44.73380,
+        lng: 11.79100,
+        type: 'mercato',
+        street: 'Piazza della Libertà, Portoverrara',
+        segmentId: 'mercato_portoverrara',
+        note: 'Mercato di Portoverrara (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 35. PORTOMAGGIORE - Gambulaga (Venerdì)
+    {
+        id: 'mkt_portomaggiore_gambulaga_1',
+        lat: 44.74950,
+        lng: 11.77450,
+        type: 'mercato',
+        street: 'Piazza Castello, Gambulaga',
+        segmentId: 'mercato_gambulaga',
+        note: 'Mercato di Gambulaga (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_portomaggiore_gambulaga_2',
+        lat: 44.75100,
+        lng: 11.77620,
+        type: 'mercato',
+        street: 'Piazza Castello, Gambulaga',
+        segmentId: 'mercato_gambulaga',
+        note: 'Mercato di Gambulaga (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 36. POGGIO RENATICO - Centro (Lunedì)
+    {
+        id: 'mkt_poggiorenatico_centro_1',
+        lat: 44.76450,
+        lng: 11.49650,
+        type: 'mercato',
+        street: 'Piazza del Popolo / Piazza Castello, Poggio Renatico',
+        segmentId: 'mercato_poggiorenatico_centro',
+        note: 'Mercato settimanale di Poggio Renatico (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_poggiorenatico_centro_2',
+        lat: 44.76620,
+        lng: 11.49850,
+        type: 'mercato',
+        street: 'Piazza del Popolo / Piazza Castello, Poggio Renatico',
+        segmentId: 'mercato_poggiorenatico_centro',
+        note: 'Mercato settimanale di Poggio Renatico (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 37. POGGIO RENATICO - Coronella (Sabato)
+    {
+        id: 'mkt_poggiorenatico_coronella_1',
+        lat: 44.79250,
+        lng: 11.53420,
+        type: 'mercato',
+        street: 'Piazza Caduti, Coronella',
+        segmentId: 'mercato_coronella',
+        note: 'Mercato di Coronella (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_poggiorenatico_coronella_2',
+        lat: 44.79380,
+        lng: 11.53580,
+        type: 'mercato',
+        street: 'Piazza Caduti, Coronella',
+        segmentId: 'mercato_coronella',
+        note: 'Mercato di Coronella (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 38. POGGIO RENATICO - Gallo (Mercoledì)
+    {
+        id: 'mkt_poggiorenatico_gallo_1',
+        lat: 44.74350,
+        lng: 11.53850,
+        type: 'mercato',
+        street: 'Piazza San Carlo, Gallo Ferrarese',
+        segmentId: 'mercato_gallo',
+        note: 'Mercato di Gallo (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_poggiorenatico_gallo_2',
+        lat: 44.74480,
+        lng: 11.54020,
+        type: 'mercato',
+        street: 'Piazza San Carlo, Gallo Ferrarese',
+        segmentId: 'mercato_gallo',
+        note: 'Mercato di Gallo (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 39. TERRE DEL RENO - Sant'Agostino (Martedì)
+    {
+        id: 'mkt_terredelreno_santagostino_1',
+        lat: 44.79250,
+        lng: 11.38720,
+        type: 'mercato',
+        street: 'Piazza Marconi / Via Statale, Sant\'Agostino',
+        segmentId: 'mercato_santagostino',
+        note: 'Mercato settimanale di Sant\'Agostino (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_terredelreno_santagostino_2',
+        lat: 44.79420,
+        lng: 11.38950,
+        type: 'mercato',
+        street: 'Piazza Marconi / Via Statale, Sant\'Agostino',
+        segmentId: 'mercato_santagostino',
+        note: 'Mercato settimanale di Sant\'Agostino (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 40. TERRE DEL RENO - Mirabello (Giovedì)
+    {
+        id: 'mkt_terredelreno_mirabello_1',
+        lat: 44.82620,
+        lng: 11.46450,
+        type: 'mercato',
+        street: 'Piazza Matteotti / Corso Italia, Mirabello',
+        segmentId: 'mercato_mirabello',
+        note: 'Mercato settimanale di Mirabello (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_terredelreno_mirabello_2',
+        lat: 44.82780,
+        lng: 11.46650,
+        type: 'mercato',
+        street: 'Piazza Matteotti / Corso Italia, Mirabello',
+        segmentId: 'mercato_mirabello',
+        note: 'Mercato settimanale di Mirabello (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 41. TERRE DEL RENO - San Carlo (Domenica)
+    {
+        id: 'mkt_terredelreno_sancarlo_1',
+        lat: 44.80950,
+        lng: 11.43250,
+        type: 'mercato',
+        street: 'Piazza Pola, San Carlo',
+        segmentId: 'mercato_sancarlo',
+        note: 'Mercato di San Carlo (Domenica)',
+        schedule: { mode: 'recurring', days: [0], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_terredelreno_sancarlo_2',
+        lat: 44.81100,
+        lng: 11.43420,
+        type: 'mercato',
+        street: 'Piazza Pola, San Carlo',
+        segmentId: 'mercato_sancarlo',
+        note: 'Mercato di San Carlo (Domenica)',
+        schedule: { mode: 'recurring', days: [0], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 42. VIGARANO MAINARDA - Mainarda (Giovedì)
+    {
+        id: 'mkt_vigarano_mainarda_1',
+        lat: 44.84150,
+        lng: 11.49420,
+        type: 'mercato',
+        street: 'Piazza Kennedy / Via Matteotti, Vigarano Mainarda',
+        segmentId: 'mercato_vigarano_mainarda',
+        note: 'Mercato di Vigarano Mainarda (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_vigarano_mainarda_2',
+        lat: 44.84300,
+        lng: 11.49650,
+        type: 'mercato',
+        street: 'Piazza Kennedy / Via Matteotti, Vigarano Mainarda',
+        segmentId: 'mercato_vigarano_mainarda',
+        note: 'Mercato di Vigarano Mainarda (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 43. VIGARANO MAINARDA - Pieve (Martedì)
+    {
+        id: 'mkt_vigarano_pieve_1',
+        lat: 44.86250,
+        lng: 11.50350,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto / Via Mantova, Vigarano Pieve',
+        segmentId: 'mercato_vigarano_pieve',
+        note: 'Mercato di Vigarano Pieve (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_vigarano_pieve_2',
+        lat: 44.86400,
+        lng: 11.50520,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto / Via Mantova, Vigarano Pieve',
+        segmentId: 'mercato_vigarano_pieve',
+        note: 'Mercato di Vigarano Pieve (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 44. MESOLA - Centro (Sabato)
+    {
+        id: 'mkt_mesola_centro_1',
+        lat: 44.92250,
+        lng: 12.23050,
+        type: 'mercato',
+        street: 'Piazza Santo Spirito / Piazza della Vittoria, Mesola',
+        segmentId: 'mercato_mesola_centro',
+        note: 'Mercato settimanale di Mesola (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_mesola_centro_2',
+        lat: 44.92420,
+        lng: 12.23280,
+        type: 'mercato',
+        street: 'Piazza Santo Spirito / Piazza della Vittoria, Mesola',
+        segmentId: 'mercato_mesola_centro',
+        note: 'Mercato settimanale di Mesola (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 45. MESOLA - Bosco Mesola (Martedì)
+    {
+        id: 'mkt_mesola_bosco_1',
+        lat: 44.90850,
+        lng: 12.24720,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto, Bosco Mesola',
+        segmentId: 'mercato_bosco_mesola',
+        note: 'Mercato di Bosco Mesola (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_mesola_bosco_2',
+        lat: 44.91000,
+        lng: 12.24900,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto, Bosco Mesola',
+        segmentId: 'mercato_bosco_mesola',
+        note: 'Mercato di Bosco Mesola (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 46. GORO - Centro (Sabato)
+    {
+        id: 'mkt_goro_centro_1',
+        lat: 44.85150,
+        lng: 12.29650,
+        type: 'mercato',
+        street: 'Piazza Bruno Rossi / Via Roma, Goro',
+        segmentId: 'mercato_goro_centro',
+        note: 'Mercato settimanale di Goro (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_goro_centro_2',
+        lat: 44.85320,
+        lng: 12.29880,
+        type: 'mercato',
+        street: 'Piazza Bruno Rossi / Via Roma, Goro',
+        segmentId: 'mercato_goro_centro',
+        note: 'Mercato settimanale di Goro (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 47. GORO - Gorino (Giovedì)
+    {
+        id: 'mkt_goro_gorino_1',
+        lat: 44.81950,
+        lng: 12.35350,
+        type: 'mercato',
+        street: 'Piazza Nazario Sauro, Gorino',
+        segmentId: 'mercato_gorino',
+        note: 'Mercato di Gorino (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_goro_gorino_2',
+        lat: 44.82100,
+        lng: 12.35520,
+        type: 'mercato',
+        street: 'Piazza Nazario Sauro, Gorino',
+        segmentId: 'mercato_gorino',
+        note: 'Mercato di Gorino (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 48. OSTELLATO - Centro (Martedì)
+    {
+        id: 'mkt_ostellato_centro_1',
+        lat: 44.74350,
+        lng: 11.93920,
+        type: 'mercato',
+        street: 'Piazza della Repubblica / Via Garibaldi, Ostellato',
+        segmentId: 'mercato_ostellato_centro',
+        note: 'Mercato settimanale di Ostellato (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_ostellato_centro_2',
+        lat: 44.74520,
+        lng: 11.94150,
+        type: 'mercato',
+        street: 'Piazza della Repubblica / Via Garibaldi, Ostellato',
+        segmentId: 'mercato_ostellato_centro',
+        note: 'Mercato settimanale di Ostellato (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 49. OSTELLATO - Rovereto (Venerdì)
+    {
+        id: 'mkt_ostellato_rovereto_1',
+        lat: 44.77850,
+        lng: 11.90750,
+        type: 'mercato',
+        street: 'Piazza Trieste, Rovereto di Ostellato',
+        segmentId: 'mercato_rovereto_ostellato',
+        note: 'Mercato di Rovereto (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_ostellato_rovereto_2',
+        lat: 44.78000,
+        lng: 11.90920,
+        type: 'mercato',
+        street: 'Piazza Trieste, Rovereto di Ostellato',
+        segmentId: 'mercato_rovereto_ostellato',
+        note: 'Mercato di Rovereto (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 50. OSTELLATO - San Giovanni (Giovedì)
+    {
+        id: 'mkt_ostellato_sangiovanni_1',
+        lat: 44.73850,
+        lng: 11.99650,
+        type: 'mercato',
+        street: 'Piazza della Libertà, San Giovanni di Ostellato',
+        segmentId: 'mercato_sangiovanni_ostellato',
+        note: 'Mercato di San Giovanni di Ostellato (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_ostellato_sangiovanni_2',
+        lat: 44.74000,
+        lng: 11.99820,
+        type: 'mercato',
+        street: 'Piazza della Libertà, San Giovanni di Ostellato',
+        segmentId: 'mercato_sangiovanni_ostellato',
+        note: 'Mercato di San Giovanni di Ostellato (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 51. FISCAGLIA - Migliarino (Mercoledì)
+    {
+        id: 'mkt_fiscaglia_migliarino_1',
+        lat: 44.77250,
+        lng: 11.93350,
+        type: 'mercato',
+        street: 'Piazza della Libertà / Piazza Repubblica, Migliarino',
+        segmentId: 'mercato_migliarino',
+        note: 'Mercato settimanale di Migliarino (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fiscaglia_migliarino_2',
+        lat: 44.77420,
+        lng: 11.93580,
+        type: 'mercato',
+        street: 'Piazza della Libertà / Piazza Repubblica, Migliarino',
+        segmentId: 'mercato_migliarino',
+        note: 'Mercato settimanale di Migliarino (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 52. FISCAGLIA - Massa Fiscaglia (Martedì)
+    {
+        id: 'mkt_fiscaglia_massafiscaglia_1',
+        lat: 44.80850,
+        lng: 12.01520,
+        type: 'mercato',
+        street: 'Piazza Garibaldi / Via Roma, Massa Fiscaglia',
+        segmentId: 'mercato_massafiscaglia',
+        note: 'Mercato settimanale di Massa Fiscaglia (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fiscaglia_massafiscaglia_2',
+        lat: 44.81020,
+        lng: 12.01750,
+        type: 'mercato',
+        street: 'Piazza Garibaldi / Via Roma, Massa Fiscaglia',
+        segmentId: 'mercato_massafiscaglia',
+        note: 'Mercato settimanale di Massa Fiscaglia (Martedì)',
+        schedule: { mode: 'recurring', days: [2], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 53. FISCAGLIA - Migliaro (Venerdì)
+    {
+        id: 'mkt_fiscaglia_migliaro_1',
+        lat: 44.79250,
+        lng: 11.97450,
+        type: 'mercato',
+        street: 'Piazza XXV Aprile, Migliaro',
+        segmentId: 'mercato_migliaro',
+        note: 'Mercato di Migliaro (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_fiscaglia_migliaro_2',
+        lat: 44.79400,
+        lng: 11.97620,
+        type: 'mercato',
+        street: 'Piazza XXV Aprile, Migliaro',
+        segmentId: 'mercato_migliaro',
+        note: 'Mercato di Migliaro (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 54. TRESIGNANA - Tresigallo (Lunedì)
+    {
+        id: 'mkt_tresignana_tresigallo_1',
+        lat: 44.81620,
+        lng: 11.89550,
+        type: 'mercato',
+        street: 'Piazza Italia / Piazza della Repubblica, Tresigallo',
+        segmentId: 'mercato_tresigallo',
+        note: 'Mercato settimanale di Tresigallo (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_tresignana_tresigallo_2',
+        lat: 44.81800,
+        lng: 11.89780,
+        type: 'mercato',
+        street: 'Piazza Italia / Piazza della Repubblica, Tresigallo',
+        segmentId: 'mercato_tresigallo',
+        note: 'Mercato settimanale di Tresigallo (Lunedì)',
+        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 55. TRESIGNANA - Formignana (Mercoledì)
+    {
+        id: 'mkt_tresignana_formignana_1',
+        lat: 44.84620,
+        lng: 11.85950,
+        type: 'mercato',
+        street: 'Piazza Unità / Via Roma, Formignana',
+        segmentId: 'mercato_formignana',
+        note: 'Mercato settimanale di Formignana (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_tresignana_formignana_2',
+        lat: 44.84780,
+        lng: 11.86180,
+        type: 'mercato',
+        street: 'Piazza Unità / Via Roma, Formignana',
+        segmentId: 'mercato_formignana',
+        note: 'Mercato settimanale di Formignana (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 56. RIVA DEL PO - Berra (Mercoledì)
+    {
+        id: 'mkt_rivadelpo_berra_1',
+        lat: 44.97850,
+        lng: 11.97520,
+        type: 'mercato',
+        street: 'Piazza della Repubblica, Berra',
+        segmentId: 'mercato_berra',
+        note: 'Mercato settimanale di Berra (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_rivadelpo_berra_2',
+        lat: 44.98020,
+        lng: 11.97750,
+        type: 'mercato',
+        street: 'Piazza della Repubblica, Berra',
+        segmentId: 'mercato_berra',
+        note: 'Mercato settimanale di Berra (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 57. RIVA DEL PO - Ro Ferrarese (Giovedì)
+    {
+        id: 'mkt_rivadelpo_ro_1',
+        lat: 44.94750,
+        lng: 11.75820,
+        type: 'mercato',
+        street: 'Piazza Umberto I, Ro Ferrarese',
+        segmentId: 'mercato_ro',
+        note: 'Mercato settimanale di Ro Ferrarese (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_rivadelpo_ro_2',
+        lat: 44.94920,
+        lng: 11.76050,
+        type: 'mercato',
+        street: 'Piazza Umberto I, Ro Ferrarese',
+        segmentId: 'mercato_ro',
+        note: 'Mercato settimanale di Ro Ferrarese (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 58. RIVA DEL PO - Serravalle (Venerdì)
+    {
+        id: 'mkt_rivadelpo_serravalle_1',
+        lat: 44.96850,
+        lng: 12.04350,
+        type: 'mercato',
+        street: 'Piazza Giuseppe Mazzini, Serravalle',
+        segmentId: 'mercato_serravalle',
+        note: 'Mercato di Serravalle (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_rivadelpo_serravalle_2',
+        lat: 44.97000,
+        lng: 12.04520,
+        type: 'mercato',
+        street: 'Piazza Giuseppe Mazzini, Serravalle',
+        segmentId: 'mercato_serravalle',
+        note: 'Mercato di Serravalle (Venerdì)',
+        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 59. RIVA DEL PO - Cologna (Sabato)
+    {
+        id: 'mkt_rivadelpo_cologna_1',
+        lat: 44.96150,
+        lng: 11.89720,
+        type: 'mercato',
+        street: 'Piazza Libertà, Cologna',
+        segmentId: 'mercato_cologna',
+        note: 'Mercato di Cologna (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_rivadelpo_cologna_2',
+        lat: 44.96300,
+        lng: 11.89900,
+        type: 'mercato',
+        street: 'Piazza Libertà, Cologna',
+        segmentId: 'mercato_cologna',
+        note: 'Mercato di Cologna (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 60. MASI TORELLO - Centro (Giovedì)
+    {
+        id: 'mkt_masitorello_centro_1',
+        lat: 44.79650,
+        lng: 11.79850,
+        type: 'mercato',
+        street: 'Piazza Mario Antolini / Via Roma, Masi Torello',
+        segmentId: 'mercato_masitorello_centro',
+        note: 'Mercato settimanale di Masi Torello (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_masitorello_centro_2',
+        lat: 44.79800,
+        lng: 11.80050,
+        type: 'mercato',
+        street: 'Piazza Mario Antolini / Via Roma, Masi Torello',
+        segmentId: 'mercato_masitorello_centro',
+        note: 'Mercato settimanale di Masi Torello (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 61. MASI TORELLO - Masi San Giacomo (Sabato)
+    {
+        id: 'mkt_masitorello_sanciacomo_1',
+        lat: 44.78950,
+        lng: 11.83450,
+        type: 'mercato',
+        street: 'Piazza della Chiesa, Masi San Giacomo',
+        segmentId: 'mercato_masisangiacomo',
+        note: 'Mercato di Masi San Giacomo (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_masitorello_sanciacomo_2',
+        lat: 44.79100,
+        lng: 11.83620,
+        type: 'mercato',
+        street: 'Piazza della Chiesa, Masi San Giacomo',
+        segmentId: 'mercato_masisangiacomo',
+        note: 'Mercato di Masi San Giacomo (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 62. VOGHIERA - Centro (Mercoledì)
+    {
+        id: 'mkt_voghiera_centro_1',
+        lat: 44.76150,
+        lng: 11.74820,
+        type: 'mercato',
+        street: 'Piazza del Popolo / Viale Dante, Voghiera',
+        segmentId: 'mercato_voghiera_centro',
+        note: 'Mercato settimanale di Voghiera (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_voghiera_centro_2',
+        lat: 44.76300,
+        lng: 11.75020,
+        type: 'mercato',
+        street: 'Piazza del Popolo / Viale Dante, Voghiera',
+        segmentId: 'mercato_voghiera_centro',
+        note: 'Mercato settimanale di Voghiera (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 63. VOGHIERA - Ducentola (Sabato)
+    {
+        id: 'mkt_voghiera_ducentola_1',
+        lat: 44.78350,
+        lng: 11.72150,
+        type: 'mercato',
+        street: 'Piazza San Bartolomeo, Ducentola',
+        segmentId: 'mercato_ducentola',
+        note: 'Mercato di Ducentola (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_voghiera_ducentola_2',
+        lat: 44.78500,
+        lng: 11.72320,
+        type: 'mercato',
+        street: 'Piazza San Bartolomeo, Ducentola',
+        segmentId: 'mercato_ducentola',
+        note: 'Mercato di Ducentola (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 64. JOLANDA DI SAVOIA - Centro (Mercoledì)
+    {
+        id: 'mkt_jolandadisavoia_centro_1',
+        lat: 44.88350,
+        lng: 11.97720,
+        type: 'mercato',
+        street: 'Piazza Unità d\'Italia / Corso Garibaldi, Jolanda di Savoia',
+        segmentId: 'mercato_jolandadisavoia_centro',
+        note: 'Mercato settimanale di Jolanda di Savoia (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_jolandadisavoia_centro_2',
+        lat: 44.88520,
+        lng: 11.97950,
+        type: 'mercato',
+        street: 'Piazza Unità d\'Italia / Corso Garibaldi, Jolanda di Savoia',
+        segmentId: 'mercato_jolandadisavoia_centro',
+        note: 'Mercato settimanale di Jolanda di Savoia (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 65. LAGOSANTO - Centro (Mercoledì)
+    {
+        id: 'mkt_lagosanto_centro_1',
+        lat: 44.76250,
+        lng: 12.14020,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto / Via Roma, Lagosanto',
+        segmentId: 'mercato_lagosanto_centro',
+        note: 'Mercato settimanale di Lagosanto (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_lagosanto_centro_2',
+        lat: 44.76420,
+        lng: 12.14250,
+        type: 'mercato',
+        street: 'Piazza Vittorio Veneto / Via Roma, Lagosanto',
+        segmentId: 'mercato_lagosanto_centro',
+        note: 'Mercato settimanale di Lagosanto (Mercoledì)',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 66. MOLINELLA (BO) - Centro (Mercoledì)
+    {
+        id: 'mkt_molinella_centro_1',
+        lat: 44.62050,
+        lng: 11.66850,
+        type: 'mercato',
+        street: 'Piazza Anselmo Martoni / Via Mazzini, Molinella',
+        segmentId: 'mercato_molinella_centro',
+        note: 'Mercato settimanale di Molinella (Mercoledì) - Piazza Martoni e centro chiusi',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_molinella_centro_2',
+        lat: 44.62220,
+        lng: 11.67100,
+        type: 'mercato',
+        street: 'Piazza Anselmo Martoni / Via Mazzini, Molinella',
+        segmentId: 'mercato_molinella_centro',
+        note: 'Mercato settimanale di Molinella (Mercoledì) - Piazza Martoni e centro chiusi',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 67. SAN MATTEO DELLA DECIMA (BO) - Centro (Mercoledì)
+    {
+        id: 'mkt_sanmatteodelladecima_1',
+        lat: 44.72150,
+        lng: 11.19850,
+        type: 'mercato',
+        street: 'Piazza delle Poste / Via Cento, San Matteo della Decima',
+        segmentId: 'mercato_sanmatteodelladecima',
+        note: 'Mercato settimanale di San Matteo della Decima (Mercoledì) - Area centro chiusa',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_sanmatteodelladecima_2',
+        lat: 44.72320,
+        lng: 11.20080,
+        type: 'mercato',
+        street: 'Piazza delle Poste / Via Cento, San Matteo della Decima',
+        segmentId: 'mercato_sanmatteodelladecima',
+        note: 'Mercato settimanale di San Matteo della Decima (Mercoledì) - Area centro chiusa',
+        schedule: { mode: 'recurring', days: [3], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 68. SANTA MARIA MADDALENA (RO) - Centro (Giovedì)
+    {
+        id: 'mkt_santamariamaddalena_1',
+        lat: 44.89650,
+        lng: 11.60250,
+        type: 'mercato',
+        street: 'Piazza Maggiore / Via della Pace, Santa Maria Maddalena',
+        segmentId: 'mercato_santamariamaddalena',
+        note: 'Mercato settimanale di Santa Maria Maddalena (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_santamariamaddalena_2',
+        lat: 44.89820,
+        lng: 11.60480,
+        type: 'mercato',
+        street: 'Piazza Maggiore / Via della Pace, Santa Maria Maddalena',
+        segmentId: 'mercato_santamariamaddalena',
+        note: 'Mercato settimanale di Santa Maria Maddalena (Giovedì)',
+        schedule: { mode: 'recurring', days: [4], timeStart: '06:00', timeEnd: '14:00' }
+    },
+
+    // 69. OCCHIOBELLO (RO) - Centro (Sabato)
+    {
+        id: 'mkt_occhiobello_centro_1',
+        lat: 44.92150,
+        lng: 11.58350,
+        type: 'mercato',
+        street: 'Piazza Giacomo Matteotti / Via Roma, Occhiobello',
+        segmentId: 'mercato_occhiobello_centro',
+        note: 'Mercato settimanale di Occhiobello (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    },
+    {
+        id: 'mkt_occhiobello_centro_2',
+        lat: 44.92320,
+        lng: 11.58580,
+        type: 'mercato',
+        street: 'Piazza Giacomo Matteotti / Via Roma, Occhiobello',
+        segmentId: 'mercato_occhiobello_centro',
+        note: 'Mercato settimanale di Occhiobello (Sabato)',
+        schedule: { mode: 'recurring', days: [6], timeStart: '06:00', timeEnd: '14:00' }
+    }
+];
 
 // Coordinate di Ferrara
 const FERRARA_COORDS = [44.8381, 11.6198];
@@ -296,6 +1818,11 @@ function initMap() {
     loadMarkers();
     updateUI();
     initGeolocation();
+
+    // Aggiornamento automatico periodico (ogni 60 secondi) per far apparire/scomparire i mercati ed eventi a orario
+    setInterval(() => {
+        refreshMarkers();
+    }, 60000);
 }
 
 // --- GEOLOCALIZZAZIONE ---
@@ -905,7 +2432,7 @@ function createCustomIcon(type, status = 'active') {
 }
 
 // Aggiungi un marker alla mappa
-function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null) {
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null, segmentId = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const ts = parseInt(markerId);
@@ -919,7 +2446,8 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         note: note || null,
         fbKey: fbKey || null,
         street: street || null,
-        schedule: schedule || null
+        schedule: schedule || null,
+        segmentId: segmentId || null
     };
 
     const status = getMarkerScheduleStatus(markerObj);
@@ -1026,7 +2554,8 @@ function saveMarkerToFirebase(markerObj) {
         timestamp: parseInt(markerObj.id) || Date.now(),
         note: markerObj.note || null,
         street: markerObj.street || null,
-        schedule: markerObj.schedule || null
+        schedule: markerObj.schedule || null,
+        segmentId: markerObj.segmentId || null
     };
     const newRef = markersRef.push(payload);
     markerObj.fbKey = newRef.key;
@@ -1473,9 +3002,12 @@ function loadMarkers() {
             activeLayers = {};
 
             const data = snapshot.val();
+            const loadedIds = new Set();
             if (data) {
                 Object.entries(data).forEach(([fbKey, m]) => {
-                    const localId = m.timestamp ? m.timestamp.toString() : fbKey;
+                    const localId = m.timestamp ? m.timestamp.toString() : (m.id || fbKey);
+                    loadedIds.add(localId);
+                    if (m.id) loadedIds.add(m.id);
                     const markerObj = {
                         id: localId,
                         lat: m.lat,
@@ -1484,14 +3016,26 @@ function loadMarkers() {
                         note: m.note || null,
                         fbKey: fbKey,
                         street: m.street || null,
-                        schedule: m.schedule || null
+                        schedule: m.schedule || null,
+                        segmentId: m.segmentId || null
                     };
                     markersData.push(markerObj);
-                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null, m.segmentId || null);
                 });
-                saveToLocalStorage();
-                console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale da Firebase`);
             }
+
+            // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti
+            if (typeof DEFAULT_WEEKLY_MARKETS !== 'undefined' && Array.isArray(DEFAULT_WEEKLY_MARKETS)) {
+                DEFAULT_WEEKLY_MARKETS.forEach(dm => {
+                    if (!loadedIds.has(dm.id)) {
+                        markersData.push(dm);
+                        addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
+                    }
+                });
+            }
+
+            saveToLocalStorage();
+            console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale (inclusi mercati provinciali)`);
 
             updateFilterCounts();
             updateRoadSegments();
@@ -1508,11 +3052,15 @@ function loadMarkers() {
 // Carica i marker dal localStorage (fallback offline)
 function loadFromLocalStorage() {
     const saved = localStorage.getItem('ferrara_viabilita_markers');
+    markersData = [];
+    const loadedIds = new Set();
     if (saved) {
         try {
-            markersData = JSON.parse(saved);
-            markersData.forEach(m => {
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
+            const parsed = JSON.parse(saved);
+            parsed.forEach(m => {
+                loadedIds.add(m.id);
+                markersData.push(m);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
             });
             console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
@@ -1520,6 +3068,17 @@ function loadFromLocalStorage() {
             markersData = [];
         }
     }
+
+    // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti
+    if (typeof DEFAULT_WEEKLY_MARKETS !== 'undefined' && Array.isArray(DEFAULT_WEEKLY_MARKETS)) {
+        DEFAULT_WEEKLY_MARKETS.forEach(dm => {
+            if (!loadedIds.has(dm.id)) {
+                markersData.push(dm);
+                addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
+            }
+        });
+    }
+
     updateFilterCounts();
     updateRoadSegments();
 }
@@ -1532,7 +3091,7 @@ function refreshMarkers() {
     activeLayers = {};
 
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null);
+        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
     });
 
     updateFilterCounts();
