@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 *.log
 *.tmp
+backup_*/
+backup_*.zip
