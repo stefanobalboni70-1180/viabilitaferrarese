@@ -35,35 +35,6 @@ body {
     width: 100vw;
     height: 100vh;
     z-index: 1;
-    transform-origin: 50% 50%;
-}
-
-/* Heading-Up Mode: la mappa ruota fluida mantenendo la direzione di marcia verso l'alto */
-#map.guidance-heading-up {
-    position: fixed !important;
-    width: 170vw !important;
-    height: 170vh !important;
-    top: -35vh !important;
-    left: -35vw !important;
-    transition: transform 0.65s cubic-bezier(0.2, 0.9, 0.4, 1);
-}
-
-.hud-compass-badge {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #e2e8f0;
-    background: rgba(30, 41, 59, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 3px 8px;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.hud-compass-needle {
-    display: inline-block;
-    transition: transform 0.65s cubic-bezier(0.2, 0.9, 0.4, 1);
 }
 
 /* Glassmorphism Header */
