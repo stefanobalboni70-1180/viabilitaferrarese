@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.7';
+const APP_VERSION = '3.6.8';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -93,29 +93,7 @@ function initFirebase() {
 // --- DATABASE MERCATI SETTIMANALI DELLA PROVINCIA DI FERRARA E LIMITROFI (118) ---
 // Configurazione completa con programmazione ricorrente e coppie per evidenziare il tratto stradale / piazza
 const DEFAULT_WEEKLY_MARKETS = [
-    // 1. FERRARA - Centro (Lunedì) - Piazza Travaglio / Baluardi
-    {
-        id: 'mkt_fe_lun_1',
-        lat: 44.83155,
-        lng: 11.62145,
-        type: 'mercato',
-        street: 'Piazza Travaglio / Baluardi, Ferrara',
-        segmentId: 'mercato_fe_lun',
-        note: 'Mercato settimanale del Lunedì - Area Piazza Travaglio e Porta Reno',
-        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:30' }
-    },
-    {
-        id: 'mkt_fe_lun_2',
-        lat: 44.83020,
-        lng: 11.62250,
-        type: 'mercato',
-        street: 'Piazza Travaglio / Baluardi, Ferrara',
-        segmentId: 'mercato_fe_lun',
-        note: 'Mercato settimanale del Lunedì - Baluardo di San Lorenzo',
-        schedule: { mode: 'recurring', days: [1], timeStart: '06:00', timeEnd: '14:30' }
-    },
-
-    // 2. FERRARA - Centro (Venerdì) - Piazza Travaglio / Via Kennedy / Baluardi
+    // 1. FERRARA - Centro (Venerdì) - Piazza Travaglio / Via Kennedy / Baluardi
     {
         id: 'mkt_fe_ven_1',
         lat: 44.83155,
@@ -3006,6 +2984,9 @@ function loadMarkers() {
             if (data) {
                 Object.entries(data).forEach(([fbKey, m]) => {
                     const localId = m.timestamp ? m.timestamp.toString() : (m.id || fbKey);
+                    if (localId === 'mkt_fe_lun_1' || localId === 'mkt_fe_lun_2' || m.id === 'mkt_fe_lun_1' || m.id === 'mkt_fe_lun_2') {
+                        return; // Rimosso su richiesta
+                    }
                     loadedIds.add(localId);
                     if (m.id) loadedIds.add(m.id);
                     const markerObj = {
@@ -3058,6 +3039,7 @@ function loadFromLocalStorage() {
         try {
             const parsed = JSON.parse(saved);
             parsed.forEach(m => {
+                if (m.id === 'mkt_fe_lun_1' || m.id === 'mkt_fe_lun_2') return;
                 loadedIds.add(m.id);
                 markersData.push(m);
                 addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
