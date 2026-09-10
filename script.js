@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.5';
+const APP_VERSION = '3.6.6';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2764,6 +2764,11 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
                                     });
                                 }
 
+                                // Verifica compatibilità della strada con i mezzi di soccorso 118 (esclude vicoli angusti / percorsi ciclabili)
+                                if (typeof isRouteSuitableForEmergency === 'function' && !isRouteSuitableForEmergency(rawSteps, destLat, destLng)) {
+                                    continue;
+                                }
+
                                 const distKm = (r.distance / 1000).toFixed(1);
                                 const durMin = ep.isZtl
                                     ? calcEmergencyDuration(r.distance, null)
@@ -2871,6 +2876,52 @@ function formatManeuverSteps(rawSteps) {
             location: step.maneuver && step.maneuver.location ? [step.maneuver.location[1], step.maneuver.location[0]] : null
         };
     });
+}
+
+// -------------------------------------------------------
+// STRADE STRETTE, VICOLI MEDIEVALI E PERCORSI NON CONFACENTI
+// AI VEICOLI DI EMERGENZA (Ambulanza Tipo A 118: largh. 2.30m, alt. 2.80m)
+// -------------------------------------------------------
+const NARROW_AND_UNSUITABLE_STREETS = [
+    // Vicoli e strade medievali a sagoma ridotta / curve a 90° cieche
+    'via delle volte', 'capo delle volte', 'delle volte',
+    'via delle vecchie', 'via colomba', 'via della luna', 'via del granchio',
+    'via zemola', 'via voltacasalo', 'via fassolo', 'via cammello', 'via brasavola',
+    'via guglielmo degli adelardi', 'degli adelardi', 'via adelardi',
+    'via vignatagliata', 'via vittoria', 'via gattamarcia',
+    'vicolo dei duelli', 'vicolo del leoncorno', 'vicolo mozzo', 'vicolo del chiozzino',
+    'vicolo colombara', 'vicolo boccacanale', 'vicolo del carbone', 'vicolo zenzalo',
+    'vicolo san paolo', 'vicolo del follo', 'vicolo lupi', 'vicolo agnello', 'vicolo torto',
+    'vicolo ',
+    // Tratti pedonali angusti o con ostacoli/arredi fissi
+    'via san romano', 'via mazzini', 'via contrari', 'via fondobanchetto',
+    'via coperta', 'via gusmaria', 'via del turco', 'via carlo mayr',
+    'via delle scotte', 'via gorgadello', 'via canonica',
+    // Piste ciclabili e percorsi ciclo-pedonali non carrabili
+    'pista ciclabile', 'ciclopedonale', 'ciclabile', 'percorso ciclopedonale', 'pista ciclopedonale',
+    'sottomura', 'sopramura', 'sottomura est', 'sottomura ovest', 'sottomura sud', 'sottomura nord',
+    'parco urbano', 'percorso pedonale', 'pedonale', 'scalinata', 'sentiero', 'passerella',
+    'tracciato ciclabile', 'area pedonale', 'footway', 'cycleway', 'path', 'steps'
+];
+
+// Verifica se un percorso contiene strade troppo strette o non confacenti ai mezzi di soccorso 118
+function isRouteSuitableForEmergency(steps, destLat = null, destLng = null) {
+    if (!steps || steps.length === 0) return true;
+    for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        const rawName = (step.name || '').trim().toLowerCase();
+        if (!rawName) continue;
+
+        // Se è l'ultimo passo o la destinazione finale, l'accesso di prossimità è consentito
+        const isFinalStep = (i === steps.length - 1) || (step.maneuver && step.maneuver.type === 'arrive');
+        if (isFinalStep) continue;
+
+        const isUnsuitable = NARROW_AND_UNSUITABLE_STREETS.some(unfit => rawName.includes(unfit));
+        if (isUnsuitable) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // -------------------------------------------------------
@@ -3251,9 +3302,9 @@ function evaluateSpecialFeatures(coords) {
 }
 
 // Calcola fino a 3 differenti scelte di percorso garantendo:
-// - Percorso più veloce prioritario (con transito ZTL / Mercati 118 consentito, corsie preferenziali bus/taxi)
-// - Alternativa garantita che EVITA la ZTL e i MERCATI ATTIVI su viabilità ordinaria
-// - Rispetto rigoroso dei sensi unici e direzioni di marcia ordinarie
+// - Percorso più veloce prioritario (con transito ZTL / Mercati 118 consentito su grandi assi carrabili)
+// - Alternativa 1 e 2 garantite su strade ampie confacenti al mezzo di soccorso (esclude vicoli angusti e piste ciclabili)
+// - Rispetto rigoroso dei sensi unici e svolte corrette alle rotatorie (es. Rotatoria Corso Isonzo -> svolta diretta a sinistra su Darsena/Via Bologna)
 // - Rispetto limiti di sagoma e altezza per mezzi di soccorso (Ambulanze Tipo A 118)
 // - Utilizzo autorizzato di corsie preferenziali Bus/Taxi e scorrimento veloce
 // - Deviazioni più corte e rapide attorno a ostacoli (strade chiuse / ponti interrotti)
@@ -3271,30 +3322,36 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     }
 
     // Endpoints di routing:
-    // 1. Profilo bicicletta/pedonale (permette scorciatoie 118 autorizzate in ZTL provinciali / aree mercatali)
-    // 2. Profilo auto diretto (viabilità ordinaria / sensi unici rigorosamente rispettati)
-    // 3. Bypass dedicati su arterie a scorrimento veloce e anelli di circonvallazione (Tangenziale Ovest, Est, Baluardi)
-    // 4. Bypass perimetrali automatici generati per centri storici provinciali o mercati
+    // 1. Rotte auto dirette con alternative su viabilità ordinaria
+    // 2. Grandi Assi Emergenza ZTL autorizzati (strade ad ampia carreggiata: Giovecca, Cavour, Porta Reno, Kennedy)
+    // 3. Direttrice Corso Isonzo -> Rotatoria Darsena con svolta diretta su Darsena Est / Via Bologna
+    // 4. Bypass Circonvallazione Ovest (Viale Po / Viale IV Novembre)
+    // 5. Bypass Tangenziale Est / Baluardi Est (Via Caldirolo / Viale Alfonso I d'Este)
+    // 6. Percorso ZTL 118 diretto (verificato per escludere vicoli angusti)
     const endpoints = [
-        // Scorciatoia ZTL 118 diretta
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: true },
         // Rotte auto dirette (rispetto rigoroso dei sensi unici ordinari)
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
         { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
-        // Bypass Circonvallazione / Scorrimento Veloce Ovest (Viale IV Novembre / Viale Po / Stazione -> Via Ferraresi / Darsena Ovest -> Via Bologna)
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6020,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6080,44.8235;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Sud-Ovest' },
-        // Bypass Scorrimento Veloce Est (Via Caldirolo / Tangenziale Est / Piazzale Medaglie d'Oro / Viale Alfonso I d'Este)
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale / Circonvallazione Est' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' }
+        // Grandi Assi Emergenza Centro 118 (strade larghe e corsie preferenziali bus/soccorso)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6250,44.8365;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Giovecca' },
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6140,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Viale Cavour' },
+        // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna (senza deviazioni a destra per Mulinetto)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6108,44.8335;11.6150,44.8275;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Corso Isonzo / Darsena / Via Bologna' },
+        // Circonvallazione Ovest (Viale Po / Viale IV Novembre)
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6030,44.8410;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
+        // Tangenziale Est & Baluardi Est
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale Est' },
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' },
+        // Scorciatoia ZTL 118 diretta (subordinata a verifica larghezza strada)
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: true }
     ];
 
-    // Se il tragitto o uno dei punti è nei pressi di un mercato o di una ZTL provinciale, genera bypass dinamici
+    // Se il tragitto o uno dei punti è nei pressi di un mercato, genera bypass dedicati
     const midLat = (startLat + destLat) / 2;
     const midLng = (startLng + destLng) / 2;
     activeMarkets.forEach((mz, mIdx) => {
         const d = calculateDistanceMeters(midLat, midLng, mz.lat, mz.lng);
-        if (d < 5000 && endpoints.length < 12) {
+        if (d < 5000 && endpoints.length < 14) {
             // Offset perimetrale di 300m per aggirare l'area mercatale
             const offLat = mz.lat + 0.003;
             const offLng = mz.lng + 0.003;
@@ -3348,6 +3405,9 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         const obsCheck = evaluateRouteObstacles(coords, obstacles);
         const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps : [];
 
+        // Verifica compatibilità della strada con i mezzi di soccorso 118 (esclude vicoli angusti / percorsi ciclabili)
+        const isSuitable = isRouteSuitableForEmergency(steps, destLat, destLng);
+
         return {
             index: idx,
             isDetour: false,
@@ -3367,6 +3427,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             intersectsBlock: obsCheck.intersects,
             blockReasons: obsCheck.reasons,
             collidedObstacles: obsCheck.collidedObstacles,
+            unsuitableForEmergency: !isSuitable,
             steps: formatManeuverSteps(steps),
             rawSteps: steps
         };
@@ -3400,16 +3461,21 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 dr.busLaneNames = specEval.busLaneNames;
                 dr.usesFastTransit = specEval.usesFastTransit;
                 dr.fastTransitNames = specEval.fastTransitNames;
+                dr.unsuitableForEmergency = false;
             });
             processedRoutes.push(...detourRoutes);
         }
     }
 
+    // Filtra ed elimina tassativamente i percorsi non adatti ai veicoli di soccorso (strade troppo strette / ciclabili)
+    const emergencyCompliantRoutes = processedRoutes.filter(r => !r.unsuitableForEmergency);
+    const validPool = emergencyCompliantRoutes.length > 0 ? emergencyCompliantRoutes : processedRoutes;
+
     // Ordina i percorsi:
     // 1. Liberi da blocchi
     // 2. Più veloci
     // 3. Minore distanza
-    processedRoutes.sort((a, b) => {
+    validPool.sort((a, b) => {
         if (a.intersectsBlock !== b.intersectsBlock) {
             return a.intersectsBlock ? 1 : -1;
         }
@@ -3420,8 +3486,8 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     });
 
     // Filtra percorsi liberi da ostacoli
-    const freeRoutes = processedRoutes.filter(r => !r.intersectsBlock);
-    const pool = freeRoutes.length > 0 ? freeRoutes : processedRoutes;
+    const freeRoutes = validPool.filter(r => !r.intersectsBlock);
+    const pool = freeRoutes.length > 0 ? freeRoutes : validPool;
 
     const ztlCandidates = pool.filter(r => r.isZtlRoute);
     const noZtlCandidates = pool.filter(r => !r.isZtlRoute);
@@ -3433,7 +3499,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
     const selected3 = [];
 
-    // 1. Slot 1: Il percorso più veloce in assoluto
+    // 1. Slot 1: Il percorso più veloce in assoluto su strade adeguate all'ambulanza
     const fastest = pool[0];
     if (fastest) selected3.push(fastest);
 
@@ -3461,7 +3527,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Se il percorso 1 è in ZTL e abbiamo aggiunto il percorso 2 Fuori ZTL, prova ad aggiungere come percorso 3 un'altra opzione Fuori ZTL distinta (es. Circonvallazione Est vs Ovest o Scorrimento Veloce)
+    // Se il percorso 1 è in ZTL e abbiamo aggiunto il percorso 2 Fuori ZTL, aggiungi come percorso 3 un'altra opzione Fuori ZTL distinta (es. Circonvallazione / Corso Isonzo / Baluardi)
     if (fastest && fastest.isZtlRoute && selected3.length < 3) {
         for (const r of noZtlCandidates) {
             if (selected3.length >= 3) break;
@@ -3476,7 +3542,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Riempi gli slot mancanti fino a 3 con percorsi geometricamente distinti
+    // Riempi gli slot mancanti fino a 3 con percorsi geometricamente distinti e adatti ai mezzi di emergenza
     for (const r of pool) {
         if (selected3.length >= 3) break;
         const isDuplicate = selected3.some(s =>
@@ -3488,7 +3554,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    for (const r of processedRoutes) {
+    for (const r of validPool) {
         if (selected3.length >= 3) break;
         if (!selected3.includes(r)) {
             selected3.push(r);
@@ -3507,7 +3573,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 r.title = "Percorso 1 (Più Veloce - Transito Area Mercato 118)";
                 r.badgeText = "⚡ Più Veloce (Mercato)";
             } else if (r.isZtlRoute) {
-                r.title = "Percorso 1 (Più Veloce - Transito ZTL 118)";
+                r.title = "Percorso 1 (Più Veloce - Transito Grandi Assi ZTL 118)";
                 r.badgeText = "⚡ Più Veloce (ZTL)";
             } else if (r.isDetour) {
                 r.title = "Percorso 1 (Più Veloce con Deviazione)";
@@ -3526,7 +3592,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             r.title = `Percorso ${i + 1} (Transito Area Mercato 118)`;
             r.badgeText = "🛒 Transito Mercato";
         } else if (r.isZtlRoute) {
-            r.title = `Percorso ${i + 1} (Transito ZTL 118)`;
+            r.title = `Percorso ${i + 1} (Transito Grandi Assi ZTL 118)`;
             r.badgeText = "🛡️ Transito ZTL";
         } else if (r.isDetour) {
             r.title = `Percorso ${i + 1} (Alternativo con Deviazione)`;
