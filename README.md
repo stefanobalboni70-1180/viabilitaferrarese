@@ -1,8 +1,12 @@
-# Viabilità Ferrara 118 - Versione 3.6.19
+# Viabilità Ferrara 118 - Versione 3.6.20
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Nuove Funzionalità & Regole di Circolazione 118 (v3.6.19):
+### Nuove Funzionalità & Correzioni UI (v3.6.20):
+- **Risoluzione Sovrapposizione Finestre Admin (PC & Mobile):** riarchitettura del layout della barra superiore con container di flusso unificato (`.top-nav-wrapper`), eliminando le coordinate assolute rigide e garantendo che la barra di ricerca/filtri admin compaia sempre sotto l'header senza alcuna sovrapposizione su qualsiasi risoluzione.
+- **Ottimizzazione Responsive Header & Pulsanti:** disposizione fluida dei pulsanti di azione e controllo (News, Naviga, Segnala Problema, Gestione News, Segnalazioni, Logout) con wrapping pulito e touch targets ottimizzati per smartphone.
+- **Riposizionamento Banner Selezione Mappa:** il banner di selezione punto mappa (`#picker-banner`) è stato riposizionato in basso in modalità fluttuante (`bottom: 30px`) per evitare collisioni con l'header superiore.
+- **Modali a Schermo Intero Centrati e Scrollabili:** overlay modali convertiti a `position: fixed` con backdrop blur, garantendo visibilità e leggibilità su tutti i dispositivi.
 - **Finestra Notizie Urgenti (Flash News 20s):** popup visibile per 20 secondi all'avvio dell'applicazione con conto alla rovescia, barra di progresso e chiusura manuale o automatica per avvisi straordinari e criticità viabilistiche immediate.
 - **Pannello Gestione Notizie Urgenti per Amministratore:** gestione completa fino a un massimo di 3 comunicazioni urgenti con personalizzazione della durata (ore, giorni, data esatta o permanente), modifica immediata, disattivazione e cancellazione sincronizzata in tempo reale su Firebase.
 - **Pulsante di Consultazione Rapida `🚨 News` nell'Header:** consente agli equipaggi di rileggere in ogni momento le comunicazioni urgenti attive.

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara v3.6.19 - Navigatore 118</title>
+    <title>Viabilità Ferrara v3.6.20 - Navigatore 118</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.19">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.20">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -24,41 +24,45 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.6.19">
+    <link rel="stylesheet" href="style.css?v=3.6.20">
 </head>
 <body>
     
-    <header class="glass-header">
-        <div class="header-content">
-            <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.19</span></h1>
-            <div class="header-actions">
-                <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">🚨 News <span id="user-news-badge" class="badge">0</span></button>
-                <button id="nav-btn" class="nav-btn" title="Navigazione Soccorso 118">🧭 Naviga</button>
-                <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
-                <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti">📢 Gestione News <span id="admin-news-badge" class="badge">0/3</span></button>
-                <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
-                    🔔 Segnalazioni <span id="reports-badge" class="badge">0</span>
-                </button>
-                <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
-                <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
+    <div class="top-nav-wrapper">
+        <header class="glass-header">
+            <div class="header-content">
+                <div class="header-title-group">
+                    <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.20</span></h1>
+                </div>
+                <div class="header-actions">
+                    <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">🚨 News <span id="user-news-badge" class="badge">0</span></button>
+                    <button id="nav-btn" class="nav-btn" title="Navigazione Soccorso 118">🧭 Naviga</button>
+                    <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
+                    <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti">📢 Gestione News <span id="admin-news-badge" class="badge">0/3</span></button>
+                    <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
+                        🔔 Segnalazioni <span id="reports-badge" class="badge">0</span>
+                    </button>
+                    <button id="admin-login-btn" class="admin-btn">Accesso Admin</button>
+                    <button id="admin-logout-btn" class="admin-btn hidden">Esci (Admin)</button>
+                </div>
             </div>
-        </div>
-        <p class="subtitle" id="header-subtitle">Modalità Visualizzazione: clicca sui marker per i dettagli</p>
-    </header>
+            <p class="subtitle" id="header-subtitle">Modalità Visualizzazione: clicca sui marker per i dettagli</p>
+        </header>
 
-    <!-- Admin Search Box & Status Filter -->
-    <div id="admin-search-container" class="search-container hidden">
-        <div class="admin-top-row">
-            <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
-            <button id="admin-search-btn">Cerca</button>
-        </div>
-        <div class="admin-filter-bar">
-            <span class="filter-label">Filtro:</span>
-            <button class="filter-pill active" data-filter="active">🟢 Attivi (<span id="filter-count-active">0</span>)</button>
-            <button class="filter-pill" data-filter="upcoming">⏳ Programmati (<span id="filter-count-upcoming">0</span>)</button>
-            <button class="filter-pill" data-filter="expired">⚪ Scaduti (<span id="filter-count-expired">0</span>)</button>
-            <button class="filter-pill" data-filter="all">Tutti (<span id="filter-count-all">0</span>)</button>
+        <!-- Admin Search Box & Status Filter -->
+        <div id="admin-search-container" class="search-container hidden">
+            <div class="admin-top-row">
+                <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
+                <button id="admin-search-btn">Cerca</button>
+            </div>
+            <div class="admin-filter-bar">
+                <span class="filter-label">Filtro:</span>
+                <button class="filter-pill active" data-filter="active">🟢 Attivi (<span id="filter-count-active">0</span>)</button>
+                <button class="filter-pill" data-filter="upcoming">⏳ Programmati (<span id="filter-count-upcoming">0</span>)</button>
+                <button class="filter-pill" data-filter="expired">⚪ Scaduti (<span id="filter-count-expired">0</span>)</button>
+                <button class="filter-pill" data-filter="all">Tutti (<span id="filter-count-all">0</span>)</button>
+            </div>
         </div>
     </div>
 
@@ -529,6 +533,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.6.19"></script>
+    <script src="script.js?v=3.6.20"></script>
 </body>
 </html>

@@ -37,28 +37,44 @@ body {
     z-index: 1;
 }
 
-/* Glassmorphism Header */
-.glass-header {
+/* Top Navigation Flow Container (Header + Admin Bar) */
+.top-nav-wrapper {
     position: absolute;
-    top: 20px;
+    top: 14px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.9);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: max-content;
+    max-width: 95vw;
+    pointer-events: none;
+}
+
+/* Glassmorphism Header */
+.glass-header {
+    position: static;
+    transform: none;
+    background: rgba(255, 255, 255, 0.92);
     color: #0f172a;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 16px;
-    padding: 16px 32px;
-    z-index: 1000;
+    padding: 12px 24px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     text-align: center;
     transition: all 0.3s ease;
+    pointer-events: auto;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .glass-header:hover {
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.96);
 }
 
 .header-content {
@@ -67,6 +83,13 @@ body {
     justify-content: center;
     gap: 12px;
     margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .header-icon {
@@ -74,9 +97,13 @@ body {
 }
 
 h1 {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
 }
 
 h1 span.city-name {
@@ -92,85 +119,35 @@ h1 span.city-name {
     padding: 2px 8px;
     border-radius: 999px;
     vertical-align: middle;
-    margin-left: 6px;
+    margin-left: 4px;
     letter-spacing: 0;
     display: inline-block;
 }
 
 .subtitle {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: #475569;
     font-weight: 400;
 }
 
-/* Admin Search Box */
-.search-container {
-    position: absolute;
-    top: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    display: flex;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    padding: 8px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    transition: all 0.3s ease;
-}
-
-.search-container input {
-    background: rgba(0,0,0,0.05);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    color: #0f172a;
-    padding: 8px 12px;
-    border-radius: 8px;
-    outline: none;
-    width: 250px;
-    font-size: 0.9rem;
-}
-
-.search-container input:focus {
-    border-color: var(--primary);
-    background: #ffffff;
-}
-
-.search-container input::placeholder {
-    color: #64748b;
-}
-
-.search-container button {
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background 0.2s;
-}
-
-.search-container button:hover {
-    background: var(--primary-hover);
-}
-
 /* Modal Overlay */
 .modal-overlay {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: 2000;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 9999;
     display: flex;
     justify-content: center;
     align-items: center;
     opacity: 1;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.25s ease;
 }
 
 .modal-overlay.hidden {
@@ -732,11 +709,11 @@ h1 span.city-name {
 
 /* Banner Selezione Punto Mappa */
 .picker-banner {
-    position: absolute;
-    top: 90px;
+    position: fixed;
+    bottom: 30px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1500;
+    z-index: 2500;
     background: #0f172a;
     color: #f8fafc;
     border: 2px solid #3b82f6;
@@ -744,6 +721,8 @@ h1 span.city-name {
     padding: 10px 18px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     animation: banner-pop 0.3s ease-out;
+    max-width: 92vw;
+    width: max-content;
 }
 
 @keyframes banner-pop {
@@ -1383,11 +1362,23 @@ h1 span.city-name {
    ======================================================= */
 
 .search-container {
+    position: static;
+    transform: none;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    width: auto;
-    max-width: 500px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    padding: 10px 14px;
+    border-radius: 14px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    width: 100%;
+    max-width: 520px;
+    box-sizing: border-box;
 }
 
 .admin-top-row {
@@ -1398,6 +1389,41 @@ h1 span.city-name {
 
 .admin-top-row input {
     flex-grow: 1;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    color: #0f172a;
+    padding: 8px 12px;
+    border-radius: 8px;
+    outline: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.admin-top-row input:focus {
+    border-color: var(--primary);
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.admin-top-row input::placeholder {
+    color: #64748b;
+}
+
+.admin-top-row button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.88rem;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.admin-top-row button:hover {
+    background: var(--primary-hover);
 }
 
 .admin-filter-bar {
@@ -1405,7 +1431,7 @@ h1 span.city-name {
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
-    padding-top: 4px;
+    padding-top: 6px;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
@@ -1419,9 +1445,9 @@ h1 span.city-name {
     background: rgba(0, 0, 0, 0.04);
     border: 1px solid rgba(0, 0, 0, 0.12);
     color: #334155;
-    padding: 3px 8px;
+    padding: 4px 9px;
     border-radius: 999px;
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -1454,56 +1480,97 @@ h1 span.city-name {
 
 /* Responsive Design per Dispositivi Mobili */
 @media (max-width: 768px) {
+    .top-nav-wrapper {
+        top: 8px;
+        width: 96vw;
+        max-width: 96vw;
+        gap: 6px;
+    }
+
     .glass-header {
-        width: 95%;
-        padding: 12px;
-        top: 10px;
+        width: 100%;
+        padding: 10px 12px;
         border-radius: 12px;
     }
     
     .header-content {
-        flex-wrap: wrap;
-        gap: 8px;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
     }
     
+    .header-title-group {
+        justify-content: center;
+    }
+
     h1 {
-        font-size: 1.15rem;
+        font-size: 1.05rem;
+        justify-content: center;
     }
     
+    .version-tag {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+    }
+
     .subtitle {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
+        line-height: 1.25;
     }
 
     .header-actions {
         width: 100%;
-        justify-content: space-between;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
         margin-left: 0;
     }
 
     .user-report-btn,
     .admin-reports-btn,
+    .admin-news-btn,
+    .user-news-btn,
+    .nav-btn,
     .admin-btn {
-        flex: 1;
-        padding: 8px 6px;
-        font-size: 0.75rem;
+        flex: 1 1 auto;
+        padding: 6px 8px;
+        font-size: 0.72rem;
         justify-content: center;
         text-align: center;
     }
     
     .search-container {
-        width: 95%;
-        top: 155px;
-        padding: 8px;
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 12px;
     }
     
     .admin-top-row input {
-        width: 100%;
-        flex-grow: 1;
+        font-size: 0.82rem;
+        padding: 6px 10px;
+    }
+
+    .admin-top-row button {
+        padding: 6px 12px;
+        font-size: 0.82rem;
+    }
+    
+    .admin-filter-bar {
+        justify-content: center;
+        gap: 4px;
+    }
+
+    .filter-pill {
+        font-size: 0.68rem;
+        padding: 3px 6px;
     }
     
     .modal-content {
         width: 95%;
         padding: 16px;
+        max-height: 90vh;
+        overflow-y: auto;
     }
     
     .options-grid {
@@ -1540,16 +1607,6 @@ h1 span.city-name {
 
     .report-types-grid {
         grid-template-columns: repeat(2, 1fr);
-    }
-
-    .picker-banner {
-        width: 90%;
-        top: 135px;
-        padding: 8px 12px;
-    }
-
-    .picker-banner-content {
-        font-size: 0.78rem;
     }
 }
 
