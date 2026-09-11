@@ -4417,6 +4417,21 @@ async function saveAdminNews() {
     const errorEl = document.getElementById('admin-news-form-error');
     const saveBtn = document.getElementById('admin-news-save-btn');
 
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+
+    // Verifica stato autenticazione amministratore su Firebase
+    if (isFirebaseOnline && (!auth || !auth.currentUser)) {
+        if (errorEl) {
+            errorEl.innerHTML = "⚠️ <strong>Accesso richiesto:</strong> per pubblicare o modificare notizie su Firebase devi prima accedere tramite il pulsante <strong>Accesso Admin</strong> in alto a destra.";
+            errorEl.classList.remove('hidden');
+        }
+        showToast("Effettua prima l'Accesso Admin!", "warning", 4000);
+        return;
+    }
+
     const text = textInput ? textInput.value.trim() : '';
     if (!text) {
         if (errorEl) {
@@ -4510,7 +4525,11 @@ async function saveAdminNews() {
     } catch (e) {
         console.error("Errore salvataggio news urgente:", e);
         if (errorEl) {
-            errorEl.textContent = "Errore durante il salvataggio: " + e.message;
+            if (e.message && (e.message.includes("PERMISSION_DENIED") || e.message.includes("permission_denied") || e.message.includes("Permission denied"))) {
+                errorEl.innerHTML = "⚠️ <strong>Permesso negato da Firebase:</strong><br>1. Verifica di aver effettuato l'<strong>Accesso Admin</strong> (in alto a destra).<br>2. Assicurati che nelle <strong>Regole di Firebase Database</strong> sia abilitata la scrittura per <code>urgent_news</code>.";
+            } else {
+                errorEl.textContent = "Errore durante il salvataggio: " + e.message;
+            }
             errorEl.classList.remove('hidden');
         }
     } finally {
