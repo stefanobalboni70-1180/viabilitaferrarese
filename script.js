@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.11';
+const APP_VERSION = '3.6.12';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2816,8 +2816,20 @@ function saveStreetGeomCache() {
 // Tracciati vettoriali ad alta precisione per arterie storiche e mercatali di Ferrara
 const HIGH_PRECISION_ROAD_CORRIDORS = [
     {
-        id: 'fe_porta_reno_martiri',
-        names: ['corso porta reno', 'porta reno', 'corso martiri della liberta', 'corso martiri', 'martiri della liberta', 'martiri', 'piazza travaglio', 'travaglio', 'piazza cattedrale', 'piazza trento trieste', 'largo castello'],
+        id: 'fe_corso_martiri',
+        names: ['corso martiri della liberta', 'corso martiri', 'martiri della liberta', 'martiri', 'largo castello'],
+        points: [
+            [44.83590, 11.61910], // Piazza Cattedrale / Inizio Corso Martiri
+            [44.83635, 11.61920], // Corso Martiri della Libertà (davanti Volto del Cavallo)
+            [44.83680, 11.61935], // Corso Martiri della Libertà (Teatro Comunale / Municipio)
+            [44.83730, 11.61945], // Corso Martiri della Libertà (Piazza Savonarola)
+            [44.83770, 11.61960], // Corso Martiri della Libertà / Largo Castello (Fossato Castello)
+            [44.83820, 11.61980]  // Largo Castello nord / inizio Ercole I d'Este
+        ]
+    },
+    {
+        id: 'fe_corso_porta_reno',
+        names: ['corso porta reno', 'porta reno', 'piazza travaglio', 'porta paola'],
         points: [
             [44.82650, 11.61950], // Porta Paola
             [44.82800, 11.62050], // Piazza Travaglio sud
@@ -2829,12 +2841,17 @@ const HIGH_PRECISION_ROAD_CORRIDORS = [
             [44.83410, 11.62000], // Corso Porta Reno (incrocio Ragno / San Romano)
             [44.83490, 11.61955], // Corso Porta Reno (tratto banche / negozi)
             [44.83540, 11.61920], // Corso Porta Reno (Torre dell'Orologio)
-            [44.83590, 11.61910], // Piazza Cattedrale / Piazza Trento e Trieste
-            [44.83635, 11.61920], // Corso Martiri della Libertà (davanti Cattedrale / Volto del Cavallo)
-            [44.83680, 11.61935], // Corso Martiri della Libertà (Teatro Comunale / Municipio)
-            [44.83730, 11.61945], // Corso Martiri della Libertà (Piazza Savonarola)
-            [44.83770, 11.61960], // Corso Martiri della Libertà / Largo Castello (Fossato Castello Estense)
-            [44.83820, 11.61980]  // Largo Castello nord / inizio Ercole I d'Este
+            [44.83590, 11.61910]  // Piazza Cattedrale
+        ]
+    },
+    {
+        id: 'fe_piazza_trento_trieste',
+        names: ['piazza trento e trieste', 'trento e trieste', 'trento trieste', 'piazza trento trieste', 'piazza cattedrale', 'cattedrale'],
+        points: [
+            [44.83590, 11.61910], // Piazza Cattedrale / Torre dell'Orologio
+            [44.83575, 11.62100], // Piazza Trento e Trieste centro (Listone)
+            [44.83560, 11.62280], // Piazza Trento e Trieste est
+            [44.83550, 11.62350]  // Piazza Trento e Trieste / incrocio San Romano - Contrari
         ]
     },
     {
@@ -2972,12 +2989,15 @@ function projectPointOnSegment(pLat, pLng, aLat, aLng, bLat, bLng) {
 
 // Calcola la geometria estratta da un corridoio pre-mappato ad altissima precisione
 function getCorridorGeometry(lat1, lng1, lat2, lng2, streetName) {
+    if (!streetName) return null;
     const norm = (streetName || '').toLowerCase();
     
     for (const corridor of HIGH_PRECISION_ROAD_CORRIDORS) {
+        // Il corridoio si attiva ESCLUSIVAMENTE se il nome della via corrisponde al corridoio
         const nameMatch = corridor.names.some(n => norm.includes(n));
-        const pts = corridor.points;
+        if (!nameMatch) continue;
 
+        const pts = corridor.points;
         let bestProj1 = null;
         let bestProj2 = null;
         let bestIdx1 = -1;
@@ -2996,7 +3016,7 @@ function getCorridorGeometry(lat1, lng1, lat2, lng2, streetName) {
             }
         }
 
-        const maxAllowedDist = nameMatch ? 280 : 120; // Massima distanza dal corridoio per aggancio
+        const maxAllowedDist = 180; // Massima distanza dal corridoio per aggancio
         if (bestProj1 && bestProj2 && bestProj1.dist <= maxAllowedDist && bestProj2.dist <= maxAllowedDist) {
             let res = [];
             res.push([lat1, lng1]);
@@ -3021,7 +3041,6 @@ function getCorridorGeometry(lat1, lng1, lat2, lng2, streetName) {
 
             res.push([lat2, lng2]);
 
-            // Se ha curve o punti intermedi validi, restituiscilo
             if (res.length >= 2) {
                 return res;
             }
@@ -3045,7 +3064,6 @@ function normalizeStreetKey(name) {
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
-    if (s.includes('porta reno') || s.includes('martiri')) return 'fe_porta_reno_martiri';
     // Se contiene virgole o parentesi, estrai solo il nome primario
     s = s.split(/[,(]/)[0].trim();
     return s.replace(/[^a-z0-9]/g, '');
