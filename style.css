@@ -2171,7 +2171,465 @@ h1 span.city-name {
     background: #dc2626;
 }
 
-/* Adattamento Mobile Nav Drawer */
+/* Header News Buttons */
+.user-news-btn {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: #ffffff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+    animation: urgent-pulse 2s infinite ease-in-out;
+    transition: all 0.2s ease;
+}
+
+.user-news-btn:hover {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.6);
+}
+
+.admin-news-btn {
+    background: #1e293b;
+    color: #f8fafc;
+    border: 1px solid #475569;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.admin-news-btn:hover {
+    background: #334155;
+    border-color: #64748b;
+}
+
+@keyframes urgent-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+    }
+    50% {
+        transform: scale(1.03);
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+}
+
+/* =======================================================
+   MODAL FLASH NEWS UTENTI (20 SECONDI)
+   ======================================================= */
+.urgent-news-overlay {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9999;
+}
+
+.urgent-news-content {
+    max-width: 580px;
+    width: 92%;
+    background: #0f172a;
+    border: 2px solid #ef4444;
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(239, 68, 68, 0.35), 0 0 40px rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    animation: urgentSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes urgentSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-25px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.urgent-news-top-banner {
+    background: linear-gradient(90deg, #b91c1c, #ef4444);
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #ffffff;
+}
+
+.urgent-news-pulse-badge {
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.urgent-timer-box {
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.urgent-progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(239, 68, 68, 0.25);
+    overflow: hidden;
+}
+
+.urgent-progress-bar {
+    height: 100%;
+    width: 100%;
+    background: #fbbf24;
+    transition: width 0.1s linear;
+}
+
+.urgent-news-header {
+    padding: 16px 20px 8px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.urgent-news-header h2 {
+    color: #f8fafc;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.urgent-subtitle {
+    color: #94a3b8;
+    font-size: 0.82rem;
+    margin-top: 2px;
+}
+
+.urgent-close-btn {
+    background: rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    border-radius: 8px;
+    padding: 6px;
+    transition: all 0.2s;
+}
+
+.urgent-close-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fff;
+}
+
+.urgent-news-list {
+    padding: 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 52vh;
+    overflow-y: auto;
+}
+
+.urgent-news-card {
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-left: 5px solid #ef4444;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.urgent-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.urgent-badge-pill {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+}
+
+.urgent-card-date {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.urgent-card-body {
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.urgent-card-validity {
+    font-size: 0.74rem;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.urgent-news-footer {
+    padding: 12px 20px 16px 20px;
+    background: rgba(15, 23, 42, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.urgent-dismiss-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    transition: all 0.2s;
+}
+
+.urgent-dismiss-btn:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+}
+
+/* =======================================================
+   PANNELLO AMMINISTRATORE GESTIONE NEWS
+   ======================================================= */
+.admin-news-content {
+    max-width: 640px;
+    width: 92%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.admin-news-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-news-section {
+    margin-top: 14px;
+    margin-bottom: 16px;
+}
+
+.admin-section-subtitle {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.admin-news-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.admin-news-item-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.admin-news-item-card.inactive {
+    opacity: 0.6;
+    border-style: dashed;
+}
+
+.admin-news-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-news-status-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.admin-news-status-pill.active {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.admin-news-status-pill.inactive {
+    background: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.admin-news-status-pill.expired {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.admin-news-item-text {
+    font-size: 0.9rem;
+    color: #f8fafc;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.admin-news-item-meta {
+    font-size: 0.74rem;
+    color: #94a3b8;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.admin-news-item-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.admin-action-small-btn {
+    background: #334155;
+    color: #f1f5f9;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.admin-action-small-btn:hover {
+    background: #475569;
+}
+
+.admin-action-small-btn.delete:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+.admin-news-form-box {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-news-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-news-field label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.admin-news-field textarea,
+.admin-news-field select,
+.admin-news-field input {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #f8fafc;
+    padding: 9px 12px;
+    font-size: 0.88rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.admin-news-field textarea:focus,
+.admin-news-field select:focus,
+.admin-news-field input:focus {
+    border-color: #3b82f6;
+}
+
+.char-counter {
+    font-size: 0.72rem;
+    color: #64748b;
+    text-align: right;
+}
+
+.admin-news-row-fields {
+    display: flex;
+    gap: 12px;
+}
+
+.admin-news-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.secondary-btn {
+    background: #334155;
+    color: #e2e8f0;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.secondary-btn:hover {
+    background: #475569;
+}
+
+/* Adattamento Mobile Nav Drawer & Urgent News */
 @media (max-width: 600px) {
     .nav-drawer {
         top: 75px;
@@ -2182,15 +2640,24 @@ h1 span.city-name {
         max-height: calc(100vh - 90px);
     }
 
-    .nav-btn {
-        padding: 5px 10px;
-        font-size: 0.78rem;
+    .nav-btn, .user-news-btn {
+        padding: 5px 8px;
+        font-size: 0.76rem;
     }
 
     .nav-hud {
         width: 95%;
         top: 10px;
     }
+
+    .urgent-news-content {
+        width: 95%;
+    }
+
+    .admin-news-row-fields {
+        flex-direction: column;
+    }
 }
+
 
 

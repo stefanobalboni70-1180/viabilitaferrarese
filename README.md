@@ -1,8 +1,11 @@
-# Viabilità Ferrara 118 - Versione 3.6.18
+# Viabilità Ferrara 118 - Versione 3.6.19
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.18):
+### Nuove Funzionalità & Regole di Circolazione 118 (v3.6.19):
+- **Finestra Notizie Urgenti (Flash News 20s):** popup visibile per 20 secondi all'avvio dell'applicazione con conto alla rovescia, barra di progresso e chiusura manuale o automatica per avvisi straordinari e criticità viabilistiche immediate.
+- **Pannello Gestione Notizie Urgenti per Amministratore:** gestione completa fino a un massimo di 3 comunicazioni urgenti con personalizzazione della durata (ore, giorni, data esatta o permanente), modifica immediata, disattivazione e cancellazione sincronizzata in tempo reale su Firebase.
+- **Pulsante di Consultazione Rapida `🚨 News` nell'Header:** consente agli equipaggi di rileggere in ogni momento le comunicazioni urgenti attive.
 - **Blocco Assoluto Ponti Bassi e Sottopassi Ferroviari:** esclusione totale di ponti bassi e sottopassi a sagoma ridotta, inclusi il **Sottopasso Ferroviario di Via Traversagno (limite 2.40m)**, il **Ponte di Via Golena sul Po di Volano (limite 2.50m)**, Sottopasso Via Mulinetto / Argine Ducale (2.20m), Via Poletti (2.40m), Via Felisatti (2.30m), sottopassi ciclopedonali Stazione FS e varchi storici, con deviazione automatica garantita su assi a luce libera per ambulanze (h >= 2.80m).
 - **Esclusione Tracciati Biciclette / Ciclopedonali:** tutti i percorsi di soccorso 118 sono calcolati esclusivamente su viabilità veicolare idonea ad ambulanze Tipo A (3.8t, h 2.80m, l 2.30m).
 - **Calcolo Navigazione 118 Ultra-Rapido e Parallelo:** calcolo simultaneo concorrente di tutte le rotte e deviazioni in meno di un secondo, con timeout protetti e fallback garantito.

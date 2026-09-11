@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.18';
+const APP_VERSION = '3.6.19';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -51,6 +51,14 @@ let auth = null;
 let markersRef = null;
 let reportsRef = null;
 let deletedMarkersRef = null;
+let urgentNewsRef = null;
+let urgentNewsData = []; // Notizie urgenti attive (massimo 3)
+let allUrgentNewsRaw = []; // Tutte le notizie (inclusi stati inattivi/scaduti per l'admin)
+let urgentNewsTimerInterval = null;
+let urgentNewsSecondsLeft = 20;
+let urgentNewsShownThisSession = false;
+let editingNewsId = null;
+
 let deletedMarkerIds = new Set([
     'mkt_fe_lun_1', 'mkt_fe_lun_2', 
     'mkt_fe_baluardi_1', 'mkt_fe_baluardi_2', 
@@ -174,8 +182,12 @@ function initFirebase() {
             markersRef = db.ref("markers");
             reportsRef = db.ref("user_reports");
             deletedMarkersRef = db.ref("deleted_markers");
+            urgentNewsRef = db.ref("urgent_news");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
+
+            // Inizializza ascolto Notizie Urgenti 118
+            initUrgentNewsListener();
 
             // Ascolto in tempo reale degli eventi eliminati definitivamente
             deletedMarkersRef.on('value', function (snapshot) {
@@ -230,7 +242,9 @@ function initFirebase() {
         markersRef = null;
         reportsRef = null;
         deletedMarkersRef = null;
+        urgentNewsRef = null;
         isFirebaseOnline = false;
+        loadUrgentNewsFromLocalStorage();
     }
 }
 
@@ -1831,17 +1845,20 @@ function showToast(message, type = 'normal', duration = 3500) {
 
 // Aggiorna UI in base allo stato
 function updateUI() {
+    const adminNewsBtn = document.getElementById('admin-news-btn');
     if (isAdmin) {
         loginBtn.classList.add('hidden');
         logoutBtn.classList.remove('hidden');
         searchContainer.classList.remove('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.remove('hidden');
+        if (adminNewsBtn) adminNewsBtn.classList.remove('hidden');
         headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
     } else {
         loginBtn.classList.remove('hidden');
         logoutBtn.classList.add('hidden');
         searchContainer.classList.add('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.add('hidden');
+        if (adminNewsBtn) adminNewsBtn.classList.add('hidden');
         headerSubtitle.textContent = "Modalità Visualizzazione: clicca sui marker per i dettagli";
     }
     // Ridisegna i marker
@@ -4039,6 +4056,556 @@ window.rejectReport = function (reportId) {
     renderAdminReportsList();
     showToast("Segnalazione scartata.", "normal", 3000);
 };
+
+// =======================================================
+// MODULO NOTIZIE / COMUNICAZIONI URGENTI 118 (FLASH NEWS 20s)
+// - Popup automatico di 20 secondi all'avvio per tutti gli utenti
+// - Gestione amministratore con durata, modifica e cancellazione (max 3 news)
+// - Sincronizzazione in tempo reale su Firebase Realtime Database
+// =======================================================
+
+function initUrgentNewsListener() {
+    if (!isFirebaseOnline || !urgentNewsRef) return;
+
+    urgentNewsRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        allUrgentNewsRaw = [];
+        if (val) {
+            Object.entries(val).forEach(([key, item]) => {
+                allUrgentNewsRaw.push({
+                    id: key,
+                    ...item
+                });
+            });
+            // Ordina per data di creazione decrescente
+            allUrgentNewsRaw.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        }
+
+        // Cache locale offline
+        try {
+            localStorage.setItem('ferrara_urgent_news_cache', JSON.stringify(allUrgentNewsRaw));
+        } catch (e) { }
+
+        processUrgentNews();
+    }, (err) => {
+        console.warn("Errore lettura urgent_news Firebase:", err.message);
+        loadUrgentNewsFromLocalStorage();
+    });
+}
+
+function loadUrgentNewsFromLocalStorage() {
+    try {
+        const cached = localStorage.getItem('ferrara_urgent_news_cache');
+        if (cached) {
+            allUrgentNewsRaw = JSON.parse(cached);
+        } else {
+            allUrgentNewsRaw = [];
+        }
+    } catch (e) {
+        allUrgentNewsRaw = [];
+    }
+    processUrgentNews();
+}
+
+function processUrgentNews() {
+    const now = Date.now();
+    // Filtra quelle attive e non scadute (massimo 3)
+    urgentNewsData = allUrgentNewsRaw.filter(item => {
+        if (item.active === false) return false;
+        if (item.expiresAt && item.expiresAt <= now) return false;
+        return true;
+    }).slice(0, 3);
+
+    updateUserNewsButton();
+    updateAdminNewsBadge();
+
+    // Se l'amministratore ha aperto il pannello, aggiorna la lista
+    const adminNewsModal = document.getElementById('admin-news-modal');
+    if (adminNewsModal && !adminNewsModal.classList.contains('hidden')) {
+        renderAdminNewsList();
+    }
+
+    // Se all'apertura dell'app ci sono news attive e non sono ancora state mostrate in questa sessione
+    if (urgentNewsData.length > 0 && !urgentNewsShownThisSession) {
+        urgentNewsShownThisSession = true;
+        // Mostra il popup dopo un brevissimo delay per consentire il caricamento visivo
+        setTimeout(() => {
+            showUserUrgentNewsModal(false);
+        }, 300);
+    }
+}
+
+function updateUserNewsButton() {
+    const userNewsBtn = document.getElementById('user-news-btn');
+    const userNewsBadge = document.getElementById('user-news-badge');
+    if (!userNewsBtn) return;
+
+    const count = urgentNewsData.length;
+    if (count > 0) {
+        userNewsBtn.classList.remove('hidden');
+        if (userNewsBadge) userNewsBadge.textContent = count;
+    } else {
+        userNewsBtn.classList.add('hidden');
+    }
+}
+
+function updateAdminNewsBadge() {
+    const adminNewsBadge = document.getElementById('admin-news-badge');
+    const adminNewsSlotsCount = document.getElementById('admin-news-slots-count');
+    const activeCount = urgentNewsData.length;
+    if (adminNewsBadge) adminNewsBadge.textContent = `${activeCount}/3`;
+    if (adminNewsSlotsCount) adminNewsSlotsCount.textContent = `${activeCount} / 3 attive`;
+}
+
+// Mostra la finestra Flash News per gli utenti con conto alla rovescia di 20 secondi
+function showUserUrgentNewsModal(isManualClick = false) {
+    const modal = document.getElementById('urgent-news-modal');
+    const listEl = document.getElementById('urgent-news-list');
+    const timerCountdown = document.getElementById('urgent-timer-countdown');
+    const dismissCountdown = document.getElementById('dismiss-btn-countdown');
+    const progressBar = document.getElementById('urgent-progress-bar');
+
+    if (!modal || !listEl || urgentNewsData.length === 0) {
+        if (isManualClick) {
+            showToast("Nessuna comunicazione urgente attiva al momento.", "normal", 3000);
+        }
+        return;
+    }
+
+    // Renderizza le notizie (max 3)
+    listEl.innerHTML = urgentNewsData.map((item, idx) => {
+        const safeText = escapeHtml(item.text);
+        const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        let validityStr = 'Permanente (fino a cancellazione)';
+        if (item.expiresAt) {
+            validityStr = `Scadenza: ${new Date(item.expiresAt).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        return `
+            <div class="urgent-news-card">
+                <div class="urgent-card-top">
+                    <span class="urgent-badge-pill">🚨 Avviso ${idx + 1} di ${urgentNewsData.length}</span>
+                    <span class="urgent-card-date">🕒 ${dateStr}</span>
+                </div>
+                <div class="urgent-card-body">${safeText}</div>
+                <div class="urgent-card-validity">⏳ ${validityStr}</div>
+            </div>
+        `;
+    }).join('');
+
+    modal.classList.remove('hidden');
+
+    // Avvia conto alla rovescia di 20 secondi con barra di avanzamento fluida
+    clearInterval(urgentNewsTimerInterval);
+    urgentNewsSecondsLeft = 20;
+
+    if (timerCountdown) timerCountdown.textContent = `${urgentNewsSecondsLeft}s`;
+    if (dismissCountdown) dismissCountdown.textContent = `${urgentNewsSecondsLeft}s`;
+    if (progressBar) progressBar.style.width = '100%';
+
+    const startTime = Date.now();
+    const durationMs = 20000;
+
+    urgentNewsTimerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, durationMs - elapsed);
+        const sec = Math.ceil(remaining / 1000);
+        urgentNewsSecondsLeft = sec;
+
+        if (timerCountdown) timerCountdown.textContent = `${sec}s`;
+        if (dismissCountdown) dismissCountdown.textContent = `${sec}s`;
+        if (progressBar) {
+            const pct = (remaining / durationMs) * 100;
+            progressBar.style.width = `${pct}%`;
+        }
+
+        if (remaining <= 0) {
+            clearInterval(urgentNewsTimerInterval);
+            closeUserUrgentNewsModal();
+        }
+    }, 100);
+}
+
+function closeUserUrgentNewsModal() {
+    clearInterval(urgentNewsTimerInterval);
+    const modal = document.getElementById('urgent-news-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// --- GESTIONE PANNELLO ADMIN NEWS ---
+
+function openAdminNewsModal() {
+    const modal = document.getElementById('admin-news-modal');
+    if (!modal) return;
+    resetAdminNewsForm();
+    renderAdminNewsList();
+    modal.classList.remove('hidden');
+}
+
+function closeAdminNewsModal() {
+    const modal = document.getElementById('admin-news-modal');
+    if (modal) modal.classList.add('hidden');
+    resetAdminNewsForm();
+}
+
+function renderAdminNewsList() {
+    const listEl = document.getElementById('admin-news-items-list');
+    const currentCountEl = document.getElementById('admin-news-current-count');
+    if (!listEl) return;
+
+    const now = Date.now();
+    if (currentCountEl) currentCountEl.textContent = allUrgentNewsRaw.length;
+
+    if (allUrgentNewsRaw.length === 0) {
+        listEl.innerHTML = `
+            <div class="empty-reports-msg" style="padding: 16px; background: rgba(30,41,59,0.5); border-radius: 8px; text-align: center; color: #94a3b8;">
+                <p>Nessuna comunicazione urgente inserita. Usa il modulo sottostante per pubblicarne una nuova.</p>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = allUrgentNewsRaw.map(item => {
+        const safeText = escapeHtml(item.text);
+        const safeId = escapeHtml(item.id);
+        const isExpired = item.expiresAt && item.expiresAt <= now;
+        const isActive = item.active !== false && !isExpired;
+
+        let statusClass = isActive ? 'active' : (isExpired ? 'expired' : 'inactive');
+        let statusLabel = isActive ? '🟢 Attiva' : (isExpired ? '🔴 Scaduta' : '⚪ Disattivata');
+
+        const createdStr = item.createdAt ? new Date(item.createdAt).toLocaleString('it-IT') : '-';
+        let expiryStr = 'Permanente (fino a cancellazione)';
+        if (item.expiresAt) {
+            expiryStr = new Date(item.expiresAt).toLocaleString('it-IT');
+        }
+
+        return `
+            <div class="admin-news-item-card ${isActive ? '' : 'inactive'}" id="admin-news-card-${safeId}">
+                <div class="admin-news-item-header">
+                    <span class="admin-news-status-pill ${statusClass}">${statusLabel}</span>
+                    <div class="admin-news-item-actions">
+                        <button class="admin-action-small-btn" onclick="editAdminNews('${safeId}')">✏️ Modifica</button>
+                        <button class="admin-action-small-btn" onclick="toggleAdminNews('${safeId}')">${item.active !== false ? '⏸️ Disattiva' : '▶️ Attiva'}</button>
+                        <button class="admin-action-small-btn delete" onclick="deleteAdminNews('${safeId}')">🗑️ Elimina</button>
+                    </div>
+                </div>
+                <div class="admin-news-item-text">${safeText}</div>
+                <div class="admin-news-item-meta">
+                    <span>📅 Inserita: ${createdStr}</span>
+                    <span>⏳ Scadenza: ${expiryStr}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function resetAdminNewsForm() {
+    editingNewsId = null;
+    const formTitle = document.getElementById('admin-news-form-title');
+    const editIdInput = document.getElementById('admin-news-edit-id');
+    const textInput = document.getElementById('admin-news-text-input');
+    const durationSelect = document.getElementById('admin-news-duration-select');
+    const customDateContainer = document.getElementById('admin-news-custom-date-container');
+    const customDateInput = document.getElementById('admin-news-custom-date-input');
+    const errorEl = document.getElementById('admin-news-form-error');
+    const saveBtn = document.getElementById('admin-news-save-btn');
+    const cancelBtn = document.getElementById('admin-news-cancel-edit-btn');
+    const charCount = document.getElementById('admin-news-char-count');
+
+    if (formTitle) formTitle.textContent = '➕ Nuova Comunicazione Urgente';
+    if (editIdInput) editIdInput.value = '';
+    if (textInput) textInput.value = '';
+    if (charCount) charCount.textContent = '0';
+    if (durationSelect) durationSelect.value = '24h';
+    if (customDateContainer) customDateContainer.classList.add('hidden');
+    if (customDateInput) customDateInput.value = '';
+    if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('hidden'); }
+    if (saveBtn) saveBtn.textContent = 'Pubblica Notizia Urgente';
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+window.editAdminNews = function (id) {
+    const item = allUrgentNewsRaw.find(n => n.id === id);
+    if (!item) return;
+
+    editingNewsId = id;
+    const formTitle = document.getElementById('admin-news-form-title');
+    const editIdInput = document.getElementById('admin-news-edit-id');
+    const textInput = document.getElementById('admin-news-text-input');
+    const durationSelect = document.getElementById('admin-news-duration-select');
+    const customDateContainer = document.getElementById('admin-news-custom-date-container');
+    const customDateInput = document.getElementById('admin-news-custom-date-input');
+    const saveBtn = document.getElementById('admin-news-save-btn');
+    const cancelBtn = document.getElementById('admin-news-cancel-edit-btn');
+    const charCount = document.getElementById('admin-news-char-count');
+
+    if (formTitle) formTitle.textContent = '✏️ Modifica Comunicazione Urgente';
+    if (editIdInput) editIdInput.value = id;
+    if (textInput) {
+        textInput.value = item.text || '';
+        if (charCount) charCount.textContent = textInput.value.length;
+    }
+    if (durationSelect) {
+        durationSelect.value = item.durationType || '24h';
+        if (item.durationType === 'custom') {
+            if (customDateContainer) customDateContainer.classList.remove('hidden');
+            if (customDateInput && item.expiresAt) {
+                const d = new Date(item.expiresAt);
+                const pad = (n) => n.toString().padStart(2, '0');
+                customDateInput.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+        } else {
+            if (customDateContainer) customDateContainer.classList.add('hidden');
+        }
+    }
+    if (saveBtn) saveBtn.textContent = 'Salva Modifiche';
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+    textInput.focus();
+};
+
+window.deleteAdminNews = async function (id) {
+    if (!confirm("Sei sicuro di voler eliminare definitivamente questa notizia urgente?")) return;
+
+    try {
+        if (isFirebaseOnline && urgentNewsRef) {
+            await urgentNewsRef.child(id).remove();
+        } else {
+            allUrgentNewsRaw = allUrgentNewsRaw.filter(n => n.id !== id);
+            localStorage.setItem('ferrara_urgent_news_cache', JSON.stringify(allUrgentNewsRaw));
+            processUrgentNews();
+        }
+        showToast("Notizia urgente eliminata.", "normal", 3000);
+    } catch (e) {
+        console.error("Errore cancellazione news:", e);
+        showToast("Errore durante la cancellazione: " + e.message, "error", 4000);
+    }
+};
+
+window.toggleAdminNews = async function (id) {
+    const item = allUrgentNewsRaw.find(n => n.id === id);
+    if (!item) return;
+
+    const newActiveState = item.active === false ? true : false;
+
+    // Se stiamo attivando, verifichiamo che non ci siano già 3 attive
+    if (newActiveState && urgentNewsData.length >= 3 && !urgentNewsData.some(n => n.id === id)) {
+        showToast("Impossibile attivare: sono già presenti 3 notizie attive contemporaneamente.", "warning", 4000);
+        return;
+    }
+
+    try {
+        if (isFirebaseOnline && urgentNewsRef) {
+            await urgentNewsRef.child(id).update({ active: newActiveState });
+        } else {
+            item.active = newActiveState;
+            localStorage.setItem('ferrara_urgent_news_cache', JSON.stringify(allUrgentNewsRaw));
+            processUrgentNews();
+        }
+        showToast(newActiveState ? "Notizia attivata." : "Notizia disattivata.", "normal", 2500);
+    } catch (e) {
+        console.error("Errore modifica stato news:", e);
+        showToast("Errore: " + e.message, "error", 3500);
+    }
+};
+
+async function saveAdminNews() {
+    const textInput = document.getElementById('admin-news-text-input');
+    const durationSelect = document.getElementById('admin-news-duration-select');
+    const customDateInput = document.getElementById('admin-news-custom-date-input');
+    const errorEl = document.getElementById('admin-news-form-error');
+    const saveBtn = document.getElementById('admin-news-save-btn');
+
+    const text = textInput ? textInput.value.trim() : '';
+    if (!text) {
+        if (errorEl) {
+            errorEl.textContent = "Inserisci il testo del messaggio urgente.";
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const durationType = durationSelect ? durationSelect.value : '24h';
+    let expiresAt = null;
+    const now = Date.now();
+
+    if (durationType === '6h') expiresAt = now + 6 * 3600 * 1000;
+    else if (durationType === '12h') expiresAt = now + 12 * 3600 * 1000;
+    else if (durationType === '24h') expiresAt = now + 24 * 3600 * 1000;
+    else if (durationType === '48h') expiresAt = now + 48 * 3600 * 1000;
+    else if (durationType === '3d') expiresAt = now + 3 * 86400 * 1000;
+    else if (durationType === '7d') expiresAt = now + 7 * 86400 * 1000;
+    else if (durationType === 'custom') {
+        const customVal = customDateInput ? customDateInput.value : null;
+        if (!customVal) {
+            if (errorEl) {
+                errorEl.textContent = "Seleziona la data e l'ora di scadenza.";
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+        expiresAt = new Date(customVal).getTime();
+        if (expiresAt <= now) {
+            if (errorEl) {
+                errorEl.textContent = "La data di scadenza deve essere futura.";
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+    } else if (durationType === 'permanent') {
+        expiresAt = null;
+    }
+
+    // Se è nuova inserzione, verifica limite massimo di 3 comunicazioni attive
+    if (!editingNewsId) {
+        const activeCount = allUrgentNewsRaw.filter(n => n.active !== false && (!n.expiresAt || n.expiresAt > now)).length;
+        if (activeCount >= 3) {
+            if (errorEl) {
+                errorEl.textContent = "Limite massimo di 3 comunicazioni attive raggiunto. Elimina o disattiva una notizia esistente prima di aggiungerne un'altra.";
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+    }
+
+    if (saveBtn) saveBtn.disabled = true;
+
+    const payload = {
+        text: text,
+        durationType: durationType,
+        expiresAt: expiresAt,
+        active: true,
+        updatedAt: now
+    };
+
+    try {
+        if (editingNewsId) {
+            if (isFirebaseOnline && urgentNewsRef) {
+                await urgentNewsRef.child(editingNewsId).update(payload);
+            } else {
+                const idx = allUrgentNewsRaw.findIndex(n => n.id === editingNewsId);
+                if (idx !== -1) {
+                    allUrgentNewsRaw[idx] = { ...allUrgentNewsRaw[idx], ...payload };
+                }
+                localStorage.setItem('ferrara_urgent_news_cache', JSON.stringify(allUrgentNewsRaw));
+                processUrgentNews();
+            }
+            showToast("Notizia urgente aggiornata con successo!", "success", 3500);
+        } else {
+            payload.createdAt = now;
+            if (isFirebaseOnline && urgentNewsRef) {
+                await urgentNewsRef.push(payload);
+            } else {
+                const localId = 'news_' + now;
+                allUrgentNewsRaw.unshift({ id: localId, ...payload });
+                localStorage.setItem('ferrara_urgent_news_cache', JSON.stringify(allUrgentNewsRaw));
+                processUrgentNews();
+            }
+            showToast("Notizia urgente pubblicata con successo! Verrà mostrata a tutti gli utenti.", "success", 4000);
+        }
+
+        resetAdminNewsForm();
+        renderAdminNewsList();
+    } catch (e) {
+        console.error("Errore salvataggio news urgente:", e);
+        if (errorEl) {
+            errorEl.textContent = "Errore durante il salvataggio: " + e.message;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+// Inizializza i listener per i pulsanti e campi del modulo Notizie Urgenti
+function initUrgentNewsModule() {
+    const userNewsBtn = document.getElementById('user-news-btn');
+    const adminNewsBtn = document.getElementById('admin-news-btn');
+    const closeUserModalBtn = document.getElementById('close-urgent-news-modal');
+    const dismissUserModalBtn = document.getElementById('dismiss-urgent-news-btn');
+    const closeAdminModalBtn = document.getElementById('close-admin-news-modal');
+    const durationSelect = document.getElementById('admin-news-duration-select');
+    const customDateContainer = document.getElementById('admin-news-custom-date-container');
+    const textInput = document.getElementById('admin-news-text-input');
+    const charCountEl = document.getElementById('admin-news-char-count');
+    const saveBtn = document.getElementById('admin-news-save-btn');
+    const cancelEditBtn = document.getElementById('admin-news-cancel-edit-btn');
+    const urgentNewsModal = document.getElementById('urgent-news-modal');
+    const adminNewsModal = document.getElementById('admin-news-modal');
+
+    if (userNewsBtn) {
+        userNewsBtn.addEventListener('click', () => {
+            showUserUrgentNewsModal(true);
+        });
+    }
+
+    if (adminNewsBtn) {
+        adminNewsBtn.addEventListener('click', () => {
+            openAdminNewsModal();
+        });
+    }
+
+    if (closeUserModalBtn) {
+        closeUserModalBtn.addEventListener('click', () => {
+            closeUserUrgentNewsModal();
+        });
+    }
+
+    if (dismissUserModalBtn) {
+        dismissUserModalBtn.addEventListener('click', () => {
+            closeUserUrgentNewsModal();
+        });
+    }
+
+    if (urgentNewsModal) {
+        urgentNewsModal.addEventListener('click', (e) => {
+            if (e.target === urgentNewsModal) {
+                closeUserUrgentNewsModal();
+            }
+        });
+    }
+
+    if (closeAdminModalBtn) {
+        closeAdminModalBtn.addEventListener('click', () => {
+            closeAdminNewsModal();
+        });
+    }
+
+    if (adminNewsModal) {
+        adminNewsModal.addEventListener('click', (e) => {
+            if (e.target === adminNewsModal) {
+                closeAdminNewsModal();
+            }
+        });
+    }
+
+    if (durationSelect && customDateContainer) {
+        durationSelect.addEventListener('change', () => {
+            customDateContainer.classList.toggle('hidden', durationSelect.value !== 'custom');
+        });
+    }
+
+    if (textInput && charCountEl) {
+        textInput.addEventListener('input', () => {
+            charCountEl.textContent = textInput.value.length;
+            const errorEl = document.getElementById('admin-news-form-error');
+            if (errorEl) errorEl.classList.add('hidden');
+        });
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            saveAdminNews();
+        });
+    }
+
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', () => {
+            resetAdminNewsForm();
+        });
+    }
+}
 
 // =======================================================
 // MODULO NAVIGATORE SOCCORSO 118 (MOBILE & DESKTOP)
@@ -6291,6 +6858,7 @@ setInterval(() => {
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initNavigationModule();
+    initUrgentNewsModule();
 });
 
 

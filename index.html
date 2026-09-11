@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara v3.6.18 - Navigatore 118</title>
+    <title>Viabilità Ferrara v3.6.19 - Navigatore 118</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.18">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.19">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -24,17 +24,19 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.6.18">
+    <link rel="stylesheet" href="style.css?v=3.6.19">
 </head>
 <body>
     
     <header class="glass-header">
         <div class="header-content">
             <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.18</span></h1>
+            <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.19</span></h1>
             <div class="header-actions">
+                <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">🚨 News <span id="user-news-badge" class="badge">0</span></button>
                 <button id="nav-btn" class="nav-btn" title="Navigazione Soccorso 118">🧭 Naviga</button>
                 <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">📢 Segnala Problema</button>
+                <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti">📢 Gestione News <span id="admin-news-badge" class="badge">0/3</span></button>
                 <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
                     🔔 Segnalazioni <span id="reports-badge" class="badge">0</span>
                 </button>
@@ -278,6 +280,107 @@
         </div>
     </div>
 
+    <!-- Modal Flash News / Comunicazioni Urgenti 118 per gli Utenti (Auto-dismiss 20s) -->
+    <div id="urgent-news-modal" class="modal-overlay hidden urgent-news-overlay">
+        <div class="modal-content urgent-news-content">
+            <div class="urgent-news-top-banner">
+                <div class="urgent-news-pulse-badge">🚨 COMUNICAZIONE STRAORDINARIA 118</div>
+                <div class="urgent-timer-box" id="urgent-timer-box" title="Tempo rimanente">
+                    <span class="timer-icon">⏳</span>
+                    <span id="urgent-timer-countdown">20s</span>
+                </div>
+            </div>
+            
+            <div class="urgent-progress-track">
+                <div id="urgent-progress-bar" class="urgent-progress-bar"></div>
+            </div>
+
+            <div class="modal-header urgent-news-header">
+                <div>
+                    <h2>Notizie Urgenti di Viabilità</h2>
+                    <p class="urgent-subtitle">Avvisi prioritari per il transito dei mezzi di soccorso</p>
+                </div>
+                <button id="close-urgent-news-modal" class="close-btn urgent-close-btn" title="Chiudi finestra">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+
+            <div id="urgent-news-list" class="urgent-news-list">
+                <!-- Verrà popolato dinamicamente con massimo 3 messaggi -->
+            </div>
+
+            <div class="urgent-news-footer">
+                <button id="dismiss-urgent-news-btn" class="primary-btn urgent-dismiss-btn">
+                    <span>✅ Ho letto / Chiudi (<span id="dismiss-btn-countdown">20s</span>)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gestione Notizie Urgenti per Amministratore -->
+    <div id="admin-news-modal" class="modal-overlay hidden">
+        <div class="modal-content admin-news-content">
+            <div class="modal-header">
+                <div class="admin-news-title-wrapper">
+                    <h2>📢 Gestione Notizie Urgenti</h2>
+                    <span id="admin-news-slots-count" class="reports-count-tag">0 / 3 attive</span>
+                </div>
+                <button id="close-admin-news-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">I messaggi inseriti qui vengono mostrati automaticamente a tutti gli utenti per un massimo di 20 secondi all'apertura dell'applicazione (fino a 3 comunicazioni).</p>
+
+            <!-- Lista Notizie Urgenti Esistenti -->
+            <div class="admin-news-section">
+                <h4 class="admin-section-subtitle">Notizie Configurate (<span id="admin-news-current-count">0</span> di 3)</h4>
+                <div id="admin-news-items-list" class="admin-news-items-list">
+                    <!-- Popolato dinamicamente -->
+                </div>
+            </div>
+
+            <!-- Form Aggiungi / Modifica Notizia -->
+            <div class="admin-news-form-box" id="admin-news-form-box">
+                <h4 class="admin-section-subtitle" id="admin-news-form-title">➕ Nuova Comunicazione Urgente</h4>
+                <input type="hidden" id="admin-news-edit-id" value="" />
+                
+                <div class="admin-news-field">
+                    <label for="admin-news-text-input">Testo della notizia urgente <span style="color:#ef4444; font-weight:700;">*</span></label>
+                    <textarea id="admin-news-text-input" rows="3" maxlength="300" placeholder="Es. Via Pomposa chiusa da oggi all'altezza di Via Caretti per lavori straordinari urgenti..."></textarea>
+                    <div class="char-counter"><span id="admin-news-char-count">0</span> / 300 caratteri</div>
+                </div>
+
+                <div class="admin-news-row-fields">
+                    <div class="admin-news-field flex-1">
+                        <label for="admin-news-duration-select">Durata di visualizzazione</label>
+                        <select id="admin-news-duration-select">
+                            <option value="6h">6 Ore</option>
+                            <option value="12h">12 Ore</option>
+                            <option value="24h" selected>24 Ore (1 Giorno)</option>
+                            <option value="48h">48 Ore (2 Giorni)</option>
+                            <option value="3d">3 Giorni</option>
+                            <option value="7d">7 Giorni</option>
+                            <option value="custom">Fino a Data/Ora specifica...</option>
+                            <option value="permanent">Permanente (fino a cancellazione)</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-news-field flex-1 hidden" id="admin-news-custom-date-container">
+                        <label for="admin-news-custom-date-input">Scadenza Esatta</label>
+                        <input type="datetime-local" id="admin-news-custom-date-input" />
+                    </div>
+                </div>
+
+                <p id="admin-news-form-error" class="error-msg hidden"></p>
+
+                <div class="admin-news-form-actions">
+                    <button id="admin-news-save-btn" class="primary-btn">Pubblica Notizia Urgente</button>
+                    <button id="admin-news-cancel-edit-btn" class="secondary-btn hidden">Annulla Modifica</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal for Admin Reports List / Notifications -->
     <div id="admin-reports-modal" class="modal-overlay hidden">
         <div class="modal-content admin-reports-content">
@@ -426,6 +529,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.6.14"></script>
+    <script src="script.js?v=3.6.19"></script>
 </body>
 </html>
