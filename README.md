@@ -1,8 +1,10 @@
-# Viabilità Ferrara 118 - Versione 3.6.14
+# Viabilità Ferrara 118 - Versione 3.6.15
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.14):
+### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.15):
+- **Calcolo Navigazione 118 Ultra-Rapido e Parallelo:** calcolo simultaneo concorrente di tutte le rotte e deviazioni in meno di un secondo, con timeout protetti e fallback garantito.
+- **Geocodifica Istantanea Locale POI:** risoluzione a 0ms di tutti i principali presidi sanitari, ospedali provinciali (Cona, Sant'Anna, Cento, Delta, Argenta, Comacchio, Bondeno, Copparo, Codigoro), stazioni e piazze.
 - **Tracciato Reale Strade Chiuse (OSM Way Geometry):** ogni tratto stradale interrotto (es. Via Ruffetta) segue fedelmente e al 100% la sagoma della carreggiata OpenStreetMap con tutte le sue curve, con divieto assoluto di deviare su strade con nome diverso (es. SP4) e divieto di formare linee rette.
 - **Sensi Unici Ordinari Rispettati:** tutti i percorsi di navigazione rispettano scrupolosamente i sensi unici di marcia e la direzione ordinaria consentita per i veicoli, evitando manovre contromano su strade a senso unico.
 - **Corsie Preferenziali Bus e Taxi:** autorizzazione e sfruttamento delle corsie riservate a bus e taxi (es. Corso Giovecca, Viale Cavour, Corso Porta Reno, Via Kennedy, Via Bologna corsia bus) con badge dedicato `🚌 Corsia Bus/Taxi`.

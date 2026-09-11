@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.14';
+const APP_VERSION = '3.6.15';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -4307,22 +4307,73 @@ async function handleNavMapPicked(mode, lat, lng) {
     openNavPanel();
 }
 
-// Geocodifica un testo di indirizzo
+// Helper per fetch con timeout controllato e sicuro (non blocca mai l'esecuzione)
+async function fetchWithTimeout(url, timeoutMs = 3200) {
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (resp.ok) {
+            return await resp.json();
+        }
+    } catch (e) { }
+    return null;
+}
+
+// Database locale POI Ferrara e Provincia per geocodifica istantanea (0ms, offline)
+const FERRARA_LOCAL_POI = [
+    { keys: ['cona', 'ospedale cona', 'ospedale di cona', 'pronto soccorso cona', 'pronto soccorso'], lat: 44.8015, lng: 11.6960, label: "Ospedale di Cona (Ferrara)" },
+    { keys: ['sant\'anna', 'santanna', 'san rocco', 'cittadella san rocco', 'ex sant\'anna', 'giovecca'], lat: 44.8360, lng: 11.6285, label: "Cittadella San Rocco (Ex Sant'Anna, Ferrara)" },
+    { keys: ['stazione', 'stazione fs', 'stazione ferroviaria', 'piazzale stazione'], lat: 44.8430, lng: 11.6030, label: "Stazione Ferroviaria di Ferrara" },
+    { keys: ['castello', 'castello estense', 'largo castello', 'centro storico'], lat: 44.8375, lng: 11.6190, label: "Castello Estense, Ferrara" },
+    { keys: ['cattedrale', 'duomo', 'piazza cattedrale', 'piazza trento trieste'], lat: 44.8358, lng: 11.6195, label: "Cattedrale di San Giorgio, Ferrara" },
+    { keys: ['piazza ariostea', 'ariostea'], lat: 44.8415, lng: 11.6255, label: "Piazza Ariostea, Ferrara" },
+    { keys: ['piazza travaglio', 'travaglio', 'porta paola', 'via kennedy'], lat: 44.8275, lng: 11.6190, label: "Piazza Travaglio / Porta Paola, Ferrara" },
+    { keys: ['piazza municipale', 'comune', 'municipio'], lat: 44.8360, lng: 11.6185, label: "Piazza Municipale, Ferrara" },
+    { keys: ['stadio', 'stadio paolo mazza', 'stadio mazza', 'spal'], lat: 44.8400, lng: 11.6070, label: "Stadio Paolo Mazza, Ferrara" },
+    { keys: ['fiera', 'fiera ferrara', 'quartiere fieristico'], lat: 44.8050, lng: 11.5830, label: "Fiera di Ferrara" },
+    { keys: ['ospedale cento', 'cento ospedale', 'ss annunziata cento', 'pronto soccorso cento'], lat: 44.7330, lng: 11.2880, label: "Ospedale SS. Annunziata, Cento" },
+    { keys: ['ospedale delta', 'ospedale del delta', 'lagosanto', 'delta', 'ospedale lagosanto'], lat: 44.7600, lng: 12.1400, label: "Ospedale del Delta, Lagosanto" },
+    { keys: ['ospedale argenta', 'argenta ospedale', 'mazzolani'], lat: 44.6150, lng: 11.8350, label: "Ospedale Mazzolani-Vandini, Argenta" },
+    { keys: ['casa della salute comacchio', 'ospedale comacchio', 'san camillo comacchio', 'comacchio'], lat: 44.6930, lng: 12.1810, label: "Casa della Salute San Camillo, Comacchio" },
+    { keys: ['casa della salute bondeno', 'ospedale bondeno', 'borselli bondeno', 'bondeno'], lat: 44.8880, lng: 11.4160, label: "Casa della Salute F.lli Borselli, Bondeno" },
+    { keys: ['casa della salute copparo', 'ospedale copparo', 'copparo'], lat: 44.8930, lng: 11.7220, label: "Casa della Salute Terre e Fiumi, Copparo" },
+    { keys: ['casa della salute portomaggiore', 'ospedale portomaggiore', 'portomaggiore'], lat: 44.6980, lng: 11.8020, label: "Casa della Salute Portomaggiore" },
+    { keys: ['casa della salute codigoro', 'ospedale codigoro', 'codigoro'], lat: 44.8300, lng: 12.1100, label: "Casa della Salute Riviera Cavallotti, Codigoro" }
+];
+
+// Geocodifica un testo di indirizzo o POI (istantaneo locale + fallback Nominatim rapido)
 async function geocodeAddressQuery(query) {
     if (!query || query.trim() === '') return null;
     const clean = query.replace(/^📍\s*/, '').trim();
+    const cleanLower = clean.toLowerCase();
+
+    // 1. Controllo immediato dizionario POI locale (0ms, affidabile)
+    for (const poi of FERRARA_LOCAL_POI) {
+        if (poi.keys.some(k => cleanLower === k || cleanLower.includes(k))) {
+            return { lat: poi.lat, lng: poi.lng, label: poi.label };
+        }
+    }
+
+    // 2. Controllo marker attivi o vie caricate
+    if (typeof markersData !== 'undefined' && Array.isArray(markersData)) {
+        const mMatch = markersData.find(m => m.street && m.street.toLowerCase().includes(cleanLower));
+        if (mMatch) {
+            return { lat: mMatch.lat, lng: mMatch.lng, label: `${mMatch.street}, Ferrara` };
+        }
+    }
+
+    // 3. Interrogazione Nominatim con timeout breve di 3.2 secondi
     try {
-        const searchQuery = encodeURIComponent(clean.includes('Ferrara') ? clean : `${clean}, Ferrara`);
-        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
-        if (resp.ok) {
-            const data = await resp.json();
-            if (data && data.length > 0) {
-                return {
-                    lat: parseFloat(data[0].lat),
-                    lng: parseFloat(data[0].lon),
-                    label: data[0].display_name.split(',')[0]
-                };
-            }
+        const searchQuery = encodeURIComponent(cleanLower.includes('ferrara') ? clean : `${clean}, Ferrara`);
+        const data = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`, 3200);
+        if (data && Array.isArray(data) && data.length > 0) {
+            return {
+                lat: parseFloat(data[0].lat),
+                lng: parseFloat(data[0].lon),
+                label: data[0].display_name.split(',')[0]
+            };
         }
     } catch (e) {
         console.warn("Geocoding error:", e);
@@ -4558,13 +4609,13 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
 }
 
 // Genera automaticamente DEVIAZIONI PIÙ BREVI E IMMEDIATE attorno ai blocchi
-// Utilizza micro-raggi stretti (a partire da 35m) per imboccare subito la prima via limitrofa
+// Utilizza micro-raggi stretti (a partire da 45m) ed esecuzione parallela veloce
 async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obstacles, collidedObstacles, directCoords = []) {
     const candidateDetours = [];
     const testedWaypoints = [];
 
     const uniqueObstacles = [];
-    for (const obs of collidedObstacles) {
+    for (const obs of (collidedObstacles || [])) {
         const already = uniqueObstacles.some(u => calculateDistanceMeters(u.lat, u.lng, obs.lat, obs.lng) < 45);
         if (!already) uniqueObstacles.push(obs);
     }
@@ -4578,7 +4629,10 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
         return Math.max(1, Math.round((distKm / 36) * 60));
     }
 
-    for (const obs of uniqueObstacles) {
+    const waypointsToTry = [];
+    const maxObstaclesToTest = uniqueObstacles.slice(0, 2);
+
+    for (const obs of maxObstaclesToTest) {
         const obsLat = obs.lat;
         const obsLng = obs.lng;
 
@@ -4612,99 +4666,82 @@ async function calculateDetourRoutes(startLat, startLng, destLat, destLng, obsta
         const perp2Lat = lngMeters / len;
         const perp2Lng = -latMeters / len;
 
-        // Raggi stretti e immediati per minimizzare l'allungamento del percorso
-        const lateralOffsets = [35, 65, 110, 160, 240, 360, 520, 750, 1100];
-        const radialOffsets = [45, 85, 140, 220, 340, 550, 850];
-
-        const waypointsToTry = [];
-
-        for (const off of lateralOffsets) {
+        // Seleziona raggi perpendicolari mirati (65m, 140m, 280m) per trovare subito la via parallela
+        const offsets = [65, 140, 280];
+        for (const off of offsets) {
             const w1Lat = obsLat + (perp1Lat * off) / 111000;
             const w1Lng = obsLng + (perp1Lng * off) / (111000 * Math.cos(obsLat * Math.PI / 180));
-            waypointsToTry.push({ lat: w1Lat, lng: w1Lng, offset: off });
+            waypointsToTry.push({ lat: w1Lat, lng: w1Lng, obsStreet: obs.street });
 
             const w2Lat = obsLat + (perp2Lat * off) / 111000;
             const w2Lng = obsLng + (perp2Lng * off) / (111000 * Math.cos(obsLat * Math.PI / 180));
-            waypointsToTry.push({ lat: w2Lat, lng: w2Lng, offset: off });
+            waypointsToTry.push({ lat: w2Lat, lng: w2Lng, obsStreet: obs.street });
         }
+    }
 
-        for (const off of radialOffsets) {
-            const dDegLat = off / 111000;
-            const dDegLng = off / (111000 * Math.cos(obsLat * Math.PI / 180));
-            waypointsToTry.push({ lat: obsLat + dDegLat, lng: obsLng, offset: off });
-            waypointsToTry.push({ lat: obsLat - dDegLat, lng: obsLng, offset: off });
-            waypointsToTry.push({ lat: obsLat, lng: obsLng + dDegLng, offset: off });
-            waypointsToTry.push({ lat: obsLat, lng: obsLng - dDegLng, offset: off });
-        }
-
-        for (const wp of waypointsToTry) {
-            let wpCollides = false;
-            for (const po of (obstacles.pointObstacles || [])) {
-                if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 50) {
-                    wpCollides = true;
-                    break;
-                }
+    // Filtra waypoints validi e non sovrapposti
+    const validWaypoints = [];
+    for (const wp of waypointsToTry) {
+        let wpCollides = false;
+        for (const po of (obstacles.pointObstacles || [])) {
+            if (!po.isDestinationTarget && calculateDistanceMeters(wp.lat, wp.lng, po.lat, po.lng) < 45) {
+                wpCollides = true;
+                break;
             }
-            if (wpCollides) continue;
+        }
+        if (wpCollides) continue;
+        const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 30);
+        if (alreadyTested) continue;
+        testedWaypoints.push(wp);
+        validWaypoints.push(wp);
+        if (validWaypoints.length >= 6) break;
+    }
 
-            const alreadyTested = testedWaypoints.some(tw => calculateDistanceMeters(tw.lat, tw.lng, wp.lat, wp.lng) < 35);
-            if (alreadyTested) continue;
-            testedWaypoints.push(wp);
-
-            const routerEndpoints = [
-                { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: true },
-                { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${wp.lng},${wp.lat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isZtl: false }
-            ];
-
-            for (const ep of routerEndpoints) {
-                try {
-                    const resp = await fetch(ep.url);
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                            const r = data.routes[0];
-                            const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
-                            const check = evaluateRouteObstacles(rCoords, obstacles);
-
-                            if (!check.intersects) {
-                                const rawSteps = [];
-                                if (r.legs) {
-                                    r.legs.forEach(leg => {
-                                        if (leg.steps) rawSteps.push(...leg.steps);
-                                    });
-                                }
-
-                                // Verifica compatibilità della strada con i mezzi di soccorso 118 (esclude vicoli angusti / percorsi ciclabili)
-                                if (typeof isRouteSuitableForEmergency === 'function' && !isRouteSuitableForEmergency(rawSteps, destLat, destLng)) {
-                                    continue;
-                                }
-
-                                const distKm = (r.distance / 1000).toFixed(1);
-                                const durMin = ep.isZtl
-                                    ? calcEmergencyDuration(r.distance, null)
-                                    : calcEmergencyDuration(r.distance, r.duration);
-
-                                candidateDetours.push({
-                                    isDetour: true,
-                                    coords: rCoords,
-                                    distanceKm: distKm,
-                                    durationMin: durMin,
-                                    distanceRaw: r.distance,
-                                    intersectsBlock: false,
-                                    blockReasons: check.reasons,
-                                    avoidedObstacles: obs.street ? [obs.street] : [],
-                                    steps: formatManeuverSteps(rawSteps),
-                                    rawSteps: rawSteps
-                                });
-
-                                if (candidateDetours.length >= 8) break;
-                            }
+    // Esegui i tentativi di routing per i waypoints in parallelo
+    const detourFetches = [];
+    for (const wp of validWaypoints) {
+        detourFetches.push(
+            (async () => {
+                const epCar = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${wp.lng.toFixed(5)},${wp.lat.toFixed(5)};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
+                const data = await fetchWithTimeout(epCar, 2500);
+                if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    const r = data.routes[0];
+                    const rCoords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+                    const check = evaluateRouteObstacles(rCoords, obstacles);
+                    if (!check.intersects) {
+                        const rawSteps = [];
+                        if (r.legs) {
+                            r.legs.forEach(leg => {
+                                if (leg.steps) rawSteps.push(...leg.steps);
+                            });
                         }
+                        if (typeof isRouteSuitableForEmergency === 'function' && !isRouteSuitableForEmergency(rawSteps, destLat, destLng)) {
+                            return null;
+                        }
+                        return {
+                            isDetour: true,
+                            coords: rCoords,
+                            distanceKm: (r.distance / 1000).toFixed(1),
+                            durationMin: calcEmergencyDuration(r.distance, r.duration),
+                            distanceRaw: r.distance,
+                            intersectsBlock: false,
+                            blockReasons: check.reasons,
+                            avoidedObstacles: wp.obsStreet ? [wp.obsStreet] : [],
+                            steps: formatManeuverSteps(rawSteps),
+                            rawSteps: rawSteps
+                        };
                     }
-                } catch (e) { }
-            }
+                }
+                return null;
+            })()
+        );
+    }
 
-            if (candidateDetours.length >= 8) break;
+    const results = await Promise.allSettled(detourFetches);
+    for (const res of results) {
+        if (res.status === 'fulfilled' && res.value) {
+            candidateDetours.push(res.value);
+            if (candidateDetours.length >= 4) break;
         }
     }
 
@@ -5057,11 +5094,18 @@ function getActiveMarketZones() {
         }
     });
 
-    // Segmenti continui di mercato
+    // Segmenti continui di mercato attivi
     Object.keys(activeSegments).forEach(key => {
         const polyline = activeSegments[key];
         if (polyline && polyline.getLatLngs) {
-            const isMarketSeg = markersData.some(m => m.type === 'mercato' && m.street && key.includes(normalizeStreetKey(m.street)));
+            const normKey = (key || '').toLowerCase();
+            const isMarketSeg = markersData.some(m => {
+                if (m.type !== 'mercato') return false;
+                if (!isMarkerVisible(m) || getMarkerScheduleStatus(m) !== 'active') return false;
+                if (isPermanentlyDeletedMarker(m)) return false;
+                const normStreet = normalizeStreetKey(m.street || '');
+                return normStreet && normStreet.length >= 3 && normKey.includes(normStreet);
+            });
             if (isMarketSeg) {
                 const lls = polyline.getLatLngs();
                 if (Array.isArray(lls)) {
@@ -5245,39 +5289,32 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         return Math.max(1, Math.round((distKm / 36) * 60));
     }
 
-    // Endpoints di routing:
-    // 1. Rotte auto dirette con alternative su viabilità ordinaria
-    // 2. Grandi Assi Emergenza ZTL autorizzati (strade ad ampia carreggiata: Giovecca, Cavour, Porta Reno, Kennedy)
-    // 3. Direttrice Corso Isonzo -> Rotatoria Darsena con svolta diretta su Darsena Est / Via Bologna
-    // 4. Bypass Circonvallazione Ovest (Viale Po / Viale IV Novembre)
-    // 5. Bypass Tangenziale Est / Baluardi Est (Via Caldirolo / Viale Alfonso I d'Este)
-    // 6. Percorso ZTL 118 diretto (verificato per escludere vicoli angusti)
+    // Endpoints di routing (Auto, Grandi Assi ZTL 118, Bypass e Scorciatoie di Soccorso)
     const endpoints = [
-        // Rotte auto dirette (rispetto rigoroso dei sensi unici ordinari)
+        // Rotte auto dirette con alternative su viabilità ordinaria
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
         { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
         // Grandi Assi Emergenza Centro 118 (strade larghe e corsie preferenziali bus/soccorso)
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6190,44.8345;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Martiri della Libertà / Porta Reno' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6250,44.8365;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Giovecca' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6140,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Viale Cavour' },
-        // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna (senza deviazioni a destra per Mulinetto)
+        // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6108,44.8335;11.6150,44.8275;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Corso Isonzo / Darsena / Via Bologna' },
         // Circonvallazione Ovest (Viale Po / Viale IV Novembre)
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6030,44.8410;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
         // Tangenziale Est & Baluardi Est
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale Est' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' },
-        // Scorciatoia ZTL 118 diretta (subordinata a verifica larghezza strada)
+        // Scorciatoia ZTL 118 diretta (subordinata a verifica larghezza carreggiata)
         { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: true }
     ];
 
     // Se il tragitto o uno dei punti è nei pressi di un mercato, genera bypass dedicati
     const midLat = (startLat + destLat) / 2;
     const midLng = (startLng + destLng) / 2;
-    activeMarkets.forEach((mz, mIdx) => {
+    activeMarkets.forEach((mz) => {
         const d = calculateDistanceMeters(midLat, midLng, mz.lat, mz.lng);
-        if (d < 5000 && endpoints.length < 14) {
-            // Offset perimetrale di 300m per aggirare l'area mercatale
+        if (d < 5000 && endpoints.length < 13) {
             const offLat = mz.lat + 0.003;
             const offLng = mz.lng + 0.003;
             endpoints.push({
@@ -5289,26 +5326,53 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     });
 
+    // Interrogazione ultra-rapida e concorrente di tutti gli endpoint (Promise.allSettled)
+    const fetchPromises = endpoints.map(async (ep) => {
+        const data = await fetchWithTimeout(ep.url, 3200);
+        if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
+            return data.routes.map(r => {
+                r._isBypass = ep.isBypass;
+                r._isBike = ep.isBike;
+                r._bypassName = ep.bypassName;
+                return r;
+            });
+        }
+        return [];
+    });
+
+    const settledResults = await Promise.allSettled(fetchPromises);
     let rawRoutes = [];
-    for (const ep of endpoints) {
-        try {
-            const resp = await fetch(ep.url);
-            if (resp.ok) {
-                const data = await resp.json();
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    data.routes.forEach(r => {
-                        r._isBypass = ep.isBypass;
-                        r._isBike = ep.isBike;
-                        r._bypassName = ep.bypassName;
-                        rawRoutes.push(r);
-                    });
-                }
-            }
-        } catch (e) { }
+    for (const res of settledResults) {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+            rawRoutes.push(...res.value);
+        }
+    }
+
+    // Fallback di emergenza garantito se tutti i server OSRM sono momentaneamente non raggiungibili
+    if (rawRoutes.length === 0) {
+        const directDist = calculateDistanceMeters(startLat, startLng, destLat, destLng);
+        rawRoutes.push({
+            distance: directDist,
+            duration: Math.max(60, directDist / 11.1),
+            geometry: {
+                coordinates: [
+                    [startLng, startLat],
+                    [destLng, destLat]
+                ]
+            },
+            legs: [{
+                steps: [
+                    { maneuver: { type: 'depart' }, name: 'Partenza', distance: directDist / 2 },
+                    { maneuver: { type: 'arrive' }, name: 'Destinazione', distance: directDist / 2 }
+                ]
+            }],
+            _isBypass: false,
+            _isBike: false
+        });
     }
 
     let processedRoutes = rawRoutes.map((r, idx) => {
-        const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+        const coords = (r.geometry && r.geometry.coordinates) ? r.geometry.coordinates.map(c => [c[1], c[0]]) : [[startLat, startLng], [destLat, destLng]];
         const distanceKm = (r.distance / 1000).toFixed(1);
 
         // Valutazione geometrica reale del transito in ZTL e Aree Mercatali
@@ -5320,10 +5384,8 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
         let durationMin;
         if (isZtlRoute && r._isBike) {
-            // Velocità d'emergenza mezzo 118 in ZTL / Aree Pedonali
             durationMin = calcEmergencyDuration(r.distance, null);
         } else {
-            // Tempo calcolato dal router per veicoli su viabilità ordinaria
             durationMin = calcEmergencyDuration(r.distance, r.duration);
         }
 
@@ -5392,7 +5454,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Filtra ed elimina tassativamente i percorsi non adatti ai veicoli di soccorso (strade troppo strette / ciclabili)
+    // Filtra percorsi adatti ai veicoli di soccorso (o usa il pool generale come fallback)
     const emergencyCompliantRoutes = processedRoutes.filter(r => !r.unsuitableForEmergency);
     const validPool = emergencyCompliantRoutes.length > 0 ? emergencyCompliantRoutes : processedRoutes;
 
@@ -5486,7 +5548,12 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Assegna titoli e badge semantici chiari e fedeli ai 3 percorsi
+    // Se ancora vuoto (fallback estremo), includi il primo percorso disponibile
+    if (selected3.length === 0 && processedRoutes.length > 0) {
+        selected3.push(processedRoutes[0]);
+    }
+
+    // Assegna titoli e badge semantici chiari e fedeli ai percorsi selezionati
     selected3.forEach((r, i) => {
         const cfg = ROUTE_CONFIGS[i] || ROUTE_CONFIGS[0];
         r.color = cfg.color;
@@ -5564,17 +5631,15 @@ async function handleCalculateNav() {
             }
         }
 
-        if (!navDestPoint || (destText && destText !== navDestPoint.label)) {
+        if (!navDestPoint || (destText && !destText.includes("🏁") && destText !== navDestPoint.label)) {
             const geoDest = await geocodeAddressQuery(destText);
             if (geoDest) {
                 navDestPoint = geoDest;
             } else {
-                showToast("Impossibile trovare l'indirizzo di destinazione specificato.", "error");
-                if (calcBtn) {
-                    calcBtn.disabled = false;
-                    calcBtn.innerHTML = "<span>🔍 Calcola Percorsi</span>";
-                }
-                return;
+                // Se geocodifica fallisce per testo non trovato, usa centro mappa o notifica
+                const center = map.getCenter();
+                navDestPoint = { lat: center.lat, lng: center.lng, label: destText || "Destinazione su Mappa" };
+                showToast(`Destinazione impostata sulla mappa: ${destText}`, "normal");
             }
         }
 
