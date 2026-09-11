@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.15';
+const APP_VERSION = '3.6.16';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -4571,13 +4571,13 @@ function evaluateRouteObstacles(routeCoords, obstacles) {
     const avoidablePolys = (obstacles.polylineObstacles || []).filter(po => !po.isDestinationTarget);
 
     for (const po of avoidablePoints) {
-        const threshold = (po.type === 'sagra' || po.type === 'mercato') ? 60 : 42;
+        const threshold = (po.type === 'sagra' || po.type === 'mercato' || po.type === 'sagoma') ? 65 : 42;
         const d = distPointToPolylineMeters(po.lat, po.lng, routeCoords);
 
         if (d < threshold) {
             intersects = true;
             const typeLabel = po.type === 'ponte' ? 'Ponte interrotto' :
-                              po.type === 'sagoma' ? 'Limite sagoma/altezza (Incompatibile con ambulanza)' :
+                              po.type === 'sagoma' ? 'Ponte basso / Limite altezza (Incompatibile con ambulanza)' :
                               po.type === 'lavori' ? 'Lavori in corso' :
                               po.type === 'chiusa' ? 'Strada chiusa' :
                               po.type === 'mercato' ? 'Mercato' :
@@ -4839,8 +4839,13 @@ const AUTHORIZED_EMERGENCY_CORRIDORS = [
     'corso isonzo', 'isonzo', 'via darsena', 'darsena', 'via bologna', 'bologna'
 ];
 
-// Strade e vicoli medievali angusti o percorsi ciclopedonali non carrabili
+// Strade e vicoli medievali angusti, sottopassi bassi o percorsi ciclopedonali non carrabili
 const NARROW_AND_UNSUITABLE_STREETS = [
+    // Sottopassi bassi, ponti ferroviari e passaggi a sagoma ridotta
+    'via mulinetto', 'mulinetto', 'sottopasso mulinetto',
+    'via poletti', 'sottopasso poletti',
+    'via felisatti', 'sottopasso felisatti',
+    'sottopasso ferroviario', 'sottopasso pedonale', 'sottopasso ciclabile', 'ponte basso',
     // Vicoli e strade medievali a sagoma ridotta / curve cieche
     'via delle volte', 'capo delle volte', 'delle volte',
     'via delle vecchie', 'via colomba', 'via della luna', 'via del granchio',
@@ -4851,6 +4856,8 @@ const NARROW_AND_UNSUITABLE_STREETS = [
     'vicolo colombara', 'vicolo boccacanale', 'vicolo del carbone', 'vicolo zenzalo',
     'vicolo san paolo', 'vicolo del follo', 'vicolo lupi', 'vicolo agnello', 'vicolo torto',
     'vicolo ',
+    // Varchi storici e volti angusti
+    'volto del cavallo', 'volto del podesta', 'volto del podestà', 'volto della luna',
     // Tratti pedonali angusti non carrabili
     'via san romano', 'via mazzini', 'via contrari', 'via fondobanchetto',
     'via coperta', 'via gusmaria', 'via del turco', 'via carlo mayr',
@@ -4898,15 +4905,60 @@ const AMBULANCE_SPECS = {
     canUseFastTransit: true // Priorità di transito su tangenziali e arterie di scorrimento veloce
 };
 
-// Punti noti con limiti di sagoma/altezza o varchi angusti nel territorio provinciale
+// Punti noti con ponti bassi, limiti di sagoma/altezza o varchi angusti nel territorio provinciale
 const PROVINCIAL_CLEARANCE_RESTRICTIONS = [
     {
+        id: 'sottopasso_mulinetto',
+        name: 'Sottopasso Ferroviario Via Mulinetto / Argine Ducale (Ponte Basso 2.20m)',
+        lat: 44.8252,
+        lng: 11.6085,
+        maxHeight: 2.20, // Inferiore a 2.80m -> Inaccessibile alle ambulanze
+        maxWidth: 2.60,
+        type: 'sagoma_bassa'
+    },
+    {
         id: 'sottopasso_poletti',
-        name: 'Sottopasso Ferroviario Via Poletti / Porta Catena',
+        name: 'Sottopasso Ferroviario Via Poletti / Porta Catena (Ponte Basso 2.40m)',
         lat: 44.8465,
         lng: 11.6035,
-        maxHeight: 2.50, // Inferiore a 2.80m -> Inaccessibile ad ambulanze rialzate
+        maxHeight: 2.40, // Inferiore a 2.80m -> Inaccessibile ad ambulanze rialzate
         maxWidth: 2.80,
+        type: 'sagoma_bassa'
+    },
+    {
+        id: 'sottopasso_felisatti',
+        name: 'Sottopasso Ferroviario Via Felisatti / Via Tiarini (Ponte Basso 2.30m)',
+        lat: 44.8475,
+        lng: 11.6090,
+        maxHeight: 2.30,
+        maxWidth: 2.50,
+        type: 'sagoma_bassa'
+    },
+    {
+        id: 'sottopasso_stazione_ciclabile',
+        name: 'Sottopasso Ciclopedonale Stazione FS / Piazzale Castellina',
+        lat: 44.8425,
+        lng: 11.6040,
+        maxHeight: 2.20,
+        maxWidth: 2.00,
+        type: 'sagoma_bassa'
+    },
+    {
+        id: 'sottopasso_san_giacomo',
+        name: 'Sottopasso Ferroviario Via San Giacomo / Argine Ducale',
+        lat: 44.8235,
+        lng: 11.6050,
+        maxHeight: 2.40,
+        maxWidth: 2.60,
+        type: 'sagoma_bassa'
+    },
+    {
+        id: 'sottopasso_argine_ducale_sud',
+        name: 'Sottopasso Ferroviario Argine Ducale Sud',
+        lat: 44.8210,
+        lng: 11.6060,
+        maxHeight: 2.40,
+        maxWidth: 2.60,
         type: 'sagoma_bassa'
     },
     {
@@ -4914,9 +4966,36 @@ const PROVINCIAL_CLEARANCE_RESTRICTIONS = [
         name: 'Varco Storico Volto del Cavallo / Piazzetta Municipale',
         lat: 44.8362,
         lng: 11.6190,
-        maxHeight: 2.60,
+        maxHeight: 2.50,
         maxWidth: 2.10, // Varco troppo stretto per ambulanza con specchietti
         type: 'varco_stretto'
+    },
+    {
+        id: 'volto_podesta',
+        name: 'Varco Volto del Podestà / Piazza Cattedrale',
+        lat: 44.8368,
+        lng: 11.6185,
+        maxHeight: 2.50,
+        maxWidth: 2.20,
+        type: 'varco_stretto'
+    },
+    {
+        id: 'volto_san_romano',
+        name: 'Volto di San Romano / Volto della Luna',
+        lat: 44.8345,
+        lng: 11.6195,
+        maxHeight: 2.40,
+        maxWidth: 2.20,
+        type: 'varco_stretto'
+    },
+    {
+        id: 'sottopasso_monti_san_rocco',
+        name: 'Sottopasso Mura / Monti di San Rocco',
+        lat: 44.8435,
+        lng: 11.6210,
+        maxHeight: 2.20,
+        maxWidth: 2.20,
+        type: 'sagoma_bassa'
     }
 ];
 
@@ -5289,24 +5368,23 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         return Math.max(1, Math.round((distKm / 36) * 60));
     }
 
-    // Endpoints di routing (Auto, Grandi Assi ZTL 118, Bypass e Scorciatoie di Soccorso)
+    // Endpoints di routing (Solo veicolari per Mezzi di Soccorso 118: Auto, Grandi Assi ZTL, Bypass e Tangenziali)
     const endpoints = [
         // Rotte auto dirette con alternative su viabilità ordinaria
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
         { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
-        // Grandi Assi Emergenza Centro 118 (strade larghe e corsie preferenziali bus/soccorso)
+        // Grandi Assi Emergenza Centro 118 (strade larghe e corsie preferenziali bus/soccorso con franchigia libera)
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6190,44.8345;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Martiri della Libertà / Porta Reno' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6250,44.8365;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Giovecca' },
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6140,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Viale Cavour' },
-        // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6165,44.8430;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Asse Porta Po / Biagio Rossetti / Porta Mare' },
+        // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna (evita il sottopasso ferroviario basso di Mulinetto)
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6108,44.8335;11.6150,44.8275;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Corso Isonzo / Darsena / Via Bologna' },
         // Circonvallazione Ovest (Viale Po / Viale IV Novembre)
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6030,44.8410;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
         // Tangenziale Est & Baluardi Est
         { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale Est' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' },
-        // Scorciatoia ZTL 118 diretta (subordinata a verifica larghezza carreggiata)
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: true }
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' }
     ];
 
     // Se il tragitto o uno dei punti è nei pressi di un mercato, genera bypass dedicati
