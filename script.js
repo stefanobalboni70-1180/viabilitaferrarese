@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.10';
+const APP_VERSION = '3.6.11';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -51,8 +51,62 @@ let auth = null;
 let markersRef = null;
 let reportsRef = null;
 let deletedMarkersRef = null;
-let deletedMarkerIds = new Set(['mkt_fe_lun_1', 'mkt_fe_lun_2']);
+let deletedMarkerIds = new Set([
+    'mkt_fe_lun_1', 'mkt_fe_lun_2', 
+    'mkt_fe_baluardi_1', 'mkt_fe_baluardi_2', 
+    'mercato_fe_lun', 'mercato_fe_baluardi', 
+    'baluardi_pallone', 'mercato_baluardi', 'giuoco_del_pallone'
+]);
 let isFirebaseOnline = false;
+
+// Verifica se un marker appartiene a eventi o mercati eliminati definitivamente (es. Baluardi / Giuoco del Pallone)
+function isPermanentlyDeletedMarker(m, localId = null, fbKey = null) {
+    if (!m) return true;
+    const idStr = String(localId || m.id || '');
+    const keyStr = String(fbKey || m.fbKey || '');
+    const segStr = String(m.segmentId || '');
+
+    // 1. Controllo ID espliciti nel Set di eliminati
+    if (deletedMarkerIds.has(idStr) || (keyStr && deletedMarkerIds.has(keyStr)) || (segStr && deletedMarkerIds.has(segStr))) {
+        return true;
+    }
+
+    // 2. Blacklist ID/segmenti del mercato Baluardi / Lunedì
+    if (idStr.startsWith('mkt_fe_lun') || idStr.startsWith('mkt_fe_baluardi') || 
+        segStr.includes('mercato_fe_lun') || segStr.includes('baluardi_pallone') || segStr.includes('mercato_baluardi')) {
+        deletedMarkerIds.add(idStr);
+        if (keyStr) deletedMarkerIds.add(keyStr);
+        return true;
+    }
+
+    // 3. Riconoscimento semantico e geografico del mercato rimosso Baluardi / Giuoco del Pallone / Carlo Mayr
+    const street = (m.street || '').toLowerCase();
+    const note = (m.note || '').toLowerCase();
+    const isMarket = m.type === 'mercato';
+
+    if (isMarket) {
+        if (street.includes('giuoco del pallone') || street.includes('pallone') || note.includes('giuoco del pallone') || note.includes('pallone')) {
+            if (idStr) deletedMarkerIds.add(idStr);
+            if (keyStr) deletedMarkerIds.add(keyStr);
+            return true;
+        }
+        if (street.includes('baluardi') && (street.includes('mayr') || street.includes('pallone') || note.includes('mayr') || note.includes('pallone'))) {
+            if (idStr) deletedMarkerIds.add(idStr);
+            if (keyStr) deletedMarkerIds.add(keyStr);
+            return true;
+        }
+        // Coordinate precise dell'area Baluardi / Giuoco del Pallone / Mayr
+        if (m.lat >= 44.8270 && m.lat <= 44.8330 && m.lng >= 11.6210 && m.lng <= 11.6285) {
+            if (street.includes('baluardi') || street.includes('mayr') || street.includes('pallone') || note.includes('baluardi') || note.includes('mayr') || note.includes('pallone')) {
+                if (idStr) deletedMarkerIds.add(idStr);
+                if (keyStr) deletedMarkerIds.add(keyStr);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 
 // Carica l'elenco dei marker/eventi eliminati definitivamente da localStorage
 function loadDeletedMarkersFromLocalStorage() {
@@ -105,9 +159,7 @@ function initFirebase() {
                 // Rimuovi subito eventuali marker eliminati presenti in memoria/mappa
                 let changed = false;
                 markersData = markersData.filter(m => {
-                    const isDeleted = deletedMarkerIds.has(String(m.id)) || 
-                                      (m.fbKey && deletedMarkerIds.has(String(m.fbKey))) || 
-                                      (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+                    const isDeleted = isPermanentlyDeletedMarker(m, m.id, m.fbKey);
                     if (isDeleted) {
                         if (activeLayers[m.id]) {
                             map.removeLayer(activeLayers[m.id]);
@@ -2740,16 +2792,16 @@ window.reportResolved = function (id) {
 };
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving & Bicycle Engine)
-// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali, Svincoli e vie comunali)
-// - Cache persistente locale v17 (istantaneo ai successivi caricamenti)
-// - Per vie locali (es. Via Ruffetta): segue fedelmente ogni curva della via ed esclude deviazioni su SP4
-// - Per arterie e svincoli/rampe (es. RA8, SS16): segue la carreggiata e lo svincolo
+// GEOMETRIA STRADALE da OpenStreetMap & Vettori Alta Precisione
+// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali, Svincoli e vie storiche/urbane)
+// - Supporto nativo per assi storici / ZTL (Corso Porta Reno, Corso Martiri, Piazza Travaglio, Kennedy, Giovecca, Cavour, ecc.)
+// - Motore snap-to-road integrato per garantire curve perfette anche in caso di rete lenta o blocchi OSRM
+// - Cache persistente locale v19 (istantaneo ai successivi caricamenti)
 // -------------------------------------------------------
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v18');
+    const cached = localStorage.getItem('ferrara_street_cache_v19');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -2757,8 +2809,225 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v18', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v19', JSON.stringify(streetGeomCache));
     } catch (e) { }
+}
+
+// Tracciati vettoriali ad alta precisione per arterie storiche e mercatali di Ferrara
+const HIGH_PRECISION_ROAD_CORRIDORS = [
+    {
+        id: 'fe_porta_reno_martiri',
+        names: ['corso porta reno', 'porta reno', 'corso martiri della liberta', 'corso martiri', 'martiri della liberta', 'martiri', 'piazza travaglio', 'travaglio', 'piazza cattedrale', 'piazza trento trieste', 'largo castello'],
+        points: [
+            [44.82650, 11.61950], // Porta Paola
+            [44.82800, 11.62050], // Piazza Travaglio sud
+            [44.83050, 11.62120], // Piazza Travaglio centro
+            [44.83155, 11.62145], // Piazza Travaglio / imbocco Porta Reno
+            [44.83220, 11.62110], // Corso Porta Reno sud
+            [44.83270, 11.62080], // Corso Porta Reno (incrocio Carlo Mayr / Piangipane)
+            [44.83350, 11.62035], // Corso Porta Reno (incrocio Amendola)
+            [44.83410, 11.62000], // Corso Porta Reno (incrocio Ragno / San Romano)
+            [44.83490, 11.61955], // Corso Porta Reno (tratto banche / negozi)
+            [44.83540, 11.61920], // Corso Porta Reno (Torre dell'Orologio)
+            [44.83590, 11.61910], // Piazza Cattedrale / Piazza Trento e Trieste
+            [44.83635, 11.61920], // Corso Martiri della Libertà (davanti Cattedrale / Volto del Cavallo)
+            [44.83680, 11.61935], // Corso Martiri della Libertà (Teatro Comunale / Municipio)
+            [44.83730, 11.61945], // Corso Martiri della Libertà (Piazza Savonarola)
+            [44.83770, 11.61960], // Corso Martiri della Libertà / Largo Castello (Fossato Castello Estense)
+            [44.83820, 11.61980]  // Largo Castello nord / inizio Ercole I d'Este
+        ]
+    },
+    {
+        id: 'fe_kennedy_baluardi',
+        names: ['via kennedy', 'kennedy', 'piazza travaglio', 'via baluardi', 'baluardi', 'via piangipane', 'piangipane', 'via darsena'],
+        points: [
+            [44.82720, 11.61500], // Via Darsena / Kennedy
+            [44.82900, 11.61620], // Via Kennedy ovest
+            [44.82980, 11.61680], // Via Kennedy / Baluardi
+            [44.83040, 11.61780], // Via Kennedy / parcheggio
+            [44.83080, 11.61860], // Via Kennedy centro
+            [44.83120, 11.62000], // Via Kennedy est
+            [44.83155, 11.62145], // Piazza Travaglio est
+            [44.83120, 11.62350], // Via Baluardi est
+            [44.82900, 11.62850]  // Baluardo San Rocco
+        ]
+    },
+    {
+        id: 'fe_corso_giovecca',
+        names: ['corso giovecca', 'giovecca', 'piazzale medaglie d\'oro'],
+        points: [
+            [44.83770, 11.61960], // Largo Castello / Giovecca
+            [44.83745, 11.62150], // Corso Giovecca (incrocio Borgo dei Leoni)
+            [44.83730, 11.62300], // Corso Giovecca (incrocio Terranuova)
+            [44.83705, 11.62520], // Corso Giovecca (ex Ospedale Sant'Anna)
+            [44.83680, 11.62750], // Corso Giovecca (incrocio Montebello)
+            [44.83655, 11.62980], // Corso Giovecca (incrocio Palestro)
+            [44.83630, 11.63200], // Corso Giovecca (tratto est)
+            [44.83600, 11.63450], // Corso Giovecca (Prospettiva)
+            [44.83570, 11.63600]  // Piazzale Medaglie d'Oro
+        ]
+    },
+    {
+        id: 'fe_viale_cavour',
+        names: ['viale cavour', 'cavour', 'corso porta po', 'porta po'],
+        points: [
+            [44.84150, 11.60100], // Stazione FS
+            [44.84060, 11.60300], // Giardini della Stazione
+            [44.84020, 11.60550], // Viale Cavour ovest
+            [44.83980, 11.60800], // Viale Cavour / incrocio Isonzo
+            [44.83940, 11.61050], // Viale Cavour / Poste Centrali
+            [44.83890, 11.61300], // Viale Cavour / Giardini 24 Maggio
+            [44.83840, 11.61580], // Viale Cavour / incrocio Spadari
+            [44.83790, 11.61850], // Viale Cavour / Largo Castello ovest
+            [44.83770, 11.61960]  // Largo Castello
+        ]
+    },
+    {
+        id: 'fe_ercole_este',
+        names: ['corso ercole i d\'este', 'ercole i d\'este', 'ercole deste', 'quadrivio degli angeli'],
+        points: [
+            [44.83800, 11.61980], // Castello Estense nord
+            [44.83980, 11.62020], // Palazzo dei Diamanti sud
+            [44.84150, 11.62060], // Quadrivio degli Angeli (Palazzo dei Diamanti)
+            [44.84450, 11.62130], // Corso Ercole I d'Este (tratto Mura)
+            [44.84900, 11.62240], // Porta degli Angeli
+            [44.85300, 11.62350]  // Parco Urbano Bassani
+        ]
+    },
+    {
+        id: 'fe_porta_mare_rossetti',
+        names: ['corso porta mare', 'porta mare', 'corso biagio rossetti', 'biagio rossetti', 'corso porta po', 'porta po'],
+        points: [
+            [44.83570, 11.63600], // Piazzale Medaglie d'Oro / Porta Mare
+            [44.83950, 11.63600], // Corso Porta Mare est
+            [44.84100, 11.63150], // Corso Porta Mare / Borgo dei Leoni
+            [44.84200, 11.62600], // Corso Porta Mare centro
+            [44.84300, 11.62100], // Quadrivio degli Angeli (Palazzo dei Diamanti)
+            [44.84380, 11.61650], // Corso Biagio Rossetti centro
+            [44.84350, 11.61100], // Barriere di Porta Po / Isonzo
+            [44.84150, 11.60100]  // Stazione FS
+        ]
+    },
+    {
+        id: 'fe_darsena',
+        names: ['via darsena', 'darsena'],
+        points: [
+            [44.82880, 11.61200], // Via Darsena / Corso Isonzo
+            [44.82720, 11.61500], // Via Darsena / Via Kennedy
+            [44.82500, 11.61300]  // Ponte di San Paolo
+        ]
+    },
+    {
+        id: 'cento_guercino',
+        names: ['corso guercino', 'guercino', 'piazza guercino'],
+        points: [
+            [44.73100, 11.28600], // Porta Ferrara
+            [44.72950, 11.28910], // Piazza Guercino
+            [44.72780, 11.29120], // Corso Guercino sud
+            [44.72500, 11.29400]  // Porta Bologna
+        ]
+    },
+    {
+        id: 'comacchio_centro',
+        names: ['via cavour', 'trepponti', 'piazza folegatti', 'via folegatti'],
+        points: [
+            [44.69700, 12.17800], // Via Cavour nord
+            [44.69750, 12.18600], // Piazza Folegatti
+            [44.69250, 12.18700], // Via Sambertolo
+            [44.69100, 12.18100]  // Trepponti
+        ]
+    },
+    {
+        id: 'fe_via_bologna',
+        names: ['via bologna', 'bologna'],
+        points: [
+            [44.82500, 11.61300], // Via Bologna inizio nord (Ponte di San Paolo / Darsena)
+            [44.82100, 11.61050], // Via Bologna (incrocio Foro Boario / Ippodromo)
+            [44.81500, 11.60650], // Via Bologna (argine Po di Volano)
+            [44.80800, 11.60000], // Via Bologna (Chiesuol del Fosso)
+            [44.79500, 11.59000]  // Via Bologna sud
+        ]
+    }
+];
+
+// Trova la proiezione di un punto su un segmento del corridoio
+function projectPointOnSegment(pLat, pLng, aLat, aLng, bLat, bLng) {
+    const dLat = bLat - aLat;
+    const dLng = bLng - aLng;
+    const lenSq = dLat * dLat + dLng * dLng;
+    if (lenSq === 0) {
+        return { lat: aLat, lng: aLng, t: 0, dist: calculateDistanceMeters(pLat, pLng, aLat, aLng) };
+    }
+    let t = ((pLat - aLat) * dLat + (pLng - aLng) * dLng) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projLat = aLat + t * dLat;
+    const projLng = aLng + t * dLng;
+    return {
+        lat: projLat,
+        lng: projLng,
+        t: t,
+        dist: calculateDistanceMeters(pLat, pLng, projLat, projLng)
+    };
+}
+
+// Calcola la geometria estratta da un corridoio pre-mappato ad altissima precisione
+function getCorridorGeometry(lat1, lng1, lat2, lng2, streetName) {
+    const norm = (streetName || '').toLowerCase();
+    
+    for (const corridor of HIGH_PRECISION_ROAD_CORRIDORS) {
+        const nameMatch = corridor.names.some(n => norm.includes(n));
+        const pts = corridor.points;
+
+        let bestProj1 = null;
+        let bestProj2 = null;
+        let bestIdx1 = -1;
+        let bestIdx2 = -1;
+
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p1 = projectPointOnSegment(lat1, lng1, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+            if (!bestProj1 || p1.dist < bestProj1.dist) {
+                bestProj1 = p1;
+                bestIdx1 = i + p1.t;
+            }
+            const p2 = projectPointOnSegment(lat2, lng2, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+            if (!bestProj2 || p2.dist < bestProj2.dist) {
+                bestProj2 = p2;
+                bestIdx2 = i + p2.t;
+            }
+        }
+
+        const maxAllowedDist = nameMatch ? 280 : 120; // Massima distanza dal corridoio per aggancio
+        if (bestProj1 && bestProj2 && bestProj1.dist <= maxAllowedDist && bestProj2.dist <= maxAllowedDist) {
+            let res = [];
+            res.push([lat1, lng1]);
+
+            if (bestIdx1 <= bestIdx2) {
+                const startNode = Math.ceil(bestIdx1);
+                const endNode = Math.floor(bestIdx2);
+                for (let k = startNode; k <= endNode; k++) {
+                    if (k >= 0 && k < pts.length) {
+                        res.push([pts[k][0], pts[k][1]]);
+                    }
+                }
+            } else {
+                const startNode = Math.floor(bestIdx1);
+                const endNode = Math.ceil(bestIdx2);
+                for (let k = startNode; k >= endNode; k--) {
+                    if (k >= 0 && k < pts.length) {
+                        res.push([pts[k][0], pts[k][1]]);
+                    }
+                }
+            }
+
+            res.push([lat2, lng2]);
+
+            // Se ha curve o punti intermedi validi, restituiscilo
+            if (res.length >= 2) {
+                return res;
+            }
+        }
+    }
+    return null;
 }
 
 // Normalizza i nomi delle strade per collegare segnalazioni appartenenti alla stessa arteria/statale
@@ -2776,6 +3045,7 @@ function normalizeStreetKey(name) {
     if (s.includes('adriatica') || s.includes('ss16')) return 'statale_adriatica';
     if (s.includes('romea') || s.includes('ss309')) return 'statale_romea';
     if (s.includes('porrettana') || s.includes('ss64')) return 'statale_porrettana';
+    if (s.includes('porta reno') || s.includes('martiri')) return 'fe_porta_reno_martiri';
     // Se contiene virgole o parentesi, estrai solo il nome primario
     s = s.split(/[,(]/)[0].trim();
     return s.replace(/[^a-z0-9]/g, '');
@@ -2812,7 +3082,7 @@ async function fetchOsrmRoute(url, isReverse = false) {
     try {
         let signal;
         if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-            signal = AbortSignal.timeout(4000);
+            signal = AbortSignal.timeout(3500);
         }
         const response = await fetch(url, signal ? { signal } : {});
         if (response.ok) {
@@ -2835,28 +3105,34 @@ async function fetchOsrmRoute(url, isReverse = false) {
 
 // Calcola il percorso reale tra due punti su una specifica strada
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
+    // 1. Controllo prioritario con geometria vettoriale ad altissima precisione (istantaneo e fedele alle curve)
+    const corridorGeom = getCorridorGeometry(lat1, lng1, lat2, lng2, targetStreetName);
+    if (corridorGeom && corridorGeom.length >= 2) {
+        return corridorGeom;
+    }
+
     const isHighway = isMajorHighway(targetStreetName);
-    const isRamp = targetStreetName.toLowerCase().includes('rampa') || targetStreetName.toLowerCase().includes('svincolo');
+    const isRamp = (targetStreetName || '').toLowerCase().includes('rampa') || (targetStreetName || '').toLowerCase().includes('svincolo');
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const normTarget = normalizeStreetKey(targetStreetName);
 
     const endpoints = isHighway || isRamp
         ? [
             { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
             { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
         ]
         : [
             { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
         ];
 
     let bestCoords = null;
-    let maxMatchedDist = -1;
-    let bestDistDiff = Infinity;
+    let bestScore = -Infinity;
 
     for (const ep of endpoints) {
         const res = await fetchOsrmRoute(ep.url, ep.rev);
@@ -2867,37 +3143,37 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
                 if (res.steps && res.steps.length > 0) {
                     for (const step of res.steps) {
                         const normStep = (step.name || '').toLowerCase();
-                        if (normStep.includes('sp4') || normStep.includes('strada provinciale') || (normStep.includes('statale') && !targetStreetName.toLowerCase().includes('statale'))) {
+                        if (normStep.includes('sp4') || (normStep.includes('statale') && !targetStreetName.toLowerCase().includes('statale'))) {
                             hasHighwayDetour = true;
                             break;
                         }
                     }
                 }
-                if (hasHighwayDetour) continue; // Scarta categoricamente qualsiasi deviazione su SP4
+                if (hasHighwayDetour) continue;
             }
 
-            let matchedDist = 0;
+            // Valuta la vicinanza della distanza alla distanza diretta (evita percorsi assurdi)
+            const ratio = res.distance / (directDist || 1);
+            if (ratio > 2.5) continue; // Troppo lungo rispetto alla linea d'aria
+
+            let score = 100 - Math.abs(ratio - 1.1) * 30 + Math.min(res.coords.length, 20);
+
+            // Bonus se i nomi delle vie corrispondono
             if (normTarget && normTarget.length >= 3 && res.steps && res.steps.length > 0) {
                 for (const step of res.steps) {
                     const normStep = normalizeStreetKey(step.name || '');
                     if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
-                        matchedDist += step.distance;
+                        score += 50;
+                        break;
                     }
                 }
             }
 
-            const distDiff = Math.abs(res.distance - directDist);
-
-            if (!isRamp && normTarget && matchedDist > maxMatchedDist) {
-                maxMatchedDist = matchedDist;
+            if (score > bestScore) {
+                bestScore = score;
                 bestCoords = res.coords;
-                if (matchedDist >= directDist * 0.7 && res.coords.length > 2) {
-                    return res.coords;
-                }
-            } else if (distDiff < bestDistDiff && res.coords.length > 2) {
-                bestDistDiff = distDiff;
-                bestCoords = res.coords;
-                if (res.distance <= directDist * 2.2) {
+                // Se è un ottimo tracciato con più nodi intermedi e lunghezza coerente, accettalo subito
+                if (res.coords.length >= 4 && ratio <= 1.8) {
                     return res.coords;
                 }
             }
@@ -3052,12 +3328,15 @@ async function updateRoadSegments() {
         }
     }
 
-    // 5. Disegna subito le linee sulla mappa (cache o coordinate dirette)
+    // 5. Disegna subito le linee sulla mappa con curve reali immediate (snap vettoriale o cache)
     const segKeys = Object.keys(validSegments);
     segKeys.forEach(segKey => {
         const segment = validSegments[segKey];
         const cacheKey = `${normalizeStreetKey(segment.streetName) || segment.streetName.toLowerCase()}_${segment.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
-        const initialCoords = streetGeomCache[cacheKey] || segment.coords;
+        const corridorSync = (segment.coords.length === 2) 
+            ? getCorridorGeometry(segment.coords[0][0], segment.coords[0][1], segment.coords[1][0], segment.coords[1][1], segment.streetName)
+            : null;
+        const initialCoords = streetGeomCache[cacheKey] || corridorSync || segment.coords;
 
         if (!activeSegments[segKey]) {
             const polyline = L.polyline(initialCoords, {
@@ -3114,11 +3393,17 @@ function loadMarkers() {
                 Object.entries(data).forEach(([fbKey, m]) => {
                     const localId = m.timestamp ? m.timestamp.toString() : (m.id || fbKey);
                     // Verifica se il marker o il suo segmento è stato eliminato definitivamente
-                    const isDeleted = deletedMarkerIds.has(String(localId)) || 
-                                      deletedMarkerIds.has(String(fbKey)) || 
-                                      (m.id && deletedMarkerIds.has(String(m.id))) || 
-                                      (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+                    const isDeleted = isPermanentlyDeletedMarker(m, localId, fbKey);
                     if (isDeleted) {
+                        // Se è presente su Firebase Realtime Database, rimuovilo automaticamente per ripulire il cloud
+                        if (isFirebaseOnline && markersRef && fbKey) {
+                            markersRef.child(fbKey).remove()
+                                .then(() => console.log('🧹 Purge automatico da Firebase:', fbKey))
+                                .catch(() => {});
+                        }
+                        if (isFirebaseOnline && deletedMarkersRef) {
+                            deletedMarkersRef.child(fbKey).set({ timestamp: Date.now(), purged: true }).catch(() => {});
+                        }
                         return; // Non caricare eventi eliminati
                     }
                     loadedIds.add(localId);
@@ -3142,7 +3427,7 @@ function loadMarkers() {
             // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti e non eliminati
             if (typeof DEFAULT_WEEKLY_MARKETS !== 'undefined' && Array.isArray(DEFAULT_WEEKLY_MARKETS)) {
                 DEFAULT_WEEKLY_MARKETS.forEach(dm => {
-                    const isDeleted = deletedMarkerIds.has(String(dm.id)) || (dm.segmentId && deletedMarkerIds.has(String(dm.segmentId)));
+                    const isDeleted = isPermanentlyDeletedMarker(dm, dm.id, null);
                     if (!loadedIds.has(dm.id) && !isDeleted) {
                         markersData.push(dm);
                         addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
@@ -3175,9 +3460,7 @@ function loadFromLocalStorage() {
         try {
             const parsed = JSON.parse(saved);
             parsed.forEach(m => {
-                const isDeleted = deletedMarkerIds.has(String(m.id)) || 
-                                  (m.fbKey && deletedMarkerIds.has(String(m.fbKey))) || 
-                                  (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+                const isDeleted = isPermanentlyDeletedMarker(m, m.id, m.fbKey);
                 if (isDeleted) return;
                 loadedIds.add(m.id);
                 markersData.push(m);
@@ -3193,7 +3476,7 @@ function loadFromLocalStorage() {
     // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti e non eliminati
     if (typeof DEFAULT_WEEKLY_MARKETS !== 'undefined' && Array.isArray(DEFAULT_WEEKLY_MARKETS)) {
         DEFAULT_WEEKLY_MARKETS.forEach(dm => {
-            const isDeleted = deletedMarkerIds.has(String(dm.id)) || (dm.segmentId && deletedMarkerIds.has(String(dm.segmentId)));
+            const isDeleted = isPermanentlyDeletedMarker(dm, dm.id, null);
             if (!loadedIds.has(dm.id) && !isDeleted) {
                 markersData.push(dm);
                 addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
@@ -3213,9 +3496,7 @@ function refreshMarkers() {
     activeLayers = {};
 
     markersData.forEach(m => {
-        const isDeleted = deletedMarkerIds.has(String(m.id)) || 
-                          (m.fbKey && deletedMarkerIds.has(String(m.fbKey))) || 
-                          (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+        const isDeleted = isPermanentlyDeletedMarker(m, m.id, m.fbKey);
         if (!isDeleted) {
             addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
         }
