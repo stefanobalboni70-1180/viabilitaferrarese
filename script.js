@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.9';
+const APP_VERSION = '3.6.10';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2749,7 +2749,7 @@ window.reportResolved = function (id) {
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v17');
+    const cached = localStorage.getItem('ferrara_street_cache_v18');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -2757,7 +2757,7 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v17', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v18', JSON.stringify(streetGeomCache));
     } catch (e) { }
 }
 
@@ -2820,33 +2820,28 @@ async function fetchOsrmRoute(url, isReverse = false) {
             if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
                 let coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-                if (isReverse) coords = coords.slice().reverse();
-                return {
-                    coords: coords,
-                    distance: route.distance || 0,
-                    steps: (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : []
-                };
+                if (isReverse) {
+                    coords = coords.reverse();
+                }
+                const steps = (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : [];
+                return { coords, distance: route.distance, duration: route.duration, steps };
             }
         }
-    } catch (e) { }
+    } catch (e) {
+        // Fallback silenzioso
+    }
     return null;
 }
 
-// Calcola il percorso reale tra due punti (anche su rampe a senso unico, svincoli e curve strette)
-// e garantisce che per le vie locali (es. Via Ruffetta) non si devii mai su provinciali (SP4) o statali
-async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName = '') {
-    const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
+// Calcola il percorso reale tra due punti su una specifica strada
+async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
     const isHighway = isMajorHighway(targetStreetName);
-    const isRamp = targetStreetName.toLowerCase().includes('ramp') || targetStreetName.toLowerCase().includes('svincolo') || targetStreetName.includes('/');
+    const isRamp = targetStreetName.toLowerCase().includes('rampa') || targetStreetName.toLowerCase().includes('svincolo');
+    const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const normTarget = normalizeStreetKey(targetStreetName);
 
-    // Endpoints in ordine di priorità:
-    // Per arterie e rampe: usa i profili automobilistici ad alta precisione
-    // Per vie locali (es. Via Ruffetta): usa profili bicycle/foot per seguire esattamente il tracciato locale della via senza deviare sulla SP4
-    const endpoints = (isHighway || isRamp)
+    const endpoints = isHighway || isRamp
         ? [
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
             { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
             { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
@@ -3009,18 +3004,27 @@ async function updateRoadSegments() {
         }
     });
 
-    // 3. Collega eventuali marker singoli vicini tra loro (es. estremità di rampe/svincoli tra SS16 e RA8)
-    singleMarkers.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
-    const usedSingle = new Set();
-    for (let i = 0; i < singleMarkers.length; i++) {
-        if (usedSingle.has(i)) continue;
-        const m1 = singleMarkers[i];
-        let bestJ = -1;
-        let minDist = 2500; // Massimo 2.5 km per collegare due punti di una rampa/svincolo
+    // 3. Collega eventuali marker singoli SOLO ED ESCLUSIVAMENTE se sono rampe o svincoli autostradali/statali
+    function isRampOrHighwayElement(m) {
+        if (!m || !m.street) return false;
+        // Non collegare MAI mercati singoli, sagre singole o generiche vie urbane tra loro
+        if (m.type === 'mercato' || m.type === 'sagra') return false;
+        const s = m.street.toLowerCase();
+        return s.includes('rampa') || s.includes('svincolo') || s.includes('raccordo') || s.includes('bretella') || isMajorHighway(s);
+    }
 
-        for (let j = i + 1; j < singleMarkers.length; j++) {
+    const eligibleRampMarkers = singleMarkers.filter(isRampOrHighwayElement);
+    eligibleRampMarkers.sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
+    const usedSingle = new Set();
+    for (let i = 0; i < eligibleRampMarkers.length; i++) {
+        if (usedSingle.has(i)) continue;
+        const m1 = eligibleRampMarkers[i];
+        let bestJ = -1;
+        let minDist = 800; // Massimo 800 metri per collegare due punti di una rampa/svincolo
+
+        for (let j = i + 1; j < eligibleRampMarkers.length; j++) {
             if (usedSingle.has(j)) continue;
-            const m2 = singleMarkers[j];
+            const m2 = eligibleRampMarkers[j];
             const d = calculateDistanceMeters(m1.lat, m1.lng, m2.lat, m2.lng);
             if (d < minDist) {
                 minDist = d;
@@ -3029,7 +3033,7 @@ async function updateRoadSegments() {
         }
 
         if (bestJ !== -1) {
-            const m2 = singleMarkers[bestJ];
+            const m2 = eligibleRampMarkers[bestJ];
             usedSingle.add(i);
             usedSingle.add(bestJ);
             const rampKey = `ramp_${m1.id}_${m2.id}`;
