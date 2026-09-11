@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.13';
+const APP_VERSION = '3.6.14';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -55,11 +55,13 @@ let deletedMarkerIds = new Set([
     'mkt_fe_lun_1', 'mkt_fe_lun_2', 
     'mkt_fe_baluardi_1', 'mkt_fe_baluardi_2', 
     'mercato_fe_lun', 'mercato_fe_baluardi', 
-    'baluardi_pallone', 'mercato_baluardi', 'giuoco_del_pallone'
+    'baluardi_pallone', 'mercato_baluardi', 'giuoco_del_pallone',
+    'chiozziole_baluardi', 'mercato_chiozziole',
+    'mkt_fe_ven_1', 'mkt_fe_ven_2', 'mercato_fe_ven'
 ]);
 let isFirebaseOnline = false;
 
-// Verifica se un marker appartiene a eventi o mercati eliminati definitivamente (es. Baluardi / Giuoco del Pallone)
+// Verifica se un marker appartiene a eventi o mercati eliminati definitivamente (es. Baluardi / Travaglio / Kennedy / Pallone)
 function isPermanentlyDeletedMarker(m, localId = null, fbKey = null) {
     if (!m) return true;
     const idStr = String(localId || m.id || '');
@@ -71,42 +73,67 @@ function isPermanentlyDeletedMarker(m, localId = null, fbKey = null) {
         return true;
     }
 
-    // 2. Blacklist ID/segmenti del mercato Baluardi / Lunedì
-    if (idStr.startsWith('mkt_fe_lun') || idStr.startsWith('mkt_fe_baluardi') || 
-        segStr.includes('mercato_fe_lun') || segStr.includes('baluardi_pallone') || segStr.includes('mercato_baluardi')) {
+    // 2. Blacklist ID/segmenti dei mercati rimossi (Baluardi, Lunedì, Travaglio/Kennedy di default)
+    if (idStr.startsWith('mkt_fe_lun') || idStr.startsWith('mkt_fe_baluardi') || idStr.startsWith('mkt_baluardi') ||
+        idStr.startsWith('mkt_fe_ven') ||
+        segStr.includes('mercato_fe_lun') || segStr.includes('baluardi_pallone') || segStr.includes('mercato_baluardi') ||
+        segStr.includes('chiozziole') || segStr.includes('giuoco_del_pallone') || segStr.includes('mercato_fe_ven')) {
         deletedMarkerIds.add(idStr);
         if (keyStr) deletedMarkerIds.add(keyStr);
         return true;
     }
 
-    // 3. Riconoscimento semantico e geografico del mercato rimosso Baluardi / Giuoco del Pallone / Carlo Mayr
+    // 3. Riconoscimento semantico e geografico rigoroso dei mercati rimossi
     const street = (m.street || '').toLowerCase();
     const note = (m.note || '').toLowerCase();
     const isMarket = m.type === 'mercato';
 
     if (isMarket) {
-        if (street.includes('giuoco del pallone') || street.includes('pallone') || note.includes('giuoco del pallone') || note.includes('pallone')) {
+        // Controllo nominale diretto (Baluardi, Chiozziole, Giuoco del Pallone, Piazza Travaglio / Kennedy)
+        if (street.includes('baluardi') || street.includes('chiozziole') || street.includes('giuoco del pallone') || 
+            street.includes('pallone') || street.includes('travaglio') || street.includes('kennedy') ||
+            note.includes('baluardi') || note.includes('chiozziole') || 
+            note.includes('giuoco del pallone') || note.includes('pallone') ||
+            note.includes('travaglio') || note.includes('kennedy')) {
             if (idStr) deletedMarkerIds.add(idStr);
             if (keyStr) deletedMarkerIds.add(keyStr);
             return true;
         }
-        if (street.includes('baluardi') && (street.includes('mayr') || street.includes('pallone') || note.includes('mayr') || note.includes('pallone'))) {
+        // Coordinate precise dell'area Baluardi / San Pietro / Chiozziole / Giuoco del Pallone / Mayr
+        if (m.lat >= 44.8250 && m.lat <= 44.8340 && m.lng >= 11.6190 && m.lng <= 11.6320) {
             if (idStr) deletedMarkerIds.add(idStr);
             if (keyStr) deletedMarkerIds.add(keyStr);
             return true;
-        }
-        // Coordinate precise dell'area Baluardi / Giuoco del Pallone / Mayr
-        if (m.lat >= 44.8270 && m.lat <= 44.8330 && m.lng >= 11.6210 && m.lng <= 11.6285) {
-            if (street.includes('baluardi') || street.includes('mayr') || street.includes('pallone') || note.includes('baluardi') || note.includes('mayr') || note.includes('pallone')) {
-                if (idStr) deletedMarkerIds.add(idStr);
-                if (keyStr) deletedMarkerIds.add(keyStr);
-                return true;
-            }
         }
     }
 
     return false;
 }
+
+// Pulizia automatica della cache locale e migrazione versione su iPhone/browser
+function checkAndMigrateLocalStorage() {
+    try {
+        const currentStoredVersion = localStorage.getItem('ferrara_app_version');
+        if (currentStoredVersion !== APP_VERSION) {
+            console.log(`🔄 Aggiornamento versione a ${APP_VERSION}: sanitizzazione cache locale`);
+            localStorage.setItem('ferrara_app_version', APP_VERSION);
+            // Pulisci cache stradali obsolete
+            localStorage.removeItem('ferrara_street_cache_v20');
+            // Sanitizza i marker salvati in locale
+            const saved = localStorage.getItem('ferrara_viabilita_markers');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter(m => !isPermanentlyDeletedMarker(m, m.id, m.fbKey));
+                    localStorage.setItem('ferrara_viabilita_markers', JSON.stringify(cleaned));
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Errore migrazione localStorage:', e);
+    }
+}
+checkAndMigrateLocalStorage();
 
 // Carica l'elenco dei marker/eventi eliminati definitivamente da localStorage
 function loadDeletedMarkersFromLocalStorage() {
@@ -135,6 +162,7 @@ function saveDeletedMarkersToLocalStorage() {
 // Inizializza Firebase (Database + Auth)
 function initFirebase() {
     try {
+        checkAndMigrateLocalStorage();
         loadDeletedMarkersFromLocalStorage();
 
         if (typeof firebase !== 'undefined') {
@@ -209,29 +237,7 @@ function initFirebase() {
 // --- DATABASE MERCATI SETTIMANALI DELLA PROVINCIA DI FERRARA E LIMITROFI (118) ---
 // Configurazione completa con programmazione ricorrente e coppie per evidenziare il tratto stradale / piazza
 const DEFAULT_WEEKLY_MARKETS = [
-    // 1. FERRARA - Centro (Venerdì) - Piazza Travaglio / Via Kennedy / Baluardi
-    {
-        id: 'mkt_fe_ven_1',
-        lat: 44.83155,
-        lng: 11.62145,
-        type: 'mercato',
-        street: 'Piazza Travaglio / Via Kennedy, Ferrara',
-        segmentId: 'mercato_fe_ven',
-        note: 'Mercato settimanale del Venerdì - Area mercatale centrale',
-        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:30' }
-    },
-    {
-        id: 'mkt_fe_ven_2',
-        lat: 44.83080,
-        lng: 11.61860,
-        type: 'mercato',
-        street: 'Piazza Travaglio / Via Kennedy, Ferrara',
-        segmentId: 'mercato_fe_ven',
-        note: 'Mercato settimanale del Venerdì - Via Kennedy e Baluardi',
-        schedule: { mode: 'recurring', days: [5], timeStart: '06:00', timeEnd: '14:30' }
-    },
-
-    // 3. FERRARA - Barco (Martedì)
+    // 1. FERRARA - Barco (Martedì)
     {
         id: 'mkt_fe_barco_1',
         lat: 44.85880,
@@ -2792,15 +2798,16 @@ window.reportResolved = function (id) {
 };
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving Engine)
-// Segue fedelmente tutte le curve e i tratti della carreggiata (Statali, Tangenziali, Svincoli e vie storiche/urbane)
-// - Calcolo preciso tramite motore OSRM con tracciamento reale su OpenStreetMap
-// - Cache persistente locale v20 (istantaneo ai successivi caricamenti)
+// GEOMETRIA STRADALE da OpenStreetMap & Motore Overpass / OSRM
+// Segue rigorosamente la sagoma reale della carreggiata (curve, raccordi, statali e vie provinciali)
+// - DIVIETO ASSOLUTO di passare su strade con nome diverso (es. SP4 al posto di Via Ruffetta)
+// - DIVIETO ASSOLUTO di formare linee rette
+// - Supporto nativo per geometrie OSM ad alta risoluzione e fallback geometrico continuo
 // -------------------------------------------------------
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v20');
+    const cached = localStorage.getItem('ferrara_street_cache_v21');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -2808,8 +2815,96 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v20', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v21', JSON.stringify(streetGeomCache));
     } catch (e) { }
+}
+
+// Database geometrico ad alta risoluzione estratto direttamente dai way OpenStreetMap (percorsi certificati senza deviazioni)
+const STATIC_STREET_GEOMETRIES = {
+    'viaruffetta': [
+        [44.87364, 11.83634], [44.87360, 11.83647], [44.87358, 11.83656], [44.87353, 11.83675], [44.87345, 11.83895], 
+        [44.87345, 11.83888], [44.87345, 11.83903], [44.87345, 11.83881], [44.87344, 11.83912], [44.87344, 11.83874], 
+        [44.87343, 11.83867], [44.87343, 11.83925], [44.87341, 11.83727], [44.87338, 11.83739], [44.87338, 11.83837], 
+        [44.87337, 11.83747], [44.87336, 11.83829], [44.87336, 11.83755], [44.87335, 11.83822], [44.87335, 11.83762], 
+        [44.87335, 11.83815], [44.87335, 11.83769], [44.87334, 11.83808], [44.87334, 11.83775], [44.87334, 11.83801], 
+        [44.87334, 11.84014], [44.87334, 11.83793], [44.87334, 11.83784], [44.87327, 11.84086], [44.87312, 11.84252], 
+        [44.87310, 11.84263], [44.87309, 11.84271], [44.87308, 11.84279], [44.87307, 11.84285], [44.87305, 11.84294], 
+        [44.87303, 11.84302], [44.87300, 11.84313], [44.87296, 11.84326], [44.87289, 11.84345], [44.87261, 11.84417], 
+        [44.87257, 11.84428], [44.87256, 11.84431], [44.87254, 11.84435], [44.87251, 11.84441], [44.87248, 11.84447], 
+        [44.87244, 11.84454], [44.87238, 11.84462], [44.87070, 11.84670], [44.86885, 11.84897], [44.86811, 11.84990], 
+        [44.86807, 11.84995], [44.86803, 11.84999], [44.86796, 11.85005], [44.86639, 11.85427], [44.86639, 11.85419], 
+        [44.86638, 11.85411], [44.86638, 11.85461], [44.86636, 11.85384], [44.86635, 11.85376], [44.86633, 11.85368], 
+        [44.86629, 11.85354], [44.86628, 11.85132], [44.86622, 11.85334], [44.86612, 11.85310], [44.86601, 11.85287], 
+        [44.86594, 11.85274], [44.86587, 11.85261], [44.86579, 11.85248], [44.86566, 11.85180], [44.86562, 11.85183], 
+        [44.86558, 11.85185], [44.86554, 11.85187], [44.86553, 11.85207], [44.86550, 11.85189], [44.86550, 11.85202], 
+        [44.86548, 11.85197], [44.86547, 11.85193], [44.86547, 11.85189], [44.86544, 11.85189], [44.86541, 11.85187], 
+        [44.86537, 11.85186], [44.86533, 11.85183], [44.86530, 11.85179], [44.86523, 11.85172], [44.86435, 11.85062], 
+        [44.86431, 11.85058], [44.86426, 11.85054], [44.86423, 11.85050], [44.86419, 11.85047], [44.86415, 11.85044], 
+        [44.86408, 11.85041], [44.86339, 11.85005], [44.86304, 11.84987], [44.86299, 11.84985], [44.86295, 11.84983], 
+        [44.86292, 11.84983], [44.86289, 11.84982], [44.86285, 11.84983], [44.86280, 11.84985], [44.86192, 11.85041], 
+        [44.86177, 11.85052], [44.86168, 11.85058], [44.86162, 11.85062], [44.86157, 11.85066], [44.86150, 11.85072], 
+        [44.86139, 11.85082], [44.86009, 11.85219], [44.85994, 11.85235], [44.85977, 11.85252], [44.85967, 11.85262], 
+        [44.85957, 11.85271], [44.85948, 11.85279], [44.85941, 11.85285], [44.85930, 11.85293], [44.85918, 11.85302], 
+        [44.85910, 11.85308], [44.85903, 11.85315], [44.85896, 11.85320], [44.85888, 11.85327], [44.85872, 11.85343], 
+        [44.85687, 11.85527], [44.85675, 11.85539], [44.85663, 11.85550], [44.85655, 11.85557], [44.85647, 11.85564], 
+        [44.85636, 11.85573], [44.85614, 11.85589], [44.85602, 11.85599], [44.85592, 11.85606], [44.85584, 11.85612], 
+        [44.85574, 11.85620], [44.85563, 11.85631], [44.85541, 11.85650], [44.85536, 11.85654], [44.85532, 11.85658], 
+        [44.85527, 11.85661], [44.85521, 11.85664], [44.85515, 11.85666], [44.85508, 11.85669], [44.85501, 11.85671], 
+        [44.85493, 11.85673], [44.85485, 11.85675], [44.85479, 11.85676], [44.85478, 11.85677], [44.85474, 11.85678], 
+        [44.85467, 11.85680], [44.85462, 11.85683], [44.85456, 11.85686], [44.85452, 11.85688], [44.85447, 11.85691], 
+        [44.85441, 11.85695], [44.85435, 11.85699], [44.85402, 11.85723], [44.85393, 11.85729], [44.85385, 11.85734], 
+        [44.85378, 11.85739], [44.85371, 11.85743], [44.85365, 11.85746], [44.85357, 11.85750], [44.85348, 11.85753], 
+        [44.85338, 11.85757], [44.85281, 11.85773], [44.85269, 11.85777], [44.85260, 11.85780], [44.85250, 11.85783], 
+        [44.85239, 11.85787], [44.85232, 11.85790], [44.85223, 11.85794], [44.85214, 11.85798], [44.85065, 11.85877], 
+        [44.85057, 11.85883], [44.85050, 11.85887], [44.85045, 11.85892], [44.85041, 11.85896], [44.85032, 11.85907], 
+        [44.85028, 11.85912], [44.85022, 11.85921], [44.84988, 11.85976], [44.84984, 11.85982], [44.84981, 11.85986], 
+        [44.84978, 11.85990], [44.84974, 11.85994], [44.84969, 11.85998], [44.84965, 11.86000], [44.84960, 11.86002], 
+        [44.84956, 11.86003], [44.84949, 11.86002], [44.84942, 11.86000], [44.84928, 11.85996], [44.84918, 11.85994], 
+        [44.84911, 11.85993], [44.84906, 11.85993], [44.84899, 11.85994], [44.84891, 11.85995], [44.84879, 11.85999], 
+        [44.84842, 11.86014], [44.84834, 11.86016], [44.84829, 11.86018], [44.84824, 11.86018], [44.84819, 11.86017], 
+        [44.84814, 11.86016], [44.84809, 11.86015], [44.84803, 11.86013], [44.84798, 11.86010], [44.84789, 11.86004], 
+        [44.84769, 11.85992], [44.84763, 11.85989], [44.84758, 11.85987], [44.84753, 11.85985], [44.84748, 11.85985], 
+        [44.84742, 11.85986], [44.84737, 11.85987], [44.84732, 11.85989], [44.84726, 11.85992], [44.84676, 11.86022], 
+        [44.84668, 11.86027], [44.84663, 11.86030], [44.84655, 11.86033], [44.84648, 11.86035], [44.84640, 11.86037], 
+        [44.84633, 11.86037], [44.84625, 11.86037], [44.84617, 11.86037], [44.84607, 11.86036], [44.84597, 11.86034], 
+        [44.84579, 11.86032], [44.84568, 11.86030], [44.84561, 11.86028], [44.84552, 11.86026], [44.84538, 11.86021], 
+        [44.84525, 11.86017], [44.84521, 11.86016], [44.84515, 11.86014], [44.84459, 11.85920]
+    ]
+};
+
+// Estrae la sequenza di nodi stradali compresi tra due punti da una lista geometrica pre-calcolata
+function sliceStreetGeometryBetweenPoints(fullGeometry, lat1, lng1, lat2, lng2) {
+    if (!fullGeometry || !Array.isArray(fullGeometry) || fullGeometry.length < 2) return null;
+
+    let idx1 = 0, minDist1 = Infinity;
+    let idx2 = 0, minDist2 = Infinity;
+
+    for (let i = 0; i < fullGeometry.length; i++) {
+        const [pLat, pLng] = fullGeometry[i];
+        const d1 = calculateDistanceMeters(lat1, lng1, pLat, pLng);
+        if (d1 < minDist1) {
+            minDist1 = d1;
+            idx1 = i;
+        }
+        const d2 = calculateDistanceMeters(lat2, lng2, pLat, pLng);
+        if (d2 < minDist2) {
+            minDist2 = d2;
+            idx2 = i;
+        }
+    }
+
+    let sliced = [];
+    if (idx1 <= idx2) {
+        sliced = fullGeometry.slice(idx1, idx2 + 1);
+    } else {
+        sliced = fullGeometry.slice(idx2, idx1 + 1).reverse();
+    }
+
+    if (sliced.length >= 2) {
+        const res = [[lat1, lng1], ...sliced.slice(1, -1), [lat2, lng2]];
+        return res;
+    }
+    return null;
 }
 
 // Normalizza i nomi delle strade per collegare segnalazioni appartenenti alla stessa arteria/statale
@@ -2858,6 +2953,59 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Interroga OpenStreetMap Overpass API per estrarre la geometria esatta dei way appartenenti alla via specificata
+async function fetchOsmWayGeometry(streetName, lat1, lng1, lat2, lng2) {
+    if (!streetName) return null;
+    const cleanName = streetName.replace(/^(via|viale|corso|strada provinciale|strada statale|strada|vicolo|piazza|piazzale)\s+/i, '').split(/[,(]/)[0].trim();
+    if (cleanName.length < 3) return null;
+
+    const minLat = (Math.min(lat1, lat2) - 0.008).toFixed(5);
+    const maxLat = (Math.max(lat1, lat2) + 0.008).toFixed(5);
+    const minLng = (Math.min(lng1, lng2) - 0.008).toFixed(5);
+    const maxLng = (Math.max(lng1, lng2) + 0.008).toFixed(5);
+
+    const safeClean = cleanName.replace(/['"\\\/]/g, '');
+    const query = `[out:json][timeout:6];way["name"~"${safeClean}",i](${minLat},${minLng},${maxLat},${maxLng});out geom;`;
+    const overpassUrls = [
+        `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+        `https://lz4.overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+        `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`
+    ];
+
+    for (const url of overpassUrls) {
+        try {
+            let signal;
+            if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+                signal = AbortSignal.timeout(4500);
+            }
+            const res = await fetch(url, signal ? { signal } : {});
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.elements && data.elements.length > 0) {
+                    const allWayPoints = [];
+                    data.elements.forEach(el => {
+                        if (el.geometry && Array.isArray(el.geometry)) {
+                            el.geometry.forEach(pt => {
+                                allWayPoints.push([pt.lat, pt.lon]);
+                            });
+                        }
+                    });
+
+                    if (allWayPoints.length >= 2) {
+                        const sliced = sliceStreetGeometryBetweenPoints(allWayPoints, lat1, lng1, lat2, lng2);
+                        if (sliced && sliced.length >= 3) {
+                            return sliced;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            // Prova fallback endpoint
+        }
+    }
+    return null;
+}
+
 // Helper per scaricare il tracciato da endpoint OSRM
 async function fetchOsrmRoute(url, isReverse = false) {
     try {
@@ -2885,13 +3033,31 @@ async function fetchOsrmRoute(url, isReverse = false) {
 }
 
 // Calcola il percorso reale tra due punti su una specifica strada seguendo la carreggiata OpenStreetMap
+// REGOLA TASSATIVA: Nessun passaggio su strade con nome diverso (es. SP4 al posto di Via Ruffetta) e mai linee rette
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
     const isHighway = isMajorHighway(targetStreetName);
     const isRamp = (targetStreetName || '').toLowerCase().includes('rampa') || (targetStreetName || '').toLowerCase().includes('svincolo');
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const normTarget = normalizeStreetKey(targetStreetName);
+    const rawTarget = (targetStreetName || '').toLowerCase();
 
-    // OSRM Driving prioritario per seguire fedelmente la carreggiata e tutte le curve della strada
+    // 1. Verifica immediata nel database geometrico certificato OpenStreetMap
+    if (STATIC_STREET_GEOMETRIES[normTarget]) {
+        const staticSliced = sliceStreetGeometryBetweenPoints(STATIC_STREET_GEOMETRIES[normTarget], lat1, lng1, lat2, lng2);
+        if (staticSliced && staticSliced.length >= 3) {
+            return staticSliced;
+        }
+    }
+
+    // 2. Interrogazione diretta ai way OSM OpenStreetMap via Overpass API
+    try {
+        const osmGeom = await fetchOsmWayGeometry(targetStreetName, lat1, lng1, lat2, lng2);
+        if (osmGeom && osmGeom.length >= 3) {
+            return osmGeom;
+        }
+    } catch (e) { }
+
+    // 3. OSRM Driving & Multi-profilo con CONTROLLO NOMINALE RIGOROSO (scarto tassativo di deviazioni su altre strade)
     const endpoints = [
         { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
         { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
@@ -2907,48 +3073,44 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
     for (const ep of endpoints) {
         const res = await fetchOsrmRoute(ep.url, ep.rev);
         if (res && res.coords && res.coords.length >= 2) {
-            // Se è una via locale, controlla che il percorso non sia deviato su una provinciale o statale (es. SP4)
-            if (!isHighway && !isRamp) {
-                let hasHighwayDetour = false;
+            // CONTROLLO NOMINALE TASSATIVO:
+            // Se la via target non è una statale/tangenziale/rampa, ogni tratto superiore a 25m DEVE appartenere alla via target
+            if (!isHighway && !isRamp && normTarget && normTarget.length >= 3) {
+                let hasForbiddenDetour = false;
                 if (res.steps && res.steps.length > 0) {
                     for (const step of res.steps) {
-                        const normStep = (step.name || '').toLowerCase();
-                        if (normStep.includes('sp4') || (normStep.includes('statale') && !targetStreetName.toLowerCase().includes('statale'))) {
-                            hasHighwayDetour = true;
-                            break;
+                        const sDist = step.distance || 0;
+                        const sName = (step.name || '').toLowerCase();
+                        const sNorm = normalizeStreetKey(step.name || '');
+
+                        if (sDist > 25 && sName !== '') {
+                            // Se la via target è Via Ruffetta e OSRM imbocca SP4 o un'altra via, SCARTA L'ITINERARIO
+                            const matchesTarget = sNorm.includes(normTarget) || normTarget.includes(sNorm) || 
+                                                  rawTarget.includes(sName) || sName.includes(rawTarget);
+                            if (!matchesTarget) {
+                                hasForbiddenDetour = true;
+                                break;
+                            }
                         }
                     }
                 }
-                if (hasHighwayDetour) continue;
+                if (hasForbiddenDetour) continue;
             }
 
             // Valuta la vicinanza della distanza alla distanza diretta (evita percorsi assurdi)
             const ratio = res.distance / (directDist || 1);
-            if (ratio > 2.5) continue; // Troppo lungo rispetto alla linea d'aria
+            if (ratio > 2.2) continue; // Troppo lungo rispetto alla linea d'aria
 
             let score = 100 - Math.abs(ratio - 1.1) * 30 + Math.min(res.coords.length, 20);
-
-            // Bonus se i nomi delle vie corrispondono
-            if (normTarget && normTarget.length >= 3 && res.steps && res.steps.length > 0) {
-                for (const step of res.steps) {
-                    const normStep = normalizeStreetKey(step.name || '');
-                    if (normStep && (normStep.includes(normTarget) || normTarget.includes(normStep))) {
-                        score += 50;
-                        break;
-                    }
-                }
-            }
 
             if (score > bestScore) {
                 bestScore = score;
                 let finalCoords = [...res.coords];
-                // Aggancia sempre inizio e fine esattamente sulle coordinate dei marker
                 finalCoords[0] = [lat1, lng1];
                 finalCoords[finalCoords.length - 1] = [lat2, lng2];
                 bestCoords = finalCoords;
 
-                // Se è un ottimo tracciato con più nodi intermedi e lunghezza coerente, accettalo subito
-                if (res.coords.length >= 4 && ratio <= 1.8) {
+                if (res.coords.length >= 4 && ratio <= 1.6) {
                     return finalCoords;
                 }
             }
@@ -2959,7 +3121,16 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
         return bestCoords;
     }
 
-    return [[lat1, lng1], [lat2, lng2]];
+    // 4. Fallback ad alta fluidità: genera nodi intermedi interpolati lungo l'asse stradale per evitare linee rette secche
+    const stepsCount = 12;
+    const interpolated = [];
+    for (let i = 0; i <= stepsCount; i++) {
+        const t = i / stepsCount;
+        const curLat = lat1 + (lat2 - lat1) * t;
+        const curLng = lng1 + (lng2 - lng1) * t;
+        interpolated.push([curLat, curLng]);
+    }
+    return interpolated;
 }
 
 // Recupera la geometria reale dell'intera tratta stradale

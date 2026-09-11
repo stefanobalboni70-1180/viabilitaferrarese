@@ -1,8 +1,9 @@
-# Viabilità Ferrara 118 - Versione 3.6.5
+# Viabilità Ferrara 118 - Versione 3.6.14
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.5):
+### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.14):
+- **Tracciato Reale Strade Chiuse (OSM Way Geometry):** ogni tratto stradale interrotto (es. Via Ruffetta) segue fedelmente e al 100% la sagoma della carreggiata OpenStreetMap con tutte le sue curve, con divieto assoluto di deviare su strade con nome diverso (es. SP4) e divieto di formare linee rette.
 - **Sensi Unici Ordinari Rispettati:** tutti i percorsi di navigazione rispettano scrupolosamente i sensi unici di marcia e la direzione ordinaria consentita per i veicoli, evitando manovre contromano su strade a senso unico.
 - **Corsie Preferenziali Bus e Taxi:** autorizzazione e sfruttamento delle corsie riservate a bus e taxi (es. Corso Giovecca, Viale Cavour, Corso Porta Reno, Via Kennedy, Via Bologna corsia bus) con badge dedicato `🚌 Corsia Bus/Taxi`.
 - **Chiusure Stradali e Ponti Interrotti come Interruzioni Totali:** ogni strada chiusa (`chiusa`), cantiere bloccante (`lavori`) o ponte interrotto (`ponte`) è trattato come una barriera fisica non oltrepassabile. Se un ponte su fiumi/canali provinciali (Po, Po di Volano, Canale Boicelli, Reno, ecc.) è interrotto, il sistema forza l'itinerario sul ponte alternativo aperto più vicino.
