@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.8';
+const APP_VERSION = '3.6.9';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -45,16 +45,44 @@ const NOTIFICATIONS_CONFIG = {
     }
 };
 
-// Variabili Firebase
+// Variabili Firebase & Gestione Eliminazioni Definitive
 let db = null;
 let auth = null;
 let markersRef = null;
 let reportsRef = null;
+let deletedMarkersRef = null;
+let deletedMarkerIds = new Set(['mkt_fe_lun_1', 'mkt_fe_lun_2']);
 let isFirebaseOnline = false;
+
+// Carica l'elenco dei marker/eventi eliminati definitivamente da localStorage
+function loadDeletedMarkersFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('ferrara_viabilita_deleted_markers');
+        if (saved) {
+            const list = JSON.parse(saved);
+            if (Array.isArray(list)) {
+                list.forEach(id => deletedMarkerIds.add(String(id)));
+            }
+        }
+    } catch (e) {
+        console.warn('Errore lettura deleted markers da localStorage', e);
+    }
+}
+
+// Salva l'elenco dei marker/eventi eliminati definitivamente su localStorage
+function saveDeletedMarkersToLocalStorage() {
+    try {
+        localStorage.setItem('ferrara_viabilita_deleted_markers', JSON.stringify(Array.from(deletedMarkerIds)));
+    } catch (e) {
+        console.warn('Errore salvataggio deleted markers su localStorage', e);
+    }
+}
 
 // Inizializza Firebase (Database + Auth)
 function initFirebase() {
     try {
+        loadDeletedMarkersFromLocalStorage();
+
         if (typeof firebase !== 'undefined') {
             if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
@@ -63,8 +91,43 @@ function initFirebase() {
             auth = firebase.auth();
             markersRef = db.ref("markers");
             reportsRef = db.ref("user_reports");
+            deletedMarkersRef = db.ref("deleted_markers");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
+
+            // Ascolto in tempo reale degli eventi eliminati definitivamente
+            deletedMarkersRef.on('value', function (snapshot) {
+                const data = snapshot.val();
+                if (data) {
+                    Object.keys(data).forEach(k => deletedMarkerIds.add(String(k)));
+                    saveDeletedMarkersToLocalStorage();
+                }
+                // Rimuovi subito eventuali marker eliminati presenti in memoria/mappa
+                let changed = false;
+                markersData = markersData.filter(m => {
+                    const isDeleted = deletedMarkerIds.has(String(m.id)) || 
+                                      (m.fbKey && deletedMarkerIds.has(String(m.fbKey))) || 
+                                      (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+                    if (isDeleted) {
+                        if (activeLayers[m.id]) {
+                            map.removeLayer(activeLayers[m.id]);
+                            delete activeLayers[m.id];
+                        }
+                        if (m.fbKey && activeLayers[m.fbKey]) {
+                            map.removeLayer(activeLayers[m.fbKey]);
+                            delete activeLayers[m.fbKey];
+                        }
+                        changed = true;
+                        return false;
+                    }
+                    return true;
+                });
+                if (changed) {
+                    saveToLocalStorage();
+                    updateFilterCounts();
+                    updateRoadSegments();
+                }
+            });
 
             // Ascolto dello stato di autenticazione dell'amministratore
             auth.onAuthStateChanged((user) => {
@@ -86,6 +149,7 @@ function initFirebase() {
         auth = null;
         markersRef = null;
         reportsRef = null;
+        deletedMarkersRef = null;
         isFirebaseOnline = false;
     }
 }
@@ -2543,34 +2607,95 @@ function saveMarkerToFirebase(markerObj) {
 
 // Rimuovi marker (esposta globalmente per il bottone nel popup)
 window.removeMarker = function (id) {
+    if (!isAdmin) {
+        alert("Solo l'amministratore autenticato può eliminare un evento o una segnalazione.");
+        return;
+    }
+
     const markerObj = markersData.find(m => String(m.id) === String(id) || String(m.fbKey) === String(id));
-    const fbKeyToDelete = (markerObj && markerObj.fbKey) ? markerObj.fbKey : id;
-
-    // Rimuovi visivamente subito dalla mappa
-    if (activeLayers[id]) {
-        map.removeLayer(activeLayers[id]);
-        delete activeLayers[id];
-    }
-    if (markerObj && markerObj.id && activeLayers[markerObj.id]) {
-        map.removeLayer(activeLayers[markerObj.id]);
-        delete activeLayers[markerObj.id];
+    if (!markerObj) {
+        console.warn("Marker non trovato per id:", id);
+        return;
     }
 
-    if (isFirebaseOnline && markersRef && fbKeyToDelete) {
-        markersRef.child(fbKeyToDelete).remove()
-            .then(() => {
-                console.log('🗑️ Marker rimosso da Firebase:', fbKeyToDelete);
-            })
-            .catch(e => {
-                console.error('Errore rimozione Firebase:', e);
-                alert('Impossibile eliminare da Firebase: ' + e.message + '\n\nAssicurati di aver pubblicato le regole aggiornate sulla console Firebase.');
-            });
+    // Se l'evento ha un tratto/mercato collegato (segmentId) o altri marker associati
+    let targets = [markerObj];
+    if (markerObj.segmentId) {
+        const companions = markersData.filter(m => m.segmentId === markerObj.segmentId && String(m.id) !== String(markerObj.id));
+        if (companions.length > 0) {
+            targets = markersData.filter(m => m.segmentId === markerObj.segmentId);
+        }
     }
 
-    markersData = markersData.filter(m => String(m.id) !== String(id) && String(m.fbKey) !== String(id));
+    const labelMsg = markerObj.street ? `"${markerObj.street}"` : 'questa segnalazione/evento';
+    const confirmMsg = targets.length > 1 
+        ? `Sei sicuro di voler eliminare definitivamente l'evento ${labelMsg} e tutti i relativi punti stradali? L'evento sparirà per sempre.`
+        : `Sei sicuro di voler eliminare definitivamente ${labelMsg}? L'evento sparirà per sempre.`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    targets.forEach(target => {
+        const tId = String(target.id);
+        const fbKeyToDelete = target.fbKey || (tId.startsWith('-') ? tId : null);
+
+        // Aggiungi subito al registro locale delle eliminazioni
+        deletedMarkerIds.add(tId);
+        if (target.fbKey) deletedMarkerIds.add(String(target.fbKey));
+        if (target.segmentId) deletedMarkerIds.add(String(target.segmentId));
+
+        // Rimuovi visivamente subito dalla mappa
+        if (activeLayers[tId]) {
+            map.removeLayer(activeLayers[tId]);
+            delete activeLayers[tId];
+        }
+        if (target.fbKey && activeLayers[target.fbKey]) {
+            map.removeLayer(activeLayers[target.fbKey]);
+            delete activeLayers[target.fbKey];
+        }
+
+        // Rimuovi da Firebase markers (se presente come chiave dinamica)
+        if (isFirebaseOnline && markersRef && fbKeyToDelete) {
+            markersRef.child(fbKeyToDelete).remove()
+                .then(() => console.log('🗑️ Marker rimosso da Firebase:', fbKeyToDelete))
+                .catch(e => console.warn('Errore rimozione Firebase:', e.message));
+        }
+
+        // Registra su Firebase nel nodo 'deleted_markers' per sincronizzare tutti i client ed evitare che ricompaia
+        if (isFirebaseOnline && deletedMarkersRef) {
+            deletedMarkersRef.child(tId).set({
+                timestamp: Date.now(),
+                street: target.street || '',
+                note: target.note || '',
+                type: target.type || '',
+                segmentId: target.segmentId || null,
+                deletedBy: (auth && auth.currentUser) ? auth.currentUser.email : 'admin'
+            }).catch(e => console.warn('Errore salvataggio deleted_markers Firebase:', e.message));
+
+            if (target.segmentId) {
+                deletedMarkersRef.child(target.segmentId).set({
+                    timestamp: Date.now(),
+                    street: target.street || '',
+                    note: target.note || '',
+                    type: target.type || '',
+                    deletedBy: (auth && auth.currentUser) ? auth.currentUser.email : 'admin'
+                }).catch(e => console.warn('Errore salvataggio deleted_markers segmentId Firebase:', e.message));
+            }
+        }
+    });
+
+    // Salva lo stato delle eliminazioni in localStorage
+    saveDeletedMarkersToLocalStorage();
+
+    // Rimuovi dai dati locali in memoria
+    const targetIds = new Set(targets.map(t => String(t.id)).concat(targets.map(t => String(t.fbKey)).filter(Boolean)));
+    markersData = markersData.filter(m => !targetIds.has(String(m.id)) && (!m.fbKey || !targetIds.has(String(m.fbKey))));
+
     saveToLocalStorage();
     updateFilterCounts();
     updateRoadSegments();
+    showToast("🗑️ Evento eliminato definitivamente.", "success");
 };
 
 // Aggiungi Nota
@@ -2984,8 +3109,13 @@ function loadMarkers() {
             if (data) {
                 Object.entries(data).forEach(([fbKey, m]) => {
                     const localId = m.timestamp ? m.timestamp.toString() : (m.id || fbKey);
-                    if (localId === 'mkt_fe_lun_1' || localId === 'mkt_fe_lun_2' || m.id === 'mkt_fe_lun_1' || m.id === 'mkt_fe_lun_2') {
-                        return; // Rimosso su richiesta
+                    // Verifica se il marker o il suo segmento è stato eliminato definitivamente
+                    const isDeleted = deletedMarkerIds.has(String(localId)) || 
+                                      deletedMarkerIds.has(String(fbKey)) || 
+                                      (m.id && deletedMarkerIds.has(String(m.id))) || 
+                                      (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+                    if (isDeleted) {
+                        return; // Non caricare eventi eliminati
                     }
                     loadedIds.add(localId);
                     if (m.id) loadedIds.add(m.id);
@@ -3005,10 +3135,11 @@ function loadMarkers() {
                 });
             }
 
-            // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti
+            // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti e non eliminati
             if (typeof DEFAULT_WEEKLY_MARKETS !== 'undefined' && Array.isArray(DEFAULT_WEEKLY_MARKETS)) {
                 DEFAULT_WEEKLY_MARKETS.forEach(dm => {
-                    if (!loadedIds.has(dm.id)) {
+                    const isDeleted = deletedMarkerIds.has(String(dm.id)) || (dm.segmentId && deletedMarkerIds.has(String(dm.segmentId)));
+                    if (!loadedIds.has(dm.id) && !isDeleted) {
                         markersData.push(dm);
                         addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
                     }
@@ -3032,6 +3163,7 @@ function loadMarkers() {
 
 // Carica i marker dal localStorage (fallback offline)
 function loadFromLocalStorage() {
+    loadDeletedMarkersFromLocalStorage();
     const saved = localStorage.getItem('ferrara_viabilita_markers');
     markersData = [];
     const loadedIds = new Set();
@@ -3039,7 +3171,10 @@ function loadFromLocalStorage() {
         try {
             const parsed = JSON.parse(saved);
             parsed.forEach(m => {
-                if (m.id === 'mkt_fe_lun_1' || m.id === 'mkt_fe_lun_2') return;
+                const isDeleted = deletedMarkerIds.has(String(m.id)) || 
+                                  (m.fbKey && deletedMarkerIds.has(String(m.fbKey))) || 
+                                  (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+                if (isDeleted) return;
                 loadedIds.add(m.id);
                 markersData.push(m);
                 addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
@@ -3051,10 +3186,11 @@ function loadFromLocalStorage() {
         }
     }
 
-    // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti
+    // Includi i mercati settimanali di default della provincia di Ferrara e territori limitrofi se non già presenti e non eliminati
     if (typeof DEFAULT_WEEKLY_MARKETS !== 'undefined' && Array.isArray(DEFAULT_WEEKLY_MARKETS)) {
         DEFAULT_WEEKLY_MARKETS.forEach(dm => {
-            if (!loadedIds.has(dm.id)) {
+            const isDeleted = deletedMarkerIds.has(String(dm.id)) || (dm.segmentId && deletedMarkerIds.has(String(dm.segmentId)));
+            if (!loadedIds.has(dm.id) && !isDeleted) {
                 markersData.push(dm);
                 addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
             }
@@ -3073,7 +3209,12 @@ function refreshMarkers() {
     activeLayers = {};
 
     markersData.forEach(m => {
-        addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
+        const isDeleted = deletedMarkerIds.has(String(m.id)) || 
+                          (m.fbKey && deletedMarkerIds.has(String(m.fbKey))) || 
+                          (m.segmentId && deletedMarkerIds.has(String(m.segmentId)));
+        if (!isDeleted) {
+            addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
+        }
     });
 
     updateFilterCounts();

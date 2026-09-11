@@ -9,6 +9,10 @@
         }
       }
     },
+    "deleted_markers": {
+      ".read": true,
+      ".write": "auth != null"
+    },
     "user_reports": {
       ".read": "auth != null",
       ".write": "auth != null",
