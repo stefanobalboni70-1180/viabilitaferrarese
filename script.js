@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.12';
+const APP_VERSION = '3.6.13';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2792,16 +2792,15 @@ window.reportResolved = function (id) {
 };
 
 // -------------------------------------------------------
-// GEOMETRIA STRADALE da OpenStreetMap & Vettori Alta Precisione
-// Segue fedelmente tutte le curve e i tratti della strada (Statali, Tangenziali, Svincoli e vie storiche/urbane)
-// - Supporto nativo per assi storici / ZTL (Corso Porta Reno, Corso Martiri, Piazza Travaglio, Kennedy, Giovecca, Cavour, ecc.)
-// - Motore snap-to-road integrato per garantire curve perfette anche in caso di rete lenta o blocchi OSRM
-// - Cache persistente locale v19 (istantaneo ai successivi caricamenti)
+// GEOMETRIA STRADALE da OpenStreetMap (OSRM Driving Engine)
+// Segue fedelmente tutte le curve e i tratti della carreggiata (Statali, Tangenziali, Svincoli e vie storiche/urbane)
+// - Calcolo preciso tramite motore OSRM con tracciamento reale su OpenStreetMap
+// - Cache persistente locale v20 (istantaneo ai successivi caricamenti)
 // -------------------------------------------------------
 
 let streetGeomCache = {};
 try {
-    const cached = localStorage.getItem('ferrara_street_cache_v19');
+    const cached = localStorage.getItem('ferrara_street_cache_v20');
     if (cached) streetGeomCache = JSON.parse(cached);
 } catch (e) {
     streetGeomCache = {};
@@ -2809,244 +2808,8 @@ try {
 
 function saveStreetGeomCache() {
     try {
-        localStorage.setItem('ferrara_street_cache_v19', JSON.stringify(streetGeomCache));
+        localStorage.setItem('ferrara_street_cache_v20', JSON.stringify(streetGeomCache));
     } catch (e) { }
-}
-
-// Tracciati vettoriali ad alta precisione per arterie storiche e mercatali di Ferrara
-const HIGH_PRECISION_ROAD_CORRIDORS = [
-    {
-        id: 'fe_corso_martiri',
-        names: ['corso martiri della liberta', 'corso martiri', 'martiri della liberta', 'martiri', 'largo castello'],
-        points: [
-            [44.83590, 11.61910], // Piazza Cattedrale / Inizio Corso Martiri
-            [44.83635, 11.61920], // Corso Martiri della Libertà (davanti Volto del Cavallo)
-            [44.83680, 11.61935], // Corso Martiri della Libertà (Teatro Comunale / Municipio)
-            [44.83730, 11.61945], // Corso Martiri della Libertà (Piazza Savonarola)
-            [44.83770, 11.61960], // Corso Martiri della Libertà / Largo Castello (Fossato Castello)
-            [44.83820, 11.61980]  // Largo Castello nord / inizio Ercole I d'Este
-        ]
-    },
-    {
-        id: 'fe_corso_porta_reno',
-        names: ['corso porta reno', 'porta reno', 'piazza travaglio', 'porta paola'],
-        points: [
-            [44.82650, 11.61950], // Porta Paola
-            [44.82800, 11.62050], // Piazza Travaglio sud
-            [44.83050, 11.62120], // Piazza Travaglio centro
-            [44.83155, 11.62145], // Piazza Travaglio / imbocco Porta Reno
-            [44.83220, 11.62110], // Corso Porta Reno sud
-            [44.83270, 11.62080], // Corso Porta Reno (incrocio Carlo Mayr / Piangipane)
-            [44.83350, 11.62035], // Corso Porta Reno (incrocio Amendola)
-            [44.83410, 11.62000], // Corso Porta Reno (incrocio Ragno / San Romano)
-            [44.83490, 11.61955], // Corso Porta Reno (tratto banche / negozi)
-            [44.83540, 11.61920], // Corso Porta Reno (Torre dell'Orologio)
-            [44.83590, 11.61910]  // Piazza Cattedrale
-        ]
-    },
-    {
-        id: 'fe_piazza_trento_trieste',
-        names: ['piazza trento e trieste', 'trento e trieste', 'trento trieste', 'piazza trento trieste', 'piazza cattedrale', 'cattedrale'],
-        points: [
-            [44.83590, 11.61910], // Piazza Cattedrale / Torre dell'Orologio
-            [44.83575, 11.62100], // Piazza Trento e Trieste centro (Listone)
-            [44.83560, 11.62280], // Piazza Trento e Trieste est
-            [44.83550, 11.62350]  // Piazza Trento e Trieste / incrocio San Romano - Contrari
-        ]
-    },
-    {
-        id: 'fe_kennedy_baluardi',
-        names: ['via kennedy', 'kennedy', 'piazza travaglio', 'via baluardi', 'baluardi', 'via piangipane', 'piangipane', 'via darsena'],
-        points: [
-            [44.82720, 11.61500], // Via Darsena / Kennedy
-            [44.82900, 11.61620], // Via Kennedy ovest
-            [44.82980, 11.61680], // Via Kennedy / Baluardi
-            [44.83040, 11.61780], // Via Kennedy / parcheggio
-            [44.83080, 11.61860], // Via Kennedy centro
-            [44.83120, 11.62000], // Via Kennedy est
-            [44.83155, 11.62145], // Piazza Travaglio est
-            [44.83120, 11.62350], // Via Baluardi est
-            [44.82900, 11.62850]  // Baluardo San Rocco
-        ]
-    },
-    {
-        id: 'fe_corso_giovecca',
-        names: ['corso giovecca', 'giovecca', 'piazzale medaglie d\'oro'],
-        points: [
-            [44.83770, 11.61960], // Largo Castello / Giovecca
-            [44.83745, 11.62150], // Corso Giovecca (incrocio Borgo dei Leoni)
-            [44.83730, 11.62300], // Corso Giovecca (incrocio Terranuova)
-            [44.83705, 11.62520], // Corso Giovecca (ex Ospedale Sant'Anna)
-            [44.83680, 11.62750], // Corso Giovecca (incrocio Montebello)
-            [44.83655, 11.62980], // Corso Giovecca (incrocio Palestro)
-            [44.83630, 11.63200], // Corso Giovecca (tratto est)
-            [44.83600, 11.63450], // Corso Giovecca (Prospettiva)
-            [44.83570, 11.63600]  // Piazzale Medaglie d'Oro
-        ]
-    },
-    {
-        id: 'fe_viale_cavour',
-        names: ['viale cavour', 'cavour', 'corso porta po', 'porta po'],
-        points: [
-            [44.84150, 11.60100], // Stazione FS
-            [44.84060, 11.60300], // Giardini della Stazione
-            [44.84020, 11.60550], // Viale Cavour ovest
-            [44.83980, 11.60800], // Viale Cavour / incrocio Isonzo
-            [44.83940, 11.61050], // Viale Cavour / Poste Centrali
-            [44.83890, 11.61300], // Viale Cavour / Giardini 24 Maggio
-            [44.83840, 11.61580], // Viale Cavour / incrocio Spadari
-            [44.83790, 11.61850], // Viale Cavour / Largo Castello ovest
-            [44.83770, 11.61960]  // Largo Castello
-        ]
-    },
-    {
-        id: 'fe_ercole_este',
-        names: ['corso ercole i d\'este', 'ercole i d\'este', 'ercole deste', 'quadrivio degli angeli'],
-        points: [
-            [44.83800, 11.61980], // Castello Estense nord
-            [44.83980, 11.62020], // Palazzo dei Diamanti sud
-            [44.84150, 11.62060], // Quadrivio degli Angeli (Palazzo dei Diamanti)
-            [44.84450, 11.62130], // Corso Ercole I d'Este (tratto Mura)
-            [44.84900, 11.62240], // Porta degli Angeli
-            [44.85300, 11.62350]  // Parco Urbano Bassani
-        ]
-    },
-    {
-        id: 'fe_porta_mare_rossetti',
-        names: ['corso porta mare', 'porta mare', 'corso biagio rossetti', 'biagio rossetti', 'corso porta po', 'porta po'],
-        points: [
-            [44.83570, 11.63600], // Piazzale Medaglie d'Oro / Porta Mare
-            [44.83950, 11.63600], // Corso Porta Mare est
-            [44.84100, 11.63150], // Corso Porta Mare / Borgo dei Leoni
-            [44.84200, 11.62600], // Corso Porta Mare centro
-            [44.84300, 11.62100], // Quadrivio degli Angeli (Palazzo dei Diamanti)
-            [44.84380, 11.61650], // Corso Biagio Rossetti centro
-            [44.84350, 11.61100], // Barriere di Porta Po / Isonzo
-            [44.84150, 11.60100]  // Stazione FS
-        ]
-    },
-    {
-        id: 'fe_darsena',
-        names: ['via darsena', 'darsena'],
-        points: [
-            [44.82880, 11.61200], // Via Darsena / Corso Isonzo
-            [44.82720, 11.61500], // Via Darsena / Via Kennedy
-            [44.82500, 11.61300]  // Ponte di San Paolo
-        ]
-    },
-    {
-        id: 'cento_guercino',
-        names: ['corso guercino', 'guercino', 'piazza guercino'],
-        points: [
-            [44.73100, 11.28600], // Porta Ferrara
-            [44.72950, 11.28910], // Piazza Guercino
-            [44.72780, 11.29120], // Corso Guercino sud
-            [44.72500, 11.29400]  // Porta Bologna
-        ]
-    },
-    {
-        id: 'comacchio_centro',
-        names: ['via cavour', 'trepponti', 'piazza folegatti', 'via folegatti'],
-        points: [
-            [44.69700, 12.17800], // Via Cavour nord
-            [44.69750, 12.18600], // Piazza Folegatti
-            [44.69250, 12.18700], // Via Sambertolo
-            [44.69100, 12.18100]  // Trepponti
-        ]
-    },
-    {
-        id: 'fe_via_bologna',
-        names: ['via bologna', 'bologna'],
-        points: [
-            [44.82500, 11.61300], // Via Bologna inizio nord (Ponte di San Paolo / Darsena)
-            [44.82100, 11.61050], // Via Bologna (incrocio Foro Boario / Ippodromo)
-            [44.81500, 11.60650], // Via Bologna (argine Po di Volano)
-            [44.80800, 11.60000], // Via Bologna (Chiesuol del Fosso)
-            [44.79500, 11.59000]  // Via Bologna sud
-        ]
-    }
-];
-
-// Trova la proiezione di un punto su un segmento del corridoio
-function projectPointOnSegment(pLat, pLng, aLat, aLng, bLat, bLng) {
-    const dLat = bLat - aLat;
-    const dLng = bLng - aLng;
-    const lenSq = dLat * dLat + dLng * dLng;
-    if (lenSq === 0) {
-        return { lat: aLat, lng: aLng, t: 0, dist: calculateDistanceMeters(pLat, pLng, aLat, aLng) };
-    }
-    let t = ((pLat - aLat) * dLat + (pLng - aLng) * dLng) / lenSq;
-    t = Math.max(0, Math.min(1, t));
-    const projLat = aLat + t * dLat;
-    const projLng = aLng + t * dLng;
-    return {
-        lat: projLat,
-        lng: projLng,
-        t: t,
-        dist: calculateDistanceMeters(pLat, pLng, projLat, projLng)
-    };
-}
-
-// Calcola la geometria estratta da un corridoio pre-mappato ad altissima precisione
-function getCorridorGeometry(lat1, lng1, lat2, lng2, streetName) {
-    if (!streetName) return null;
-    const norm = (streetName || '').toLowerCase();
-    
-    for (const corridor of HIGH_PRECISION_ROAD_CORRIDORS) {
-        // Il corridoio si attiva ESCLUSIVAMENTE se il nome della via corrisponde al corridoio
-        const nameMatch = corridor.names.some(n => norm.includes(n));
-        if (!nameMatch) continue;
-
-        const pts = corridor.points;
-        let bestProj1 = null;
-        let bestProj2 = null;
-        let bestIdx1 = -1;
-        let bestIdx2 = -1;
-
-        for (let i = 0; i < pts.length - 1; i++) {
-            const p1 = projectPointOnSegment(lat1, lng1, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
-            if (!bestProj1 || p1.dist < bestProj1.dist) {
-                bestProj1 = p1;
-                bestIdx1 = i + p1.t;
-            }
-            const p2 = projectPointOnSegment(lat2, lng2, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
-            if (!bestProj2 || p2.dist < bestProj2.dist) {
-                bestProj2 = p2;
-                bestIdx2 = i + p2.t;
-            }
-        }
-
-        const maxAllowedDist = 180; // Massima distanza dal corridoio per aggancio
-        if (bestProj1 && bestProj2 && bestProj1.dist <= maxAllowedDist && bestProj2.dist <= maxAllowedDist) {
-            let res = [];
-            res.push([lat1, lng1]);
-
-            if (bestIdx1 <= bestIdx2) {
-                const startNode = Math.ceil(bestIdx1);
-                const endNode = Math.floor(bestIdx2);
-                for (let k = startNode; k <= endNode; k++) {
-                    if (k >= 0 && k < pts.length) {
-                        res.push([pts[k][0], pts[k][1]]);
-                    }
-                }
-            } else {
-                const startNode = Math.floor(bestIdx1);
-                const endNode = Math.ceil(bestIdx2);
-                for (let k = startNode; k >= endNode; k--) {
-                    if (k >= 0 && k < pts.length) {
-                        res.push([pts[k][0], pts[k][1]]);
-                    }
-                }
-            }
-
-            res.push([lat2, lng2]);
-
-            if (res.length >= 2) {
-                return res;
-            }
-        }
-    }
-    return null;
 }
 
 // Normalizza i nomi delle strade per collegare segnalazioni appartenenti alla stessa arteria/statale
@@ -3121,33 +2884,22 @@ async function fetchOsrmRoute(url, isReverse = false) {
     return null;
 }
 
-// Calcola il percorso reale tra due punti su una specifica strada
+// Calcola il percorso reale tra due punti su una specifica strada seguendo la carreggiata OpenStreetMap
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
-    // 1. Controllo prioritario con geometria vettoriale ad altissima precisione (istantaneo e fedele alle curve)
-    const corridorGeom = getCorridorGeometry(lat1, lng1, lat2, lng2, targetStreetName);
-    if (corridorGeom && corridorGeom.length >= 2) {
-        return corridorGeom;
-    }
-
     const isHighway = isMajorHighway(targetStreetName);
     const isRamp = (targetStreetName || '').toLowerCase().includes('rampa') || (targetStreetName || '').toLowerCase().includes('svincolo');
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const normTarget = normalizeStreetKey(targetStreetName);
 
-    const endpoints = isHighway || isRamp
-        ? [
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
-        ]
-        : [
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-            { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-            { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
-        ];
+    // OSRM Driving prioritario per seguire fedelmente la carreggiata e tutte le curve della strada
+    const endpoints = [
+        { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+        { url: `https://router.project-osrm.org/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
+        { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
+    ];
 
     let bestCoords = null;
     let bestScore = -Infinity;
@@ -3189,10 +2941,15 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
 
             if (score > bestScore) {
                 bestScore = score;
-                bestCoords = res.coords;
+                let finalCoords = [...res.coords];
+                // Aggancia sempre inizio e fine esattamente sulle coordinate dei marker
+                finalCoords[0] = [lat1, lng1];
+                finalCoords[finalCoords.length - 1] = [lat2, lng2];
+                bestCoords = finalCoords;
+
                 // Se è un ottimo tracciato con più nodi intermedi e lunghezza coerente, accettalo subito
                 if (res.coords.length >= 4 && ratio <= 1.8) {
-                    return res.coords;
+                    return finalCoords;
                 }
             }
         }
@@ -3346,15 +3103,12 @@ async function updateRoadSegments() {
         }
     }
 
-    // 5. Disegna subito le linee sulla mappa con curve reali immediate (snap vettoriale o cache)
+    // 5. Disegna subito le linee sulla mappa con curve reali immediate (cache o segmento iniziale)
     const segKeys = Object.keys(validSegments);
     segKeys.forEach(segKey => {
         const segment = validSegments[segKey];
         const cacheKey = `${normalizeStreetKey(segment.streetName) || segment.streetName.toLowerCase()}_${segment.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
-        const corridorSync = (segment.coords.length === 2) 
-            ? getCorridorGeometry(segment.coords[0][0], segment.coords[0][1], segment.coords[1][0], segment.coords[1][1], segment.streetName)
-            : null;
-        const initialCoords = streetGeomCache[cacheKey] || corridorSync || segment.coords;
+        const initialCoords = streetGeomCache[cacheKey] || segment.coords;
 
         if (!activeSegments[segKey]) {
             const polyline = L.polyline(initialCoords, {
