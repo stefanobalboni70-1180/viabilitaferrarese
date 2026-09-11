@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.16';
+const APP_VERSION = '3.6.17';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -4340,7 +4340,8 @@ const FERRARA_LOCAL_POI = [
     { keys: ['casa della salute bondeno', 'ospedale bondeno', 'borselli bondeno', 'bondeno'], lat: 44.8880, lng: 11.4160, label: "Casa della Salute F.lli Borselli, Bondeno" },
     { keys: ['casa della salute copparo', 'ospedale copparo', 'copparo'], lat: 44.8930, lng: 11.7220, label: "Casa della Salute Terre e Fiumi, Copparo" },
     { keys: ['casa della salute portomaggiore', 'ospedale portomaggiore', 'portomaggiore'], lat: 44.6980, lng: 11.8020, label: "Casa della Salute Portomaggiore" },
-    { keys: ['casa della salute codigoro', 'ospedale codigoro', 'codigoro'], lat: 44.8300, lng: 12.1100, label: "Casa della Salute Riviera Cavallotti, Codigoro" }
+    { keys: ['casa della salute codigoro', 'ospedale codigoro', 'codigoro'], lat: 44.8300, lng: 12.1100, label: "Casa della Salute Riviera Cavallotti, Codigoro" },
+    { keys: ['via golena', 'golena', 'ponte golena', 'ponte via golena'], lat: 44.8137, lng: 11.6855, label: "Via Golena / Ponte sul Po di Volano (Limite Altezza 2.50m)" }
 ];
 
 // Geocodifica un testo di indirizzo o POI (istantaneo locale + fallback Nominatim rapido)
@@ -4841,7 +4842,8 @@ const AUTHORIZED_EMERGENCY_CORRIDORS = [
 
 // Strade e vicoli medievali angusti, sottopassi bassi o percorsi ciclopedonali non carrabili
 const NARROW_AND_UNSUITABLE_STREETS = [
-    // Sottopassi bassi, ponti ferroviari e passaggi a sagoma ridotta
+    // Sottopassi bassi, ponti a sagoma ridotta e ferrovie
+    'via golena', 'golena', 'ponte golena', 'ponte via golena',
     'via mulinetto', 'mulinetto', 'sottopasso mulinetto',
     'via poletti', 'sottopasso poletti',
     'via felisatti', 'sottopasso felisatti',
@@ -4907,6 +4909,15 @@ const AMBULANCE_SPECS = {
 
 // Punti noti con ponti bassi, limiti di sagoma/altezza o varchi angusti nel territorio provinciale
 const PROVINCIAL_CLEARANCE_RESTRICTIONS = [
+    {
+        id: 'ponte_via_golena',
+        name: 'Ponte di Via Golena / Po di Volano (Ponte Basso 2.50m)',
+        lat: 44.8137,
+        lng: 11.6855,
+        maxHeight: 2.50, // Basso (2.50m): inaccessibile alle ambulanze 118 (h 2.80m)
+        maxWidth: 2.40,
+        type: 'sagoma_bassa'
+    },
     {
         id: 'sottopasso_mulinetto',
         name: 'Sottopasso Ferroviario Via Mulinetto / Argine Ducale (Ponte Basso 2.20m)',

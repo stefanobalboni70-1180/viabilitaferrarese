@@ -1,9 +1,9 @@
-# Viabilità Ferrara 118 - Versione 3.6.16
+# Viabilità Ferrara 118 - Versione 3.6.17
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.16):
-- **Blocco Assoluto Ponti Bassi e Sottopassi Ferroviari:** esclusione totale di ponti bassi, sottopassi ferroviari a sagoma ridotta (es. Via Mulinetto / Argine Ducale 2.20m, Via Poletti 2.40m, Via Felisatti 2.30m, sottopassi ciclopedonali Stazione FS, varchi storici bassi) con deviazione automatica garantita su assi a luce libera per ambulanze (h >= 2.80m).
+### Regole di Circolazione Mezzi di Soccorso 118 (v3.6.17):
+- **Blocco Assoluto Ponti Bassi e Sottopassi Ferroviari:** esclusione totale di ponti bassi e sottopassi a sagoma ridotta, incluso il **Ponte di Via Golena sul Po di Volano (limite 2.50m)**, Sottopasso Via Mulinetto / Argine Ducale (2.20m), Via Poletti (2.40m), Via Felisatti (2.30m), sottopassi ciclopedonali Stazione FS e varchi storici, con deviazione automatica garantita su assi a luce libera per ambulanze (h >= 2.80m).
 - **Esclusione Tracciati Biciclette / Ciclopedonali:** tutti i percorsi di soccorso 118 sono calcolati esclusivamente su viabilità veicolare idonea ad ambulanze Tipo A (3.8t, h 2.80m, l 2.30m).
 - **Calcolo Navigazione 118 Ultra-Rapido e Parallelo:** calcolo simultaneo concorrente di tutte le rotte e deviazioni in meno di un secondo, con timeout protetti e fallback garantito.
 - **Geocodifica Istantanea Locale POI:** risoluzione a 0ms di tutti i principali presidi sanitari, ospedali provinciali (Cona, Sant'Anna, Cento, Delta, Argenta, Comacchio, Bondeno, Copparo, Codigoro), stazioni e piazze.
