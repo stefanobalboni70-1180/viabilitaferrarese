@@ -1,35 +1,12 @@
 # Viabilità Ferrara 118 - Versione 3.7.0
 
-Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
+Applicazione per la consultazione e gestione in tempo reale della viabilità, interruzioni stradali, mercati, sagre, segnalazioni e comunicazioni urgenti per i mezzi di soccorso 118 e i cittadini di Ferrara e Provincia.
 
-### Nuove Funzionalità & Correzioni UI (v3.7.0):
-- **Calcolo Multi-Corridoio e Scelta Alternativa (Senza Autostrada / Statale SS16 / Romea / Misto / Autostrada):** per tutti i trasferimenti provinciali ed extraurbani (es. Ferrara-Ravenna, Ferrara-Cesena, Ferrara-Bologna, Ferrara-Rovigo, Ferrara-Delta), il navigatore 118 calcola fino a 3 percorsi differenziati per direttrice strategica:
-  1. *Percorso 1 (Più Veloce / Direttrice Principale):* il tempo di percorrenza minimo in assoluto (es. SS16 Adriatica diretta per Ravenna / Cesena, oppure Autostrada A13 per Bologna).
-  2. *Percorso 2 (Senza Autostrada / Statale Veloce):* direttrice rapida su viabilità statale senza pedaggio (es. SS16 Adriatica via Argenta/Alfonsine, oppure SS64 Porrettana).
-  3. *Percorso 3 (Misto / Corridoio Alternativo):* itinerario alternativo differenziato (es. Raccordo Ferrara-Porto Garibaldi RA8 + SS309 Romea, oppure Autostrada A13/A14, oppure Trasversale di Pianura).
-- **Integrazione Ospedale Maurizio Bufalini di Cesena (Trauma Center Hub Romagna):** inserito nel registro presidi di soccorso, nelle chips rapide e nel menu a tendina con riconoscimento istantaneo (0ms) per coordinate `44.1332, 12.2530` e indicazioni dirette.
-- **Risoluzione Definitiva Bug Reindirizzamento Cona:** rimosso l'aggancio generico forzato a Cona durante la digitazione o selezione di altri ospedali; il sistema isola e preserva la destinazione sanitaria selezionata.
-- **Risoluzione Sovrapposizione Finestre Admin (PC & Mobile):** riarchitettura del layout della barra superiore con container di flusso unificato (`.top-nav-wrapper`), eliminando le coordinate assolute rigide e garantendo che la barra di ricerca/filtri admin compaia sempre sotto l'header senza alcuna sovrapposizione su qualsiasi risoluzione.
-- **Ottimizzazione Responsive Header & Pulsanti:** disposizione fluida dei pulsanti di azione e controllo (News, Naviga, Segnala Problema, Gestione News, Segnalazioni, Logout) con wrapping pulito e touch targets ottimizzati per smartphone.
-- **Riposizionamento Banner Selezione Mappa:** il banner di selezione punto mappa (`#picker-banner`) è stato riposizionato in basso in modalità fluttuante (`bottom: 30px`) per evitare collisioni con l'header superiore.
-- **Modali a Schermo Intero Centrati e Scrollabili:** overlay modali convertiti a `position: fixed` con backdrop blur, garantendo visibilità e leggibilità su tutti i dispositivi.
-- **Finestra Notizie Urgenti (Flash News 20s):** popup visibile per 20 secondi all'avvio dell'applicazione con conto alla rovescia, barra di progresso e chiusura manuale o automatica per avvisi straordinari e criticità viabilistiche immediate.
-- **Pannello Gestione Notizie Urgenti per Amministratore:** gestione completa fino a un massimo di 3 comunicazioni urgenti con personalizzazione della durata (ore, giorni, data esatta o permanente), modifica immediata, disattivazione e cancellazione sincronizzata in tempo reale su Firebase.
-- **Pulsante di Consultazione Rapida `🚨 News` nell'Header:** consente agli equipaggi di rileggere in ogni momento le comunicazioni urgenti attive.
-- **Blocco Assoluto Ponti Bassi e Sottopassi Ferroviari:** esclusione totale di ponti bassi e sottopassi a sagoma ridotta, inclusi il **Sottopasso Ferroviario di Via Traversagno (limite 2.40m)**, il **Ponte di Via Golena sul Po di Volano (limite 2.50m)**, Sottopasso Via Mulinetto / Argine Ducale (2.20m), Via Poletti (2.40m), Via Felisatti (2.30m), sottopassi ciclopedonali Stazione FS e varchi storici, con deviazione automatica garantita su assi a luce libera per ambulanze (h >= 2.80m).
-- **Esclusione Tracciati Biciclette / Ciclopedonali:** tutti i percorsi di soccorso 118 sono calcolati esclusivamente su viabilità veicolare idonea ad ambulanze Tipo A (3.8t, h 2.80m, l 2.30m).
-- **Calcolo Navigazione 118 Ultra-Rapido e Parallelo:** calcolo simultaneo concorrente di tutte le rotte e deviazioni in meno di un secondo, con timeout protetti e fallback garantito.
-- **Geocodifica Istantanea Locale POI:** risoluzione a 0ms di tutti i principali presidi sanitari, ospedali provinciali (Cona, Sant'Anna, Cento, Delta, Argenta, Comacchio, Bondeno, Copparo, Codigoro), stazioni e piazze.
-- **Tracciato Reale Strade Chiuse (OSM Way Geometry):** ogni tratto stradale interrotto (es. Via Ruffetta) segue fedelmente e al 100% la sagoma della carreggiata OpenStreetMap con tutte le sue curve, con divieto assoluto di deviare su strade con nome diverso (es. SP4) e divieto di formare linee rette.
-- **Sensi Unici Ordinari Rispettati:** tutti i percorsi di navigazione rispettano scrupolosamente i sensi unici di marcia e la direzione ordinaria consentita per i veicoli, evitando manovre contromano su strade a senso unico.
-- **Corsie Preferenziali Bus e Taxi:** autorizzazione e sfruttamento delle corsie riservate a bus e taxi (es. Corso Giovecca, Viale Cavour, Corso Porta Reno, Via Kennedy, Via Bologna corsia bus) con badge dedicato `🚌 Corsia Bus/Taxi`.
-- **Chiusure Stradali e Ponti Interrotti come Interruzioni Totali:** ogni strada chiusa (`chiusa`), cantiere bloccante (`lavori`) o ponte interrotto (`ponte`) è trattato come una barriera fisica non oltrepassabile. Se un ponte su fiumi/canali provinciali (Po, Po di Volano, Canale Boicelli, Reno, ecc.) è interrotto, il sistema forza l'itinerario sul ponte alternativo aperto più vicino.
-- **Limiti di Sagoma e Altezza per Ambulanze (Tipo A / MSA / MSB):**
-  - Altezza massima considerata: **2.80 m** (con barra lampeggianti e antenne).
-  - Larghezza minima di passaggio: **2.30 m** (inclusi specchietti retrovisori).
-  - Punti con franchigia inferiore (sottopassi ferroviari bassi, varchi stretti storici) vengono automaticamente rilevati e bypassati.
-- **Corsie e Direttrici di Scorrimento Veloce:** priorità di utilizzo e valorizzazione di Tangenziale Ovest, Tangenziale Est, Raccordo Autostradale Ferrara-Porto Garibaldi (RA8), SS16 Adriatica e SS64 con badge `⚡ Scorrimento Veloce`.
-- **Riconoscimento Geometrico ZTL Provinciali:** delimitazione poligonale ZTL per Ferrara (Principale e Nucleo Pedonale), Cento, Comacchio, Argenta, Bondeno, Portomaggiore, Copparo e Codigoro.
-- **Aree Mercatali Attive come ZTL Dinamiche:** i mercati settimanali e rionali attivi vengono rilevati e gestiti come ZTL/aree pedonali a tempo con bypass dedicati.
-- **Transito Fuori ZTL Garantito:** se il percorso 1 transita per la ZTL/Mercato, il Percorso 2 è sempre garantito sulla viabilità ordinaria esterna (`🚗 Fuori ZTL`).
-- **Guida Vocale Turn-by-Turn con HUD Dinamico:** istruzioni vocali anticipate e immediate, calcolo scalare dei metri e ricalcolo istantaneo in caso di fuori rotta.
+### Funzionalità Principali (v3.7.0):
+- **Tracciato Reale Strade Chiuse (OSM Way Geometry):** ogni tratto stradale interrotto (inclusa Via Ruffetta) segue fedelmente al 100% la sagoma della carreggiata OpenStreetMap con tutte le sue curve, senza approssimazioni a linee rette e senza deviazioni su altre arterie stradali.
+- **Finestra Notizie Urgenti (Flash News 20s):** popup informativo visualizzato per 20 secondi all'avvio con barra di avanzamento per avvisi straordinari e criticità viabilistiche immediate.
+- **Pulsante di Consultazione Rapida `🚨 News`:** permette agli operatori di riaprire e consultare in qualsiasi momento tutte le comunicazioni urgenti attive.
+- **Pannello Gestione Notizie per Amministratore:** creazione, modifica e disattivazione di comunicazioni prioritarie (fino a 3 attive) con sincronizzazione istantanea su Firebase.
+- **Modulo Segnalazioni Utenti:** invio rapido di segnalazioni di viabilità da parte dei cittadini e degli equipaggi sul territorio, con moderazione e validazione da pannello Admin.
+- **Gestione Chiusure, Mercati e Sagre:** visualizzazione dinamica sulla mappa Leaflet con filtri temporali e sincronizzazione automatica.
+- **UI Moderna e Responsiva:** layout ottimizzato con interfaccia fluida per smartphone, tablet e postazioni desktop di centrale.
