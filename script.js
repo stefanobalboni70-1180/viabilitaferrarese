@@ -7113,64 +7113,54 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const pool = freeRoutes.length > 0 ? freeRoutes : validPool;
 
     const selected3 = [];
-    const fastest = pool[0];
 
     if (isInterurban) {
-        // --- LOGICA DI SELEZIONE INTELLIGENTE PERCORSI EXTRAURBANI / INTERPROVINCIALI ---
-        // 1. Slot 1: Il percorso più veloce in assoluto
-        if (fastest) selected3.push(fastest);
+        // --- SELEZIONE DIRETTA E GARANTITA DEI CORRIDOI STRATEGICI 118 ---
+        const ss16Route = pool.find(r => r.corridorTag === 'ss16_e45' || r.corridorTag === 'ss16' || (r.corridor && r.corridor.hasSS16));
+        const romeaRoute = pool.find(r => r.corridorTag === 'romea' || (r.corridor && r.corridor.hasRomea));
+        const motorwayRoute = pool.find(r => r.corridorTag === 'motorway' || (r.corridor && r.corridor.hasMotorway));
+        const ss64Route = pool.find(r => r.corridorTag === 'ss64' || (r.corridor && r.corridor.hasSS64));
+        const centeseRoute = pool.find(r => r.corridorTag === 'centese' || (r.corridor && r.corridor.hasCentese));
+        const transpolesanaRoute = pool.find(r => r.corridorTag === 'transpolesana' || (r.corridor && r.corridor.hasTranspolesana));
+        const ra8Route = pool.find(r => r.corridorTag === 'ra8' || (r.corridor && r.corridor.hasRA8));
 
-        // 2. Slot 2: Percorso rapido SENZA AUTOSTRADA (es. SS16 Adriatica + E45 o SS64 Porrettana o Romea senza pedaggio)
-        const noMotorwayCandidates = pool.filter(r => r.isNoMotorway);
-        const motorwayCandidates = pool.filter(r => !r.isNoMotorway);
-
-        if (fastest && !fastest.isNoMotorway) {
-            // Il più veloce usa autostrada -> Slot 2 DEVE essere la migliore opzione Senza Autostrada (SS16 + E45, SS64, Romea)
-            const bestNoMotorway = noMotorwayCandidates.find(r => !selected3.includes(r));
-            if (bestNoMotorway) {
-                bestNoMotorway.isNoMotorwayAlternative = true;
-                selected3.push(bestNoMotorway);
-            }
-        } else if (fastest && fastest.isNoMotorway) {
-            // Il più veloce è già statale/senza autostrada -> Slot 2 propone un'altra direttrice alternativa (es. Romea vs SS16)
-            const secondCorridor = pool.find(r =>
-                !selected3.includes(r) &&
-                r.corridorName !== fastest.corridorName &&
-                Math.abs(parseFloat(r.distanceKm) - parseFloat(fastest.distanceKm)) >= 2.0
-            );
-            if (secondCorridor) {
-                selected3.push(secondCorridor);
-            } else if (noMotorwayCandidates.length > 1) {
-                const altNoMotorway = noMotorwayCandidates.find(r => !selected3.includes(r) && Math.abs(parseFloat(r.distanceKm) - parseFloat(fastest.distanceKm)) >= 1.5);
-                if (altNoMotorway) selected3.push(altNoMotorway);
-            }
+        // 1. Verso Cesena Bufalini / Romagna / Ravenna
+        if (destLat <= 44.75 && destLng >= 11.75) {
+            // Percorso 1: Statale SS16 Adriatica + E45 (Ferrara - Argenta - Ravenna - Cesena)
+            if (ss16Route) selected3.push(ss16Route);
+            // Percorso 2: Superstrada Ferrara-Mare RA8 + SS309 Romea + E45
+            if (romeaRoute && !selected3.includes(romeaRoute)) selected3.push(romeaRoute);
+            // Percorso 3: Autostrada A13 / A14
+            if (motorwayRoute && !selected3.includes(motorwayRoute)) selected3.push(motorwayRoute);
+        } else if (destLat <= 44.65 && destLng >= 11.20 && destLng <= 11.75) {
+            // Verso Bologna: SS64 Porrettana, Autostrada A13
+            if (ss64Route) selected3.push(ss64Route);
+            if (motorwayRoute && !selected3.includes(motorwayRoute)) selected3.push(motorwayRoute);
+        } else if (destLng <= 11.35 && destLat <= 44.85) {
+            // Verso Modena / Cento: Centese SP255, Autostrada A13/A1
+            if (centeseRoute) selected3.push(centeseRoute);
+            if (motorwayRoute && !selected3.includes(motorwayRoute)) selected3.push(motorwayRoute);
+        } else if (destLat >= 44.90) {
+            // Verso Rovigo / Veneto: SS16, Transpolesana, Autostrada A13
+            if (ss16Route) selected3.push(ss16Route);
+            if (transpolesanaRoute && !selected3.includes(transpolesanaRoute)) selected3.push(transpolesanaRoute);
+            if (motorwayRoute && !selected3.includes(motorwayRoute)) selected3.push(motorwayRoute);
+        } else if (destLng >= 12.00 && destLat >= 44.65) {
+            // Verso Delta: Superstrada RA8
+            if (ra8Route) selected3.push(ra8Route);
         }
 
-        // 3. Slot 3: Terzo corridoio alternativo distinto (es. Autostrada A13/A14, oppure Raccordo Romea + E45)
-        const thirdCandidate = pool.find(r =>
-            !selected3.includes(r) &&
-            !selected3.some(s => s.corridorName === r.corridorName) &&
-            !selected3.some(s => Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 3.0 && Math.abs(s.durationMin - r.durationMin) <= 1)
-        );
-        if (thirdCandidate) {
-            selected3.push(thirdCandidate);
-        } else {
-            // Prova a inserire l'opzione autostradale se non ancora presente, oppure la migliore alternativa rimanente
-            const altMotorway = motorwayCandidates.find(r => !selected3.includes(r));
-            if (altMotorway) {
-                selected3.push(altMotorway);
-            }
-        }
-
-        // Riempi fino a 3 con percorsi geometricamente e nominativamente distinti
+        // Se mancano slot per arrivare a 3, inserisci i percorsi più veloci e non duplicati
         for (const r of pool) {
             if (selected3.length >= 3) break;
-            const isDuplicate = selected3.some(s =>
-                s.corridorName === r.corridorName ||
-                (Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 2.5 && Math.abs(s.durationMin - r.durationMin) <= 1)
-            );
-            if (!isDuplicate && !selected3.includes(r)) {
-                selected3.push(r);
+            if (!selected3.includes(r)) {
+                const isDuplicate = selected3.some(s =>
+                    s.corridorName === r.corridorName ||
+                    (Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 3.0 && Math.abs(s.durationMin - r.durationMin) <= 1)
+                );
+                if (!isDuplicate) {
+                    selected3.push(r);
+                }
             }
         }
     } else {
@@ -7182,6 +7172,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         ztlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
         noZtlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
 
+        const fastest = pool[0];
         if (fastest) selected3.push(fastest);
 
         if (fastest && fastest.isZtlRoute && noZtlCandidates.length > 0) {
@@ -7251,21 +7242,25 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         r.dotColor = cfg.dotColor;
 
         if (isInterurban) {
-            // Titoli e Badge per percorsi extraurbani / interprovinciali
-            if (i === 0) {
-                r.title = `Percorso 1 (Più Veloce: ${r.corridorName})`;
-                r.badgeText = "⚡ Più Veloce";
-            } else if (i === 1) {
-                if (r.isNoMotorway) {
-                    r.title = `Percorso 2 (Senza Autostrada: ${r.corridorName})`;
-                    r.badgeText = "🚫 Senza Autostrada";
-                } else {
-                    r.title = `Percorso 2 (Alternativa: ${r.corridorName})`;
-                    r.badgeText = "🔄 Alternativa 1";
-                }
+            // Titoli e Badge specifici per percorsi extraurbani / interprovinciali
+            if (r.corridorTag === 'ss16_e45' || (r.corridor && r.corridor.hasSS16 && destLat <= 44.35)) {
+                r.title = `Percorso ${i + 1} (Statale SS16 Adriatica + E45 via Argenta e Ravenna)`;
+                r.badgeText = "🛣️ SS16 + E45";
+            } else if (r.corridorTag === 'romea' || (r.corridor && r.corridor.hasRomea)) {
+                r.title = `Percorso ${i + 1} (Superstrada Ferrara-Mare RA8 + SS309 Romea)`;
+                r.badgeText = "🌊 Via Romea";
+            } else if (r.corridorTag === 'motorway' || (r.corridor && r.corridor.hasMotorway)) {
+                r.title = `Percorso ${i + 1} (Autostrada A13 / A14)`;
+                r.badgeText = "🛣️ Autostrada A13/A14";
+            } else if (r.corridorTag === 'ss64' || (r.corridor && r.corridor.hasSS64)) {
+                r.title = `Percorso ${i + 1} (Statale SS64 Porrettana)`;
+                r.badgeText = "🛣️ Statale SS64";
+            } else if (r.isNoMotorway) {
+                r.title = `Percorso ${i + 1} (Senza Autostrada: ${r.corridorName})`;
+                r.badgeText = "🚫 Senza Autostrada";
             } else {
-                r.title = `Percorso ${i + 1} (Alternativa: ${r.corridorName})`;
-                r.badgeText = `🔄 Alternativa ${i}`;
+                r.title = `Percorso ${i + 1} (${r.corridorName})`;
+                r.badgeText = `🔄 Alternativa ${i + 1}`;
             }
         } else {
             // Titoli e Badge per percorsi urbani
