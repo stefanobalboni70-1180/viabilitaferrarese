@@ -6635,7 +6635,7 @@ function analyzeRouteCorridor(steps, coords, startLat, startLng, destLat, destLn
         });
     }
 
-    if (customTag === 'ss16') hasSS16 = true;
+    if (customTag === 'ss16_e45' || customTag === 'ss16') hasSS16 = true;
     if (customTag === 'romea') { hasRomea = true; hasRA8 = true; }
     if (customTag === 'motorway') hasMotorway = true;
     if (customTag === 'ss64') hasSS64 = true;
@@ -6649,7 +6649,12 @@ function analyzeRouteCorridor(steps, coords, startLat, startLng, destLat, destLn
     let corridorBadgeClass = "clear";
     let corridorNote = "Percorso su viabilità ordinaria e arterie extraurbane.";
 
-    if (hasMotorway && (hasSS16 || hasRomea || hasRA8 || hasSS64)) {
+    if (customTag === 'ss16_e45' || (hasSS16 && destLat <= 44.35 && destLng >= 12.0)) {
+        corridorName = "Statale SS16 Adriatica + E45";
+        corridorBadge = "🛣️ SS16 + E45";
+        corridorBadgeClass = "ss16";
+        corridorNote = "Direttrice diretta via SS16 Argenta, Ravenna e Superstrada E45 per Cesena (senza autostrada).";
+    } else if (hasMotorway && (hasSS16 || hasRomea || hasRA8 || hasSS64)) {
         corridorName = "Misto (Autostrada + Direttrici Statali)";
         corridorBadge = "🔄 Misto Autostrada";
         corridorBadgeClass = "mixed";
@@ -6658,7 +6663,7 @@ function analyzeRouteCorridor(steps, coords, startLat, startLng, destLat, destLn
         corridorName = "Autostrada (A13 / A14)";
         corridorBadge = "🛣️ Autostrada A13/A14";
         corridorBadgeClass = "highway";
-        corridorNote = "Percorso su direttrice autostradale a pedaggio.";
+        corridorNote = "Percorso su direttrice autostradale a pedaggio (A13 Ferrara Sud - A14 Cesena/Romagna).";
     } else if (hasRA8 && hasRomea) {
         corridorName = "Superstrada Ferrara-Mare + SS309 Romea";
         corridorBadge = "🌊 Via Romea";
@@ -6752,32 +6757,58 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
     // Se il tragitto è extraurbano o interprovinciale, genera query per le direttrici strategiche (SS16, Romea, Autostrada, SS64, ecc.)
     if (isInterurban) {
-        // 1. Verso Est / Sud-Est (Ravenna, Cesena Bufalini, Forlì, Faenza, Rimini, Comacchio, Argenta)
+        // 1. Verso Est / Sud-Est (Cesena Bufalini, Ravenna, Faenza, Forlì, Rimini, Comacchio, Argenta)
         if (destLat <= 44.75 && destLng >= 11.75) {
-            // Corridoio Statale SS16 Adriatica (Senza Autostrada / Via Argenta - Alfonsine)
-            endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.0400,44.5060;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
-                isBypass: false,
-                isBike: false,
-                corridorTag: 'ss16',
-                corridorLabel: 'Via SS16 Adriatica (Senza Autostrada)'
-            });
-            // Corridoio Superstrada Ferrara-Mare (RA8) + SS309 Romea
-            endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2350,44.5500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
-                isBypass: false,
-                isBike: false,
-                corridorTag: 'romea',
-                corridorLabel: 'Via Superstrada Ferrara-Mare (RA8) + SS309 Romea'
-            });
-            // Corridoio Autostrada A13 / A14
-            endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5500,44.7500;11.8800,44.4000;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
-                isBypass: false,
-                isBike: false,
-                corridorTag: 'motorway',
-                corridorLabel: 'Via Autostrada A13 / A14'
-            });
+            const isCesenaOrSouthRomagna = destLat <= 44.35;
+            if (isCesenaOrSouthRomagna) {
+                // Corridoio Richiesto: Ferrara -> Argenta (SS16) -> Ravenna (SS16) -> E45 (SS3bis) -> Cesena Bufalini
+                endpoints.push({
+                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.1650,44.3850;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    isBypass: false,
+                    isBike: false,
+                    corridorTag: 'ss16_e45',
+                    corridorLabel: 'Via SS16 Adriatica + E45 (Ferrara - Argenta - Ravenna - Cesena)'
+                });
+                // Corridoio Superstrada Ferrara-Mare (RA8) + SS309 Romea + E45
+                endpoints.push({
+                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2400,44.5400;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    isBypass: false,
+                    isBike: false,
+                    corridorTag: 'romea',
+                    corridorLabel: 'Via Superstrada Ferrara-Mare (RA8) + SS309 Romea + E45'
+                });
+                // Corridoio Autostrada A13 / A14
+                endpoints.push({
+                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.3700;12.2100,44.1800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    isBypass: false,
+                    isBike: false,
+                    corridorTag: 'motorway',
+                    corridorLabel: 'Via Autostrada A13 / A14'
+                });
+            } else {
+                // Ravenna / Bassa Romagna
+                endpoints.push({
+                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.0400,44.5060;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    isBypass: false,
+                    isBike: false,
+                    corridorTag: 'ss16',
+                    corridorLabel: 'Via SS16 Adriatica (Senza Autostrada)'
+                });
+                endpoints.push({
+                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2350,44.5500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    isBypass: false,
+                    isBike: false,
+                    corridorTag: 'romea',
+                    corridorLabel: 'Via Superstrada Ferrara-Mare (RA8) + SS309 Romea'
+                });
+                endpoints.push({
+                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.4000;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    isBypass: false,
+                    isBike: false,
+                    corridorTag: 'motorway',
+                    corridorLabel: 'Via Autostrada A13 / A14'
+                });
+            }
         }
 
         // 2. Verso Sud (Bologna, Imola, San Lazzaro, Casalecchio)
@@ -6966,13 +6997,22 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
 
         const obsCheck = evaluateRouteObstacles(coords, obstacles);
-        const steps = (r.legs && r.legs[0] && r.legs[0].steps) ? r.legs[0].steps : [];
+        
+        // Estrai tutti gli step di svolta appiattendo tutti i segmenti (legs) dell'itinerario
+        const rawSteps = [];
+        if (r.legs && Array.isArray(r.legs)) {
+            r.legs.forEach(leg => {
+                if (leg.steps && Array.isArray(leg.steps)) {
+                    rawSteps.push(...leg.steps);
+                }
+            });
+        }
 
         // Verifica compatibilità della strada con i mezzi di soccorso 118 (esclude vicoli angusti / percorsi ciclabili)
-        const isSuitable = isRouteSuitableForEmergency(steps, destLat, destLng);
+        const isSuitable = isRouteSuitableForEmergency(rawSteps, destLat, destLng);
 
         // Analisi corridoio stradale (SS16, Romea, Autostrada, ecc.)
-        const corridorInfo = analyzeRouteCorridor(steps, coords, startLat, startLng, destLat, destLng, r._corridorTag);
+        const corridorInfo = analyzeRouteCorridor(rawSteps, coords, startLat, startLng, destLat, destLng, r._corridorTag);
 
         return {
             index: idx,
@@ -7003,8 +7043,8 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             blockReasons: obsCheck.reasons,
             collidedObstacles: obsCheck.collidedObstacles,
             unsuitableForEmergency: !isSuitable,
-            steps: formatManeuverSteps(steps),
-            rawSteps: steps
+            steps: formatManeuverSteps(rawSteps),
+            rawSteps: rawSteps
         };
     });
 
@@ -7077,16 +7117,15 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
     if (isInterurban) {
         // --- LOGICA DI SELEZIONE INTELLIGENTE PERCORSI EXTRAURBANI / INTERPROVINCIALI ---
-        // 1. Slot 1: Il percorso più veloce in assoluto (es. SS16 o Superstrada/Romea o Autostrada)
+        // 1. Slot 1: Il percorso più veloce in assoluto
         if (fastest) selected3.push(fastest);
 
-        // 2. Slot 2: Percorso rapido SENZA AUTOSTRADA (es. SS16 Adriatica o SS64 o Romea senza pedaggio)
-        // Se il più veloce è già senza autostrada, seleziona una seconda direttrice statale/superstrada distinta
+        // 2. Slot 2: Percorso rapido SENZA AUTOSTRADA (es. SS16 Adriatica + E45 o SS64 Porrettana o Romea senza pedaggio)
         const noMotorwayCandidates = pool.filter(r => r.isNoMotorway);
         const motorwayCandidates = pool.filter(r => !r.isNoMotorway);
 
         if (fastest && !fastest.isNoMotorway) {
-            // Il più veloce usa autostrada -> Slot 2 DEVE essere la migliore opzione Senza Autostrada (SS16, SS64, Romea)
+            // Il più veloce usa autostrada -> Slot 2 DEVE essere la migliore opzione Senza Autostrada (SS16 + E45, SS64, Romea)
             const bestNoMotorway = noMotorwayCandidates.find(r => !selected3.includes(r));
             if (bestNoMotorway) {
                 bestNoMotorway.isNoMotorwayAlternative = true;
@@ -7107,11 +7146,11 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             }
         }
 
-        // 3. Slot 3: Terzo corridoio alternativo (es. Autostrada A13/A14, oppure Raccordo Romea, oppure Misto/Ordinaria)
+        // 3. Slot 3: Terzo corridoio alternativo distinto (es. Autostrada A13/A14, oppure Raccordo Romea + E45)
         const thirdCandidate = pool.find(r =>
             !selected3.includes(r) &&
             !selected3.some(s => s.corridorName === r.corridorName) &&
-            !selected3.some(s => Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 2.5 && Math.abs(s.durationMin - r.durationMin) <= 1)
+            !selected3.some(s => Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 3.0 && Math.abs(s.durationMin - r.durationMin) <= 1)
         );
         if (thirdCandidate) {
             selected3.push(thirdCandidate);
@@ -7123,12 +7162,12 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             }
         }
 
-        // Riempi fino a 3 con percorsi geometricamente distinti
+        // Riempi fino a 3 con percorsi geometricamente e nominativamente distinti
         for (const r of pool) {
             if (selected3.length >= 3) break;
             const isDuplicate = selected3.some(s =>
-                Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 1.8 &&
-                Math.abs(s.durationMin - r.durationMin) <= 1
+                s.corridorName === r.corridorName ||
+                (Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 2.5 && Math.abs(s.durationMin - r.durationMin) <= 1)
             );
             if (!isDuplicate && !selected3.includes(r)) {
                 selected3.push(r);
