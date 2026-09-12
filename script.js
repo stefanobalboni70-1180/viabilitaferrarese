@@ -6047,67 +6047,80 @@ function formatManeuverSteps(rawSteps) {
 }
 
 // -------------------------------------------------------
+// -------------------------------------------------------
 // ASSI AUTORIZZATI DI SCORRIMENTO 118 IN ZTL & CENTRO STORICO
 // (Sempre consentiti per il transito rapido del mezzo di soccorso)
 // -------------------------------------------------------
 const AUTHORIZED_EMERGENCY_CORRIDORS = [
-    'corso martiri della liberta', 'martiri della liberta', 'corso martiri', 'martiri',
+    'corso martiri della liberta', 'corso martiri della libertà', 'martiri della liberta', 'martiri della libertà', 'corso martiri', 'martiri',
     'largo castello', 'piazza castello', 'piazza cattedrale', 'piazza repubblica', 'piazza savonarola',
     'corso porta reno', 'porta reno', 'piazza travaglio', 'via kennedy', 'kennedy',
-    'corso giovecca', 'giovecca', 'viale cavour', 'cavour',
+    'corso giovecca', 'giovecca', 'corso della giovecca', 'viale cavour', 'cavour',
     'corso ercole i d\'este', 'ercole i d\'este',
     'corso porta mare', 'porta mare', 'corso biagio rossetti', 'biagio rossetti', 'corso porta po', 'porta po',
-    'corso isonzo', 'isonzo', 'via darsena', 'darsena', 'via bologna', 'bologna'
+    'corso isonzo', 'isonzo', 'via darsena', 'darsena', 'via bologna', 'bologna',
+    'via caldirolo', 'via colombarola', 'via san maurelio', 'via ravenna', 'via pomposa', 'via comacchio',
+    'via argine ducale', 'via ferraresi', 'via fabbri', 'via san giacomo', 'via traversagno',
+    'strada statale', 'ss16', 'ss309', 'ss64', 'ss434', 'superstrada', 'autostrada', 'tangenziale', 'raccordo'
 ];
 
 // Strade e vicoli medievali angusti, sottopassi bassi o percorsi ciclopedonali non carrabili
 const NARROW_AND_UNSUITABLE_STREETS = [
     // Sottopassi bassi, ponti a sagoma ridotta e ferrovie
-    'via traversagno', 'traversagno', 'ponte traversagno', 'sottopasso traversagno',
-    'via golena', 'golena', 'ponte golena', 'ponte via golena',
-    'via mulinetto', 'mulinetto', 'sottopasso mulinetto',
-    'via poletti', 'sottopasso poletti',
-    'via felisatti', 'sottopasso felisatti',
+    'ponte traversagno', 'sottopasso traversagno',
+    'ponte golena', 'ponte via golena',
+    'sottopasso mulinetto',
+    'sottopasso poletti',
+    'sottopasso felisatti',
     'sottopasso ferroviario', 'sottopasso pedonale', 'sottopasso ciclabile', 'ponte basso',
     // Vicoli e strade medievali a sagoma ridotta / curve cieche
-    'via delle volte', 'capo delle volte', 'delle volte',
-    'via delle vecchie', 'via colomba', 'via della luna', 'via del granchio',
+    'via delle volte', 'capo delle volte',
+    'via delle vecchie', 'via della colomba', 'vicolo colomba', 'via della luna', 'via del granchio',
     'via zemola', 'via voltacasalo', 'via fassolo', 'via cammello', 'via brasavola',
     'via guglielmo degli adelardi', 'degli adelardi', 'via adelardi',
-    'via vignatagliata', 'via vittoria', 'via gattamarcia',
+    'via vignatagliata', 'via gattamarcia',
     'vicolo dei duelli', 'vicolo del leoncorno', 'vicolo mozzo', 'vicolo del chiozzino',
     'vicolo colombara', 'vicolo boccacanale', 'vicolo del carbone', 'vicolo zenzalo',
     'vicolo san paolo', 'vicolo del follo', 'vicolo lupi', 'vicolo agnello', 'vicolo torto',
-    'vicolo ',
     // Varchi storici e volti angusti
     'volto del cavallo', 'volto del podesta', 'volto del podestà', 'volto della luna',
     // Tratti pedonali angusti non carrabili
-    'via san romano', 'via mazzini', 'via contrari', 'via fondobanchetto',
-    'via coperta', 'via gusmaria', 'via del turco', 'via carlo mayr',
+    'via san romano', 'via contrari', 'via fondobanchetto',
+    'via coperta', 'via gusmaria', 'via del turco',
     'via delle scotte', 'via gorgadello', 'via canonica',
     // Piste ciclabili e percorsi sterrati/pedonali esclusivi
     'pista ciclabile', 'ciclopedonale', 'ciclabile', 'percorso ciclopedonale', 'pista ciclopedonale',
     'sottomura', 'sopramura', 'sottomura est', 'sottomura ovest', 'sottomura sud', 'sottomura nord',
-    'parco urbano', 'scalinata', 'sentiero', 'passerella', 'tracciato ciclabile', 'footway', 'cycleway', 'steps'
+    'parco urbano', 'scalinata', 'sentiero', 'passerella', 'tracciato ciclabile', 'footway', 'cycleway'
 ];
 
+// Helper per verificare se un nome di strada corrisponde a un pattern (con confini di parola esatti)
+function isStreetMatchWord(rawName, pattern) {
+    if (!rawName || !pattern) return false;
+    const cleanPattern = pattern.trim();
+    if (cleanPattern.length <= 2) return false;
+    const escaped = cleanPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(^|\\s|\\b)${escaped}(\\s|\\b|$)`, 'i');
+    return regex.test(rawName);
+}
+
 // Verifica se un percorso contiene strade troppo strette o non confacenti ai mezzi di soccorso 118
-function isRouteSuitableForEmergency(steps, destLat = null, destLng = null) {
+function isRouteSuitableForEmergency(steps, destLat = null, destLng = null, isInterurban = false) {
     if (!steps || steps.length === 0) return true;
     for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
         const rawName = (step.name || '').trim().toLowerCase();
         if (!rawName) continue;
 
-        // Se è un asse primario autorizzato 118 (es. Corso Martiri della Libertà, Porta Reno, Giovecca, Cavour), è sempre valido
-        const isAuthorizedCorridor = AUTHORIZED_EMERGENCY_CORRIDORS.some(auth => rawName.includes(auth));
+        // Se è un asse primario autorizzato 118, è sempre valido
+        const isAuthorizedCorridor = AUTHORIZED_EMERGENCY_CORRIDORS.some(auth => isStreetMatchWord(rawName, auth) || rawName.includes(auth));
         if (isAuthorizedCorridor) continue;
 
         // Se è l'ultimo passo o la destinazione finale, l'accesso di prossimità è consentito
         const isFinalStep = (i === steps.length - 1) || (step.maneuver && step.maneuver.type === 'arrive');
         if (isFinalStep) continue;
 
-        const isUnsuitable = NARROW_AND_UNSUITABLE_STREETS.some(unfit => rawName.includes(unfit));
+        const isUnsuitable = NARROW_AND_UNSUITABLE_STREETS.some(unfit => isStreetMatchWord(rawName, unfit));
         if (isUnsuitable) {
             return false;
         }
@@ -6751,8 +6764,8 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     // Endpoints di routing (Solo veicolari per Mezzi di Soccorso 118: Auto, Grandi Assi ZTL, Bypass, Superstrade e Autostrade)
     const endpoints = [
         // Rotte auto dirette con alternative su viabilità ordinaria e autostradale/scorrimento veloce
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=3`, isBypass: false, isBike: false },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=3`, isBypass: false, isBike: false }
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=3`, isBypass: false, isBike: false },
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=3`, isBypass: false, isBike: false }
     ];
 
     // Se il tragitto è extraurbano o interprovinciale, genera query per le direttrici strategiche (SS16, Romea, Autostrada, SS64, ecc.)
@@ -6763,7 +6776,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             if (isCesenaOrSouthRomagna) {
                 // Corridoio Richiesto: Ferrara -> Argenta (SS16) -> Ravenna (SS16) -> E45 (SS3bis) -> Cesena Bufalini
                 endpoints.push({
-                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.1650,44.3850;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.1650,44.3850;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'ss16_e45',
@@ -6771,7 +6784,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 });
                 // Corridoio Superstrada Ferrara-Mare (RA8) + SS309 Romea + E45
                 endpoints.push({
-                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2400,44.5400;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2400,44.5400;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'romea',
@@ -6779,7 +6792,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 });
                 // Corridoio Autostrada A13 / A14
                 endpoints.push({
-                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.3700;12.2100,44.1800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.3700;12.2100,44.1800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'motorway',
@@ -6788,21 +6801,21 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             } else {
                 // Ravenna / Bassa Romagna
                 endpoints.push({
-                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.0400,44.5060;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.0400,44.5060;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'ss16',
                     corridorLabel: 'Via SS16 Adriatica (Senza Autostrada)'
                 });
                 endpoints.push({
-                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2350,44.5500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2350,44.5500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'romea',
                     corridorLabel: 'Via Superstrada Ferrara-Mare (RA8) + SS309 Romea'
                 });
                 endpoints.push({
-                    url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.4000;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.4000;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'motorway',
@@ -6815,7 +6828,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         if (destLat <= 44.65 && destLng >= 11.20 && destLng <= 11.75) {
             // Autostrada A13
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.4500,44.6500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.4500,44.6500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'motorway',
@@ -6823,7 +6836,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             });
             // Statale SS64 Porrettana (Senza Autostrada)
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5300,44.6400;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.5300,44.6400;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'ss64',
@@ -6831,7 +6844,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             });
             // SP3 Trasversale di Pianura / SP Centese
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.4200,44.5800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.4200,44.5800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'ordinary',
@@ -6843,7 +6856,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         if (destLng <= 11.35 && destLat <= 44.85) {
             // SP255 Centese / Nonantolana
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.2885,44.7330;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.2885,44.7330;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'centese',
@@ -6851,7 +6864,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             });
             // Autostrada A13 + A1
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5500,44.7500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.5500,44.7500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'motorway',
@@ -6863,7 +6876,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         if (destLat >= 44.90) {
             // Statale SS16 Adriatica (Senza Autostrada)
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6800,44.9400;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.6800,44.9400;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'ss16',
@@ -6871,7 +6884,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             });
             // Autostrada A13
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6000,44.9500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.6000,44.9500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'motorway',
@@ -6879,7 +6892,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             });
             // Transpolesana SS434 / Sinistra Po
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.4645,45.0285;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.4645,45.0285;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'transpolesana',
@@ -6891,7 +6904,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         if (destLng >= 12.00 && destLat >= 44.65 && destLat <= 44.95) {
             // Superstrada RA8 Ferrara-Mare
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.8500,44.7600;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.8500,44.7600;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'ra8',
@@ -6899,7 +6912,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             });
             // SP15 Via del Mare / Copparo / Codigoro
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.7220,44.8930;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.7220,44.8930;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                 isBypass: false,
                 isBike: false,
                 corridorTag: 'ordinary',
@@ -7009,7 +7022,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
 
         // Verifica compatibilità della strada con i mezzi di soccorso 118 (esclude vicoli angusti / percorsi ciclabili)
-        const isSuitable = isRouteSuitableForEmergency(rawSteps, destLat, destLng);
+        const isSuitable = isRouteSuitableForEmergency(rawSteps, destLat, destLng, isInterurban);
 
         // Analisi corridoio stradale (SS16, Romea, Autostrada, ecc.)
         const corridorInfo = analyzeRouteCorridor(rawSteps, coords, startLat, startLng, destLat, destLng, r._corridorTag);
