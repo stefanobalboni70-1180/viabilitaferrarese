@@ -6,3 +6,4 @@ node_modules/
 *.tmp
 backup_*/
 backup_*.zip
+local_server.ps1

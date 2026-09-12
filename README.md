@@ -1,9 +1,14 @@
-# Viabilità Ferrara 118 - Versione 3.6.21
+# Viabilità Ferrara 118 - Versione 3.6.22
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Nuove Funzionalità & Correzioni UI (v3.6.21):
-- **Menu Rapido Destinazioni Preferite & Pronto Soccorso (1-Tap Emergency Route):** integrato nel navigatore 118 un menu a tendina e un set di chips rapide con geocodifica istantanea per tutti i Pronto Soccorso e presidi ospedalieri principali (Cona, Delta, Argenta, Cento, Ospedale Maggiore Bologna, Sant'Orsola Bologna, Bellaria Bologna, Policlinico di Modena, Ospedale di Baggiovara, Polo Sanitario Crevalcore, Ospedale di Rovigo). Con un solo tocco viene calcolato istantaneamente il percorso ottimale d'emergenza da qualsiasi posizione.
+### Nuove Funzionalità & Correzioni UI (v3.6.22):
+- **Calcolo Multi-Corridoio e Scelta Alternativa (Senza Autostrada / Statale SS16 / Romea / Misto / Autostrada):** per tutti i trasferimenti provinciali ed extraurbani (es. Ferrara-Ravenna, Ferrara-Cesena, Ferrara-Bologna, Ferrara-Rovigo, Ferrara-Delta), il navigatore 118 calcola fino a 3 percorsi differenziati per direttrice strategica:
+  1. *Percorso 1 (Più Veloce / Direttrice Principale):* il tempo di percorrenza minimo in assoluto (es. SS16 Adriatica diretta per Ravenna / Cesena, oppure Autostrada A13 per Bologna).
+  2. *Percorso 2 (Senza Autostrada / Statale Veloce):* direttrice rapida su viabilità statale senza pedaggio (es. SS16 Adriatica via Argenta/Alfonsine, oppure SS64 Porrettana).
+  3. *Percorso 3 (Misto / Corridoio Alternativo):* itinerario alternativo differenziato (es. Raccordo Ferrara-Porto Garibaldi RA8 + SS309 Romea, oppure Autostrada A13/A14, oppure Trasversale di Pianura).
+- **Integrazione Ospedale Maurizio Bufalini di Cesena (Trauma Center Hub Romagna):** inserito nel registro presidi di soccorso, nelle chips rapide e nel menu a tendina con riconoscimento istantaneo (0ms) per coordinate `44.1332, 12.2530` e indicazioni dirette.
+- **Risoluzione Definitiva Bug Reindirizzamento Cona:** rimosso l'aggancio generico forzato a Cona durante la digitazione o selezione di altri ospedali; il sistema isola e preserva la destinazione sanitaria selezionata.
 - **Risoluzione Sovrapposizione Finestre Admin (PC & Mobile):** riarchitettura del layout della barra superiore con container di flusso unificato (`.top-nav-wrapper`), eliminando le coordinate assolute rigide e garantendo che la barra di ricerca/filtri admin compaia sempre sotto l'header senza alcuna sovrapposizione su qualsiasi risoluzione.
 - **Ottimizzazione Responsive Header & Pulsanti:** disposizione fluida dei pulsanti di azione e controllo (News, Naviga, Segnala Problema, Gestione News, Segnalazioni, Logout) con wrapping pulito e touch targets ottimizzati per smartphone.
 - **Riposizionamento Banner Selezione Mappa:** il banner di selezione punto mappa (`#picker-banner`) è stato riposizionato in basso in modalità fluttuante (`bottom: 30px`) per evitare collisioni con l'header superiore.

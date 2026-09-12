@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.21';
+const APP_VERSION = '3.6.22';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2838,54 +2838,35 @@ function saveStreetGeomCache() {
 
 // Database geometrico ad alta risoluzione estratto direttamente dai way OpenStreetMap (percorsi certificati senza deviazioni)
 const STATIC_STREET_GEOMETRIES = {
-    'viaruffetta': [
-        [44.87364, 11.83634], [44.87360, 11.83647], [44.87358, 11.83656], [44.87353, 11.83675], [44.87345, 11.83895], 
-        [44.87345, 11.83888], [44.87345, 11.83903], [44.87345, 11.83881], [44.87344, 11.83912], [44.87344, 11.83874], 
-        [44.87343, 11.83867], [44.87343, 11.83925], [44.87341, 11.83727], [44.87338, 11.83739], [44.87338, 11.83837], 
-        [44.87337, 11.83747], [44.87336, 11.83829], [44.87336, 11.83755], [44.87335, 11.83822], [44.87335, 11.83762], 
-        [44.87335, 11.83815], [44.87335, 11.83769], [44.87334, 11.83808], [44.87334, 11.83775], [44.87334, 11.83801], 
-        [44.87334, 11.84014], [44.87334, 11.83793], [44.87334, 11.83784], [44.87327, 11.84086], [44.87312, 11.84252], 
+    'ruffetta': [
+        [44.87364, 11.83634], [44.87353, 11.83675], [44.87341, 11.83727], [44.87337, 11.83747], [44.87335, 11.83815], 
+        [44.87345, 11.83895], [44.87344, 11.83912], [44.87334, 11.84014], [44.87327, 11.84086], [44.87312, 11.84252], 
         [44.87310, 11.84263], [44.87309, 11.84271], [44.87308, 11.84279], [44.87307, 11.84285], [44.87305, 11.84294], 
         [44.87303, 11.84302], [44.87300, 11.84313], [44.87296, 11.84326], [44.87289, 11.84345], [44.87261, 11.84417], 
         [44.87257, 11.84428], [44.87256, 11.84431], [44.87254, 11.84435], [44.87251, 11.84441], [44.87248, 11.84447], 
         [44.87244, 11.84454], [44.87238, 11.84462], [44.87070, 11.84670], [44.86885, 11.84897], [44.86811, 11.84990], 
-        [44.86807, 11.84995], [44.86803, 11.84999], [44.86796, 11.85005], [44.86639, 11.85427], [44.86639, 11.85419], 
-        [44.86638, 11.85411], [44.86638, 11.85461], [44.86636, 11.85384], [44.86635, 11.85376], [44.86633, 11.85368], 
-        [44.86629, 11.85354], [44.86628, 11.85132], [44.86622, 11.85334], [44.86612, 11.85310], [44.86601, 11.85287], 
-        [44.86594, 11.85274], [44.86587, 11.85261], [44.86579, 11.85248], [44.86566, 11.85180], [44.86562, 11.85183], 
-        [44.86558, 11.85185], [44.86554, 11.85187], [44.86553, 11.85207], [44.86550, 11.85189], [44.86550, 11.85202], 
-        [44.86548, 11.85197], [44.86547, 11.85193], [44.86547, 11.85189], [44.86544, 11.85189], [44.86541, 11.85187], 
-        [44.86537, 11.85186], [44.86533, 11.85183], [44.86530, 11.85179], [44.86523, 11.85172], [44.86435, 11.85062], 
-        [44.86431, 11.85058], [44.86426, 11.85054], [44.86423, 11.85050], [44.86419, 11.85047], [44.86415, 11.85044], 
-        [44.86408, 11.85041], [44.86339, 11.85005], [44.86304, 11.84987], [44.86299, 11.84985], [44.86295, 11.84983], 
-        [44.86292, 11.84983], [44.86289, 11.84982], [44.86285, 11.84983], [44.86280, 11.84985], [44.86192, 11.85041], 
-        [44.86177, 11.85052], [44.86168, 11.85058], [44.86162, 11.85062], [44.86157, 11.85066], [44.86150, 11.85072], 
-        [44.86139, 11.85082], [44.86009, 11.85219], [44.85994, 11.85235], [44.85977, 11.85252], [44.85967, 11.85262], 
-        [44.85957, 11.85271], [44.85948, 11.85279], [44.85941, 11.85285], [44.85930, 11.85293], [44.85918, 11.85302], 
-        [44.85910, 11.85308], [44.85903, 11.85315], [44.85896, 11.85320], [44.85888, 11.85327], [44.85872, 11.85343], 
-        [44.85687, 11.85527], [44.85675, 11.85539], [44.85663, 11.85550], [44.85655, 11.85557], [44.85647, 11.85564], 
-        [44.85636, 11.85573], [44.85614, 11.85589], [44.85602, 11.85599], [44.85592, 11.85606], [44.85584, 11.85612], 
-        [44.85574, 11.85620], [44.85563, 11.85631], [44.85541, 11.85650], [44.85536, 11.85654], [44.85532, 11.85658], 
-        [44.85527, 11.85661], [44.85521, 11.85664], [44.85515, 11.85666], [44.85508, 11.85669], [44.85501, 11.85671], 
-        [44.85493, 11.85673], [44.85485, 11.85675], [44.85479, 11.85676], [44.85478, 11.85677], [44.85474, 11.85678], 
-        [44.85467, 11.85680], [44.85462, 11.85683], [44.85456, 11.85686], [44.85452, 11.85688], [44.85447, 11.85691], 
-        [44.85441, 11.85695], [44.85435, 11.85699], [44.85402, 11.85723], [44.85393, 11.85729], [44.85385, 11.85734], 
-        [44.85378, 11.85739], [44.85371, 11.85743], [44.85365, 11.85746], [44.85357, 11.85750], [44.85348, 11.85753], 
-        [44.85338, 11.85757], [44.85281, 11.85773], [44.85269, 11.85777], [44.85260, 11.85780], [44.85250, 11.85783], 
-        [44.85239, 11.85787], [44.85232, 11.85790], [44.85223, 11.85794], [44.85214, 11.85798], [44.85065, 11.85877], 
-        [44.85057, 11.85883], [44.85050, 11.85887], [44.85045, 11.85892], [44.85041, 11.85896], [44.85032, 11.85907], 
-        [44.85028, 11.85912], [44.85022, 11.85921], [44.84988, 11.85976], [44.84984, 11.85982], [44.84981, 11.85986], 
-        [44.84978, 11.85990], [44.84974, 11.85994], [44.84969, 11.85998], [44.84965, 11.86000], [44.84960, 11.86002], 
-        [44.84956, 11.86003], [44.84949, 11.86002], [44.84942, 11.86000], [44.84928, 11.85996], [44.84918, 11.85994], 
-        [44.84911, 11.85993], [44.84906, 11.85993], [44.84899, 11.85994], [44.84891, 11.85995], [44.84879, 11.85999], 
-        [44.84842, 11.86014], [44.84834, 11.86016], [44.84829, 11.86018], [44.84824, 11.86018], [44.84819, 11.86017], 
-        [44.84814, 11.86016], [44.84809, 11.86015], [44.84803, 11.86013], [44.84798, 11.86010], [44.84789, 11.86004], 
-        [44.84769, 11.85992], [44.84763, 11.85989], [44.84758, 11.85987], [44.84753, 11.85985], [44.84748, 11.85985], 
-        [44.84742, 11.85986], [44.84737, 11.85987], [44.84732, 11.85989], [44.84726, 11.85992], [44.84676, 11.86022], 
-        [44.84668, 11.86027], [44.84663, 11.86030], [44.84655, 11.86033], [44.84648, 11.86035], [44.84640, 11.86037], 
-        [44.84633, 11.86037], [44.84625, 11.86037], [44.84617, 11.86037], [44.84607, 11.86036], [44.84597, 11.86034], 
-        [44.84579, 11.86032], [44.84568, 11.86030], [44.84561, 11.86028], [44.84552, 11.86026], [44.84538, 11.86021], 
-        [44.84525, 11.86017], [44.84521, 11.86016], [44.84515, 11.86014], [44.84459, 11.85920]
+        [44.86807, 11.84995], [44.86803, 11.84999], [44.86796, 11.85005], [44.86639, 11.85427], [44.86636, 11.85384], 
+        [44.86628, 11.85132], [44.86566, 11.85180], [44.86523, 11.85172], [44.86435, 11.85062], [44.86408, 11.85041], 
+        [44.86339, 11.85005], [44.86304, 11.84987], [44.86192, 11.85041], [44.86139, 11.85082], [44.86009, 11.85219], 
+        [44.85872, 11.85343], [44.85687, 11.85527], [44.85614, 11.85589], [44.85541, 11.85650], [44.85485, 11.85675], 
+        [44.85402, 11.85723], [44.85338, 11.85757], [44.85281, 11.85773], [44.85214, 11.85798], [44.85065, 11.85877], 
+        [44.85022, 11.85921], [44.84988, 11.85976], [44.84918, 11.85994], [44.84842, 11.86014], [44.84769, 11.85992], 
+        [44.84676, 11.86022], [44.84640, 11.86037], [44.84579, 11.86032], [44.84525, 11.86017], [44.84459, 11.85920]
+    ],
+    'viaruffetta': [
+        [44.87364, 11.83634], [44.87353, 11.83675], [44.87341, 11.83727], [44.87337, 11.83747], [44.87335, 11.83815], 
+        [44.87345, 11.83895], [44.87344, 11.83912], [44.87334, 11.84014], [44.87327, 11.84086], [44.87312, 11.84252], 
+        [44.87310, 11.84263], [44.87309, 11.84271], [44.87308, 11.84279], [44.87307, 11.84285], [44.87305, 11.84294], 
+        [44.87303, 11.84302], [44.87300, 11.84313], [44.87296, 11.84326], [44.87289, 11.84345], [44.87261, 11.84417], 
+        [44.87257, 11.84428], [44.87256, 11.84431], [44.87254, 11.84435], [44.87251, 11.84441], [44.87248, 11.84447], 
+        [44.87244, 11.84454], [44.87238, 11.84462], [44.87070, 11.84670], [44.86885, 11.84897], [44.86811, 11.84990], 
+        [44.86807, 11.84995], [44.86803, 11.84999], [44.86796, 11.85005], [44.86639, 11.85427], [44.86636, 11.85384], 
+        [44.86628, 11.85132], [44.86566, 11.85180], [44.86523, 11.85172], [44.86435, 11.85062], [44.86408, 11.85041], 
+        [44.86339, 11.85005], [44.86304, 11.84987], [44.86192, 11.85041], [44.86139, 11.85082], [44.86009, 11.85219], 
+        [44.85872, 11.85343], [44.85687, 11.85527], [44.85614, 11.85589], [44.85541, 11.85650], [44.85485, 11.85675], 
+        [44.85402, 11.85723], [44.85338, 11.85757], [44.85281, 11.85773], [44.85214, 11.85798], [44.85065, 11.85877], 
+        [44.85022, 11.85921], [44.84988, 11.85976], [44.84918, 11.85994], [44.84842, 11.86014], [44.84769, 11.85992], 
+        [44.84676, 11.86022], [44.84640, 11.86037], [44.84579, 11.86032], [44.84525, 11.86017], [44.84459, 11.85920]
     ]
 };
 
@@ -2917,8 +2898,8 @@ function sliceStreetGeometryBetweenPoints(fullGeometry, lat1, lng1, lat2, lng2) 
         sliced = fullGeometry.slice(idx2, idx1 + 1).reverse();
     }
 
-    if (sliced.length >= 2) {
-        const res = [[lat1, lng1], ...sliced.slice(1, -1), [lat2, lng2]];
+    if (sliced.length >= 1) {
+        const res = [[lat1, lng1], ...sliced, [lat2, lng2]];
         return res;
     }
     return null;
@@ -3057,11 +3038,17 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const normTarget = normalizeStreetKey(targetStreetName);
     const rawTarget = (targetStreetName || '').toLowerCase();
+    const isRuffetta = normTarget.includes('ruffetta') || rawTarget.includes('ruffetta');
 
-    // 1. Verifica immediata nel database geometrico certificato OpenStreetMap
-    if (STATIC_STREET_GEOMETRIES[normTarget]) {
+    // 1. Verifica immediata nel database geometrico certificato OpenStreetMap (Via Ruffetta e vie tracciate)
+    if (isRuffetta && STATIC_STREET_GEOMETRIES['ruffetta']) {
+        const staticSliced = sliceStreetGeometryBetweenPoints(STATIC_STREET_GEOMETRIES['ruffetta'], lat1, lng1, lat2, lng2);
+        if (staticSliced && staticSliced.length >= 2) {
+            return staticSliced;
+        }
+    } else if (STATIC_STREET_GEOMETRIES[normTarget]) {
         const staticSliced = sliceStreetGeometryBetweenPoints(STATIC_STREET_GEOMETRIES[normTarget], lat1, lng1, lat2, lng2);
-        if (staticSliced && staticSliced.length >= 3) {
+        if (staticSliced && staticSliced.length >= 2) {
             return staticSliced;
         }
     }
@@ -4824,12 +4811,27 @@ function initNavigationModule() {
         });
     });
 
+    // Input filtro rapido nel menu ospedali
+    const navHospitalFilter = document.getElementById('nav-hospital-filter');
+    if (navHospitalFilter) {
+        navHospitalFilter.addEventListener('input', (e) => {
+            filterHospitalsList(e.target.value);
+        });
+    }
+
     if (navStartInput) {
         navStartInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCalculateNav();
         });
     }
     if (navDestInput) {
+        navDestInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            const dropdown = document.getElementById('nav-hospitals-dropdown');
+            if (dropdown && !dropdown.classList.contains('hidden')) {
+                filterHospitalsList(val);
+            }
+        });
         navDestInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCalculateNav();
         });
@@ -4874,6 +4876,7 @@ function closeNavPanel() {
 
 // --- GESTIONE MENU A TENDINA E SELEZIONE RAPIDA PRONTO SOCCORSO ---
 const HOSPITAL_DESTINATIONS = {
+    // 1. Ferrara e Provincia
     fe_cona: {
         id: 'fe_cona',
         name: "Ospedale di Cona - Pronto Soccorso",
@@ -4882,7 +4885,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Aldo Moro 8, Cona (FE)",
         lat: 44.8015,
         lng: 11.6960,
-        province: "FE"
+        province: "FE",
+        keys: ['cona', 'ospedale cona', 'ospedale di cona', 'pronto soccorso cona', 'ps cona', 'aldo moro cona', 'sant\'anna cona', 'ospedale sant\'anna cona', 'santanna cona', 'ospedale ferrara cona', 'ospedale ferrara', 'ps ferrara']
     },
     fe_delta: {
         id: 'fe_delta',
@@ -4892,7 +4896,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Valle Oppio 2, Lagosanto (FE)",
         lat: 44.7578,
         lng: 12.1394,
-        province: "FE"
+        province: "FE",
+        keys: ['delta', 'ospedale delta', 'ospedale del delta', 'ps delta', 'pronto soccorso delta', 'lagosanto', 'ospedale lagosanto', 'ps lagosanto', 'valle oppio', 'via valle oppio', 'valle oppio lagosanto']
     },
     fe_argenta: {
         id: 'fe_argenta',
@@ -4902,7 +4907,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Nazionale 5, Argenta (FE)",
         lat: 44.6146,
         lng: 11.8347,
-        province: "FE"
+        province: "FE",
+        keys: ['argenta', 'ospedale argenta', 'ospedale di argenta', 'ps argenta', 'pronto soccorso argenta', 'mazzolani', 'ospedale mazzolani', 'via nazionale argenta']
     },
     fe_cento: {
         id: 'fe_cento',
@@ -4912,8 +4918,77 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Vicini 2, Cento (FE)",
         lat: 44.7330,
         lng: 11.2885,
-        province: "FE"
+        province: "FE",
+        keys: ['cento', 'ospedale cento', 'ospedale di cento', 'ps cento', 'pronto soccorso cento', 'ss annunziata cento', 'santissima annunziata cento', 'via vicini cento', 'ospedale santissima annunziata']
     },
+    fe_sanrocco: {
+        id: 'fe_sanrocco',
+        name: "Cittadella San Rocco (Ex Sant'Anna)",
+        shortName: "Cittadella San Rocco FE",
+        city: "Ferrara",
+        address: "Corso Giovecca 203, Ferrara",
+        lat: 44.8360,
+        lng: 11.6285,
+        province: "FE",
+        keys: ['san rocco', 'cittadella san rocco', 'ex sant\'anna', 'ex santanna', 'sant\'anna giovecca', 'giovecca 203', 'anello san rocco']
+    },
+    fe_comacchio: {
+        id: 'fe_comacchio',
+        name: "Casa della Salute San Camillo (Comacchio)",
+        shortName: "San Camillo Comacchio",
+        city: "Comacchio (FE)",
+        address: "Via Felletti 2, Comacchio (FE)",
+        lat: 44.6930,
+        lng: 12.1810,
+        province: "FE",
+        keys: ['comacchio', 'ospedale comacchio', 'san camillo comacchio', 'casa della salute comacchio', 'casa salute comacchio', 'via felletti comacchio']
+    },
+    fe_bondeno: {
+        id: 'fe_bondeno',
+        name: "Casa della Salute Fratelli Borselli (Bondeno)",
+        shortName: "Casa Salute Bondeno",
+        city: "Bondeno (FE)",
+        address: "Via Dazio 11, Bondeno (FE)",
+        lat: 44.8880,
+        lng: 11.4160,
+        province: "FE",
+        keys: ['bondeno', 'ospedale bondeno', 'borselli bondeno', 'fratelli borselli', 'casa della salute bondeno', 'casa salute bondeno']
+    },
+    fe_copparo: {
+        id: 'fe_copparo',
+        name: "Casa della Salute Terre e Fiumi (Copparo)",
+        shortName: "Casa Salute Copparo",
+        city: "Copparo (FE)",
+        address: "Via Roma 18, Copparo (FE)",
+        lat: 44.8930,
+        lng: 11.7220,
+        province: "FE",
+        keys: ['copparo', 'ospedale copparo', 'terre e fiumi copparo', 'casa della salute copparo', 'casa salute copparo']
+    },
+    fe_portomaggiore: {
+        id: 'fe_portomaggiore',
+        name: "Casa della Salute di Portomaggiore",
+        shortName: "Casa Salute Portomaggiore",
+        city: "Portomaggiore (FE)",
+        address: "Via E. De Amicis 22, Portomaggiore (FE)",
+        lat: 44.6980,
+        lng: 11.8020,
+        province: "FE",
+        keys: ['portomaggiore', 'ospedale portomaggiore', 'casa della salute portomaggiore', 'casa salute portomaggiore']
+    },
+    fe_codigoro: {
+        id: 'fe_codigoro',
+        name: "Casa della Salute Riviera Cavallotti (Codigoro)",
+        shortName: "Casa Salute Codigoro",
+        city: "Codigoro (FE)",
+        address: "Riviera Cavallotti 34, Codigoro (FE)",
+        lat: 44.8300,
+        lng: 12.1100,
+        province: "FE",
+        keys: ['codigoro', 'ospedale codigoro', 'riviera cavallotti codigoro', 'casa della salute codigoro', 'casa salute codigoro']
+    },
+
+    // 2. Bologna e Provincia
     bo_maggiore: {
         id: 'bo_maggiore',
         name: "Ospedale Maggiore C.A. Pizzardi - Pronto Soccorso",
@@ -4922,7 +4997,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Largo Bartolo Nigrisoli 2, Bologna",
         lat: 44.5055,
         lng: 11.3142,
-        province: "BO"
+        province: "BO",
+        keys: ['maggiore', 'ospedale maggiore', 'maggiore bologna', 'ospedale maggiore bologna', 'ps maggiore', 'pronto soccorso maggiore', 'largo nigrisoli', 'pizzardi', 'maggiore pizzardi', 'ospedale maggiore c.a. pizzardi', 'ps maggiore bologna']
     },
     bo_santorsola: {
         id: 'bo_santorsola',
@@ -4932,7 +5008,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Albertoni 15 (Pad. 5 PS Generale), Bologna",
         lat: 44.4925,
         lng: 11.3620,
-        province: "BO"
+        province: "BO",
+        keys: ['sant orsola', 'sant\'orsola', 's orsola', 's. orsola', 'policlinico sant orsola', 'policlinico s orsola', 'sant orsola bologna', 'sant\'orsola bologna', 'ps sant orsola', 'ps sant\'orsola', 'pronto soccorso sant orsola', 'pronto soccorso sant\'orsola', 'malpighi', 'policlinico malpighi', 'via albertoni', 'sant\'orsola-malpighi']
     },
     bo_bellaria: {
         id: 'bo_bellaria',
@@ -4942,7 +5019,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Altura 3, Bologna",
         lat: 44.4715,
         lng: 11.3980,
-        province: "BO"
+        province: "BO",
+        keys: ['bellaria', 'ospedale bellaria', 'bellaria bologna', 'ospedale bellaria bologna', 'ps bellaria', 'pronto soccorso bellaria', 'via altura', 'via altura bologna']
     },
     bo_crevalcore: {
         id: 'bo_crevalcore',
@@ -4952,8 +5030,55 @@ const HOSPITAL_DESTINATIONS = {
         address: "Viale Libertà 171, Crevalcore (BO)",
         lat: 44.7214,
         lng: 11.1448,
-        province: "BO"
+        province: "BO",
+        keys: ['crevalcore', 'ospedale crevalcore', 'polo sanitario crevalcore', 'sanitario crevalcore', 'ps crevalcore', 'presidio crevalcore', 'viale liberta crevalcore']
     },
+    bo_bentivoglio: {
+        id: 'bo_bentivoglio',
+        name: "Ospedale di Bentivoglio - Pronto Soccorso",
+        shortName: "PS Ospedale Bentivoglio",
+        city: "Bentivoglio (BO)",
+        address: "Via Saliceto 1, Bentivoglio (BO)",
+        lat: 44.6366,
+        lng: 11.4172,
+        province: "BO",
+        keys: ['bentivoglio', 'ospedale bentivoglio', 'ospedale di bentivoglio', 'ps bentivoglio', 'pronto soccorso bentivoglio', 'via saliceto bentivoglio']
+    },
+    bo_budrio: {
+        id: 'bo_budrio',
+        name: "Ospedale di Budrio",
+        shortName: "Ospedale Budrio",
+        city: "Budrio (BO)",
+        address: "Via Benni 44, Budrio (BO)",
+        lat: 44.5375,
+        lng: 11.5360,
+        province: "BO",
+        keys: ['budrio', 'ospedale budrio', 'ospedale di budrio', 'ps budrio', 'via benni budrio']
+    },
+    bo_san_giovanni: {
+        id: 'bo_san_giovanni',
+        name: "Ospedale SS. Salvatore - Pronto Soccorso",
+        shortName: "PS San Giovanni in Persiceto",
+        city: "San Giovanni in Persiceto (BO)",
+        address: "Via Palma 1, San Giovanni in Persiceto (BO)",
+        lat: 44.6405,
+        lng: 11.1895,
+        province: "BO",
+        keys: ['san giovanni in persiceto', 'persiceto', 'ospedale persiceto', 'ospedale san giovanni', 'ps persiceto', 'ss salvatore persiceto', 'via palma persiceto']
+    },
+    bo_imola: {
+        id: 'bo_imola',
+        name: "Ospedale S. Maria della Scaletta - Pronto Soccorso",
+        shortName: "PS Ospedale Imola",
+        city: "Imola (BO)",
+        address: "Via Montericco 4, Imola (BO)",
+        lat: 44.3468,
+        lng: 11.6995,
+        province: "BO",
+        keys: ['imola', 'ospedale imola', 'ospedale di imola', 'ps imola', 'pronto soccorso imola', 'santa maria della scaletta', 'montericco imola']
+    },
+
+    // 3. Modena e Provincia
     mo_policlinico: {
         id: 'mo_policlinico',
         name: "AOU Policlinico di Modena - Pronto Soccorso",
@@ -4962,7 +5087,8 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via del Pozzo 71, Modena",
         lat: 44.6365,
         lng: 10.9490,
-        province: "MO"
+        province: "MO",
+        keys: ['policlinico modena', 'policlinico di modena', 'aou policlinico modena', 'modena policlinico', 'ps policlinico modena', 'pronto soccorso policlinico modena', 'via del pozzo', 'via del pozzo modena', 'policlinico mo']
     },
     mo_baggiovara: {
         id: 'mo_baggiovara',
@@ -4972,8 +5098,22 @@ const HOSPITAL_DESTINATIONS = {
         address: "Via Pietro Giardini 1355, Baggiovara (MO)",
         lat: 44.6062,
         lng: 10.8718,
-        province: "MO"
+        province: "MO",
+        keys: ['baggiovara', 'ospedale baggiovara', 'ospedale di baggiovara', 'baggiovara modena', 'ps baggiovara', 'pronto soccorso baggiovara', 'sant agostino estense', 'sant\'agostino estense', 'pietro giardini', 'civile baggiovara', 'ospedale civile baggiovara']
     },
+    mo_carpi: {
+        id: 'mo_carpi',
+        name: "Ospedale B. Ramazzini - Pronto Soccorso",
+        shortName: "PS Ospedale Carpi",
+        city: "Carpi (MO)",
+        address: "Via Guido Molinari 2, Carpi (MO)",
+        lat: 44.7865,
+        lng: 10.8745,
+        province: "MO",
+        keys: ['carpi', 'ospedale carpi', 'ospedale di carpi', 'ps carpi', 'pronto soccorso carpi', 'ramazzini', 'ramazzini carpi']
+    },
+
+    // 4. Rovigo e Veneto
     ro_rovigo: {
         id: 'ro_rovigo',
         name: "Ospedale S. Maria della Misericordia - Pronto Soccorso",
@@ -4982,7 +5122,87 @@ const HOSPITAL_DESTINATIONS = {
         address: "Viale Tre Martiri 140, Rovigo",
         lat: 45.0682,
         lng: 11.7805,
-        province: "RO"
+        province: "RO",
+        keys: ['rovigo', 'ospedale rovigo', 'ospedale di rovigo', 'ps rovigo', 'pronto soccorso rovigo', 'misericordia rovigo', 'santa maria della misericordia', 'viale tre martiri', 'ps misericordia rovigo']
+    },
+    ro_trecenta: {
+        id: 'ro_trecenta',
+        name: "Ospedale San Luca - Pronto Soccorso (Trecenta)",
+        shortName: "PS Ospedale Trecenta",
+        city: "Trecenta (RO)",
+        address: "Viale Ugo Grisetti 265, Trecenta (RO)",
+        lat: 45.0285,
+        lng: 11.4645,
+        province: "RO",
+        keys: ['trecenta', 'ospedale trecenta', 'ospedale san luca', 'san luca trecenta', 'ps trecenta', 'pronto soccorso trecenta']
+    },
+    ro_adria: {
+        id: 'ro_adria',
+        name: "Ospedale Civile di Adria - Pronto Soccorso",
+        shortName: "PS Ospedale Adria",
+        city: "Adria (RO)",
+        address: "Piazzale degli Etruschi 9, Adria (RO)",
+        lat: 45.0560,
+        lng: 12.0620,
+        province: "RO",
+        keys: ['adria', 'ospedale adria', 'ospedale di adria', 'ps adria', 'pronto soccorso adria']
+    },
+    pd_padova: {
+        id: 'pd_padova',
+        name: "Azienda Ospedale Università Padova - Pronto Soccorso",
+        shortName: "PS Policlinico Padova",
+        city: "Padova",
+        address: "Via Nicolò Giustiniani 2, Padova",
+        lat: 45.4035,
+        lng: 11.8890,
+        province: "PD",
+        keys: ['padova', 'ospedale padova', 'policlinico padova', 'ps padova', 'pronto soccorso padova', 'giustiniani padova']
+    },
+
+    // 5. Ravenna e Romagna
+    ra_ravenna: {
+        id: 'ra_ravenna',
+        name: "Ospedale Santa Maria delle Croci - Pronto Soccorso",
+        shortName: "PS Ospedale Ravenna",
+        city: "Ravenna",
+        address: "Viale Randi 5, Ravenna",
+        lat: 44.4125,
+        lng: 12.1885,
+        province: "RA",
+        keys: ['ravenna', 'ospedale ravenna', 'ospedale di ravenna', 'ps ravenna', 'pronto soccorso ravenna', 'santa maria delle croci', 'viale randi ravenna']
+    },
+    ra_lugo: {
+        id: 'ra_lugo',
+        name: "Ospedale Umberto I - Pronto Soccorso (Lugo)",
+        shortName: "PS Ospedale Lugo",
+        city: "Lugo (RA)",
+        address: "Viale Dante Masi 9, Lugo (RA)",
+        lat: 44.4215,
+        lng: 11.9080,
+        province: "RA",
+        keys: ['lugo', 'ospedale lugo', 'ospedale di lugo', 'ps lugo', 'pronto soccorso lugo', 'umberto i lugo']
+    },
+    ra_faenza: {
+        id: 'ra_faenza',
+        name: "Ospedale per gli Infermi - Pronto Soccorso (Faenza)",
+        shortName: "PS Ospedale Faenza",
+        city: "Faenza (RA)",
+        address: "Stradone 9, Faenza (RA)",
+        lat: 44.2862,
+        lng: 11.8812,
+        province: "RA",
+        keys: ['faenza', 'ospedale faenza', 'ospedale di faenza', 'ps faenza', 'pronto soccorso faenza', 'infermi faenza']
+    },
+    fc_bufalini: {
+        id: 'fc_bufalini',
+        name: "Ospedale Maurizio Bufalini - Pronto Soccorso (Trauma Center)",
+        shortName: "PS Ospedale Bufalini Cesena",
+        city: "Cesena (FC)",
+        address: "Viale Gherardi 56, Cesena (FC)",
+        lat: 44.1332,
+        lng: 12.2530,
+        province: "FC",
+        keys: ['bufalini', 'bufalini cesena', 'ospedale bufalini', 'ospedale di cesena', 'ospedale cesena', 'ps bufalini', 'pronto soccorso bufalini', 'trauma center cesena', 'cesena bufalini', 'viale gherardi cesena', 'maurizio bufalini']
     }
 };
 
@@ -5004,6 +5224,12 @@ function openHospitalsDropdown() {
     if (!dropdown) return;
     dropdown.classList.remove('hidden');
     if (toggleBtn) toggleBtn.classList.add('open');
+    const filterInput = document.getElementById('nav-hospital-filter');
+    if (filterInput) {
+        filterInput.value = '';
+        filterHospitalsList('');
+        setTimeout(() => filterInput.focus(), 50);
+    }
 }
 
 function closeHospitalsDropdown() {
@@ -5013,6 +5239,38 @@ function closeHospitalsDropdown() {
     if (toggleBtn) toggleBtn.classList.remove('open');
 }
 
+// Filtra in tempo reale gli ospedali visualizzati nel menu
+function filterHospitalsList(queryText) {
+    const q = (queryText || '').toLowerCase().trim();
+    const items = document.querySelectorAll('.hospital-item');
+    const groups = document.querySelectorAll('.hospitals-group');
+
+    items.forEach(item => {
+        const hId = item.getAttribute('data-hospital-id');
+        const h = HOSPITAL_DESTINATIONS[hId];
+        if (!h) {
+            item.style.display = q ? 'none' : 'flex';
+            return;
+        }
+        if (!q) {
+            item.style.display = 'flex';
+            return;
+        }
+        const textToMatch = `${h.name} ${h.shortName} ${h.city} ${h.address} ${(h.keys || []).join(' ')}`.toLowerCase();
+        if (textToMatch.includes(q)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+
+    // Nasconde gruppi vuoti se non hanno elementi visibili
+    groups.forEach(group => {
+        const visibleChild = group.querySelector('.hospital-item[style*="display: flex"], .hospital-item:not([style*="display: none"])');
+        group.style.display = (!q || visibleChild) ? 'block' : 'none';
+    });
+}
+
 // Selezione immediata di un Pronto Soccorso o Ospedale
 async function selectHospitalDestination(hospitalId, autoCalculate = true) {
     const hospital = HOSPITAL_DESTINATIONS[hospitalId];
@@ -5020,9 +5278,13 @@ async function selectHospitalDestination(hospitalId, autoCalculate = true) {
 
     const destInput = document.getElementById('nav-dest-input');
     navDestPoint = {
+        id: hospital.id,
+        name: hospital.name,
+        shortName: hospital.shortName,
         lat: hospital.lat,
         lng: hospital.lng,
-        label: `${hospital.name} (${hospital.address})`
+        label: `${hospital.name} (${hospital.address})`,
+        isHospital: true
     };
 
     if (destInput) {
@@ -5096,8 +5358,8 @@ function setNavStartToGps(showToastMsg = true) {
         },
         (err) => {
             console.warn("GPS error:", err.message);
-            const center = map.getCenter();
-            navStartPoint = { lat, lng: center.lng, label: "Centro Mappa" };
+            const center = map ? map.getCenter() : { lat: 44.8381, lng: 11.6198 };
+            navStartPoint = { lat: center.lat, lng: center.lng, label: "Centro Mappa" };
             if (startInput) startInput.value = "📍 Centro mappa Ferrara";
             if (showToastMsg) showToast("Impossibile rilevare GPS. Impostato centro mappa.", "normal");
         },
@@ -5139,8 +5401,8 @@ async function handleNavMapPicked(mode, lat, lng) {
     openNavPanel();
 }
 
-// Helper per fetch con timeout controllato e sicuro (non blocca mai l'esecuzione)
-async function fetchWithTimeout(url, timeoutMs = 3200) {
+// Helper per fetch con timeout controllato e fallback automatico multi-server (non blocca mai l'esecuzione)
+async function fetchWithTimeout(url, timeoutMs = 6000) {
     try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -5150,32 +5412,38 @@ async function fetchWithTimeout(url, timeoutMs = 3200) {
             return await resp.json();
         }
     } catch (e) { }
+
+    // Fallback automatico su server di routing secondario se il primo è offline o lento
+    if (url.includes('router.project-osrm.org')) {
+        const fallbackUrl = url.replace('https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car');
+        try {
+            const controller2 = new AbortController();
+            const timer2 = setTimeout(() => controller2.abort(), timeoutMs);
+            const resp2 = await fetch(fallbackUrl, { signal: controller2.signal });
+            clearTimeout(timer2);
+            if (resp2.ok) {
+                return await resp2.json();
+            }
+        } catch (e) { }
+    } else if (url.includes('routing.openstreetmap.de/routed-car')) {
+        const fallbackUrl = url.replace('https://routing.openstreetmap.de/routed-car', 'https://router.project-osrm.org');
+        try {
+            const controller2 = new AbortController();
+            const timer2 = setTimeout(() => controller2.abort(), timeoutMs);
+            const resp2 = await fetch(fallbackUrl, { signal: controller2.signal });
+            clearTimeout(timer2);
+            if (resp2.ok) {
+                return await resp2.json();
+            }
+        } catch (e) { }
+    }
     return null;
 }
 
-// Database locale POI Ferrara, Ospedali e Presidi Provinciali per geocodifica istantanea (0ms, offline)
+// Database locale POI Ferrara e Presidi Provinciali per geocodifica istantanea (0ms, offline)
 const FERRARA_LOCAL_POI = [
-    // 1. Ospedali & Pronto Soccorso Ferrara e Limitrofi
-    { keys: ['cona', 'ospedale cona', 'ospedale di cona', 'pronto soccorso cona', 'pronto soccorso', 'ps cona', 'aldo moro cona'], lat: 44.8015, lng: 11.6960, label: "Ospedale di Cona - Pronto Soccorso (Ferrara)" },
-    { keys: ['delta', 'ospedale delta', 'ospedale del delta', 'ps delta', 'lagosanto', 'valle oppio', 'via valle oppio', 'ospedale lagosanto'], lat: 44.7578, lng: 12.1394, label: "Ospedale del Delta - Pronto Soccorso (Delta)" },
-    { keys: ['ospedale argenta', 'argenta ospedale', 'mazzolani', 'argenta pronto soccorso', 'pronto soccorso argenta', 'ps argenta'], lat: 44.6146, lng: 11.8347, label: "Ospedale di Argenta - Pronto Soccorso" },
-    { keys: ['ospedale cento', 'cento ospedale', 'ss annunziata cento', 'pronto soccorso cento', 'ps cento', 'via vicini cento'], lat: 44.7330, lng: 11.2885, label: "Ospedale SS. Annunziata - Pronto Soccorso (Cento)" },
-    
-    // 2. Ospedali & Pronto Soccorso Bologna e Provincia
-    { keys: ['ospedale maggiore', 'maggiore bologna', 'ospedale maggiore bologna', 'pronto soccorso maggiore', 'ps maggiore', 'largo nigrisoli', 'ospedale maggiore pizzardi'], lat: 44.5055, lng: 11.3142, label: "Ospedale Maggiore - Pronto Soccorso (Bologna)" },
-    { keys: ['sant orsola', 'sant\'orsola', 's. orsola', 'policlinico sant orsola', 'sant orsola bologna', 'pronto soccorso sant orsola', 'ps sant orsola', 'malpighi', 'via albertoni'], lat: 44.4925, lng: 11.3620, label: "Policlinico S. Orsola-Malpighi - Pronto Soccorso (Bologna)" },
-    { keys: ['bellaria', 'ospedale bellaria', 'bellaria bologna', 'pronto soccorso bellaria', 'ps bellaria', 'via altura'], lat: 44.4715, lng: 11.3980, label: "Ospedale Bellaria - Pronto Soccorso (Bologna)" },
-    { keys: ['crevalcore', 'ospedale crevalcore', 'polo sanitario crevalcore', 'sanitario crevalcore', 'viale liberta crevalcore', 'pronto soccorso crevalcore'], lat: 44.7214, lng: 11.1448, label: "Presidio Sanitario / Ospedale Crevalcore" },
-
-    // 3. Ospedali & Pronto Soccorso Modena e Provincia
-    { keys: ['policlinico modena', 'policlinico di modena', 'modena policlinico', 'pronto soccorso policlinico modena', 'ps policlinico modena', 'via del pozzo modena'], lat: 44.6365, lng: 10.9490, label: "AOU Policlinico di Modena - Pronto Soccorso" },
-    { keys: ['baggiovara', 'ospedale baggiovara', 'baggiovara modena', 'pronto soccorso baggiovara', 'ps baggiovara', 'sant\'agostino estense', 'ospedale civile baggiovara'], lat: 44.6062, lng: 10.8718, label: "Ospedale Civile di Baggiovara - Pronto Soccorso (Modena)" },
-
-    // 4. Ospedali Rovigo (Veneto)
-    { keys: ['rovigo', 'ospedale rovigo', 'ospedale di rovigo', 'pronto soccorso rovigo', 'ps rovigo', 'misericordia rovigo', 'santa maria della misericordia rovigo'], lat: 45.0682, lng: 11.7805, label: "Ospedale S. Maria della Misericordia - Pronto Soccorso (Rovigo)" },
-
-    // 5. Presidi e Punti di Riferimento Ferrara
-    { keys: ['sant\'anna', 'santanna', 'san rocco', 'cittadella san rocco', 'ex sant\'anna', 'giovecca'], lat: 44.8360, lng: 11.6285, label: "Cittadella San Rocco (Ex Sant'Anna, Ferrara)" },
+    // 1. Presidi e Punti di Riferimento Ferrara Città
+    { keys: ['cittadella san rocco', 'ex sant\'anna', 'ex santanna', 'san rocco ferrara', 'giovecca 203'], lat: 44.8360, lng: 11.6285, label: "Cittadella San Rocco (Ex Sant'Anna, Ferrara)" },
     { keys: ['stazione', 'stazione fs', 'stazione ferroviaria', 'piazzale stazione'], lat: 44.8430, lng: 11.6030, label: "Stazione Ferroviaria di Ferrara" },
     { keys: ['castello', 'castello estense', 'largo castello', 'centro storico'], lat: 44.8375, lng: 11.6190, label: "Castello Estense, Ferrara" },
     { keys: ['cattedrale', 'duomo', 'piazza cattedrale', 'piazza trento trieste'], lat: 44.8358, lng: 11.6195, label: "Cattedrale di San Giorgio, Ferrara" },
@@ -5184,46 +5452,149 @@ const FERRARA_LOCAL_POI = [
     { keys: ['piazza municipale', 'comune', 'municipio'], lat: 44.8360, lng: 11.6185, label: "Piazza Municipale, Ferrara" },
     { keys: ['stadio', 'stadio paolo mazza', 'stadio mazza', 'spal'], lat: 44.8400, lng: 11.6070, label: "Stadio Paolo Mazza, Ferrara" },
     { keys: ['fiera', 'fiera ferrara', 'quartiere fieristico'], lat: 44.8050, lng: 11.5830, label: "Fiera di Ferrara" },
-    { keys: ['casa della salute comacchio', 'ospedale comacchio', 'san camillo comacchio', 'comacchio'], lat: 44.6930, lng: 12.1810, label: "Casa della Salute San Camillo, Comacchio" },
-    { keys: ['casa della salute bondeno', 'ospedale bondeno', 'borselli bondeno', 'bondeno'], lat: 44.8880, lng: 11.4160, label: "Casa della Salute F.lli Borselli, Bondeno" },
-    { keys: ['casa della salute copparo', 'ospedale copparo', 'copparo'], lat: 44.8930, lng: 11.7220, label: "Casa della Salute Terre e Fiumi, Copparo" },
-    { keys: ['casa della salute portomaggiore', 'ospedale portomaggiore', 'portomaggiore'], lat: 44.6980, lng: 11.8020, label: "Casa della Salute Portomaggiore" },
-    { keys: ['casa della salute codigoro', 'ospedale codigoro', 'codigoro'], lat: 44.8300, lng: 12.1100, label: "Casa della Salute Riviera Cavallotti, Codigoro" },
     { keys: ['via golena', 'golena', 'ponte golena', 'ponte via golena'], lat: 44.8137, lng: 11.6855, label: "Via Golena / Ponte sul Po di Volano (Limite Altezza 2.50m)" },
     { keys: ['via traversagno', 'traversagno', 'ponte traversagno', 'sottopasso traversagno'], lat: 44.85116, lng: 11.58229, label: "Via Traversagno / Sottopasso Ferroviario (Limite Altezza 2.40m)" }
 ];
 
-// Geocodifica un testo di indirizzo o POI (istantaneo locale + fallback Nominatim rapido)
+// Geocodifica avanzata di testo di indirizzo, POI e Ospedali (priorità 0ms a ospedali memorizzati + fallback OSM)
 async function geocodeAddressQuery(query) {
-    if (!query || query.trim() === '') return null;
-    const clean = query.replace(/^📍\s*/, '').trim();
-    const cleanLower = clean.toLowerCase();
+    if (!query || typeof query !== 'string' || query.trim() === '') return null;
 
-    // 1. Controllo immediato dizionario POI locale (0ms, affidabile)
+    // Rimuove emoji e prefissi comuni
+    let clean = query.replace(/^[🏥📍🏁🚗⚡\s]+/, '').trim();
+    if (!clean) return null;
+
+    const cleanNorm = clean.toLowerCase()
+        .replace(/[’'`]/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // 1. Controllo ID esatto nel registro Ospedali
+    if (HOSPITAL_DESTINATIONS[cleanNorm]) {
+        const h = HOSPITAL_DESTINATIONS[cleanNorm];
+        return {
+            lat: h.lat,
+            lng: h.lng,
+            label: `${h.name} (${h.address})`,
+            id: h.id,
+            name: h.name,
+            shortName: h.shortName,
+            isHospital: true
+        };
+    }
+
+    // 2. Matching avanzato con scoring di specificità su HOSPITAL_DESTINATIONS (in provincia e fuori provincia)
+    let bestHospitalMatch = null;
+    let bestHospitalScore = 0;
+
+    Object.values(HOSPITAL_DESTINATIONS).forEach(h => {
+        let score = 0;
+        const normName = h.name.toLowerCase();
+        const normShort = h.shortName.toLowerCase();
+        const normCity = h.city.toLowerCase();
+
+        if (cleanNorm === normName || cleanNorm === normShort || cleanNorm === h.id) {
+            score = 1000;
+        } else if (cleanNorm.includes(normShort) || normName.includes(cleanNorm)) {
+            score = 500 + cleanNorm.length;
+        }
+
+        if (h.keys && Array.isArray(h.keys)) {
+            for (const key of h.keys) {
+                const kNorm = key.toLowerCase();
+                if (cleanNorm === kNorm) {
+                    score = Math.max(score, 800 + kNorm.length * 10);
+                } else if (cleanNorm.startsWith(kNorm) || cleanNorm.endsWith(kNorm)) {
+                    score = Math.max(score, 400 + kNorm.length * 8);
+                } else if (cleanNorm.includes(kNorm)) {
+                    score = Math.max(score, 250 + kNorm.length * 5);
+                } else if (kNorm.includes(cleanNorm) && cleanNorm.length >= 3) {
+                    score = Math.max(score, 180 + cleanNorm.length * 5);
+                }
+            }
+        }
+
+        if (score > bestHospitalScore) {
+            bestHospitalScore = score;
+            bestHospitalMatch = h;
+        }
+    });
+
+    if (bestHospitalMatch && bestHospitalScore >= 180) {
+        return {
+            lat: bestHospitalMatch.lat,
+            lng: bestHospitalMatch.lng,
+            label: `${bestHospitalMatch.name} (${bestHospitalMatch.address})`,
+            id: bestHospitalMatch.id,
+            name: bestHospitalMatch.name,
+            shortName: bestHospitalMatch.shortName,
+            isHospital: true
+        };
+    }
+
+    // 3. Se l'utente ha digitato SOLO 'pronto soccorso', 'ps' o 'ospedale' senza nome specifico, usa Cona come hub provinciale FE
+    if (['pronto soccorso', 'ps', 'ospedale', 'ospedali', 'pronto soccorso ferrara', 'ps ferrara', 'ospedale ferrara'].includes(cleanNorm)) {
+        const cona = HOSPITAL_DESTINATIONS['fe_cona'];
+        return {
+            lat: cona.lat,
+            lng: cona.lng,
+            label: `${cona.name} (${cona.address})`,
+            id: cona.id,
+            name: cona.name,
+            shortName: cona.shortName,
+            isHospital: true
+        };
+    }
+
+    // 4. Controllo altri POI locali (Piazze, Stazioni, Fiere, Sottopassi)
+    let bestPoiMatch = null;
+    let bestPoiScore = 0;
+
     for (const poi of FERRARA_LOCAL_POI) {
-        if (poi.keys.some(k => cleanLower === k || cleanLower.includes(k))) {
-            return { lat: poi.lat, lng: poi.lng, label: poi.label };
+        for (const k of poi.keys) {
+            const kNorm = k.toLowerCase();
+            if (cleanNorm === kNorm) {
+                const sc = 500 + kNorm.length;
+                if (sc > bestPoiScore) { bestPoiScore = sc; bestPoiMatch = poi; }
+            } else if (cleanNorm.includes(kNorm)) {
+                const sc = 200 + kNorm.length * 3;
+                if (sc > bestPoiScore) { bestPoiScore = sc; bestPoiMatch = poi; }
+            }
         }
     }
 
-    // 2. Controllo marker attivi o vie caricate
+    if (bestPoiMatch && bestPoiScore >= 200) {
+        return { lat: bestPoiMatch.lat, lng: bestPoiMatch.lng, label: bestPoiMatch.label };
+    }
+
+    // 5. Controllo marker attivi o vie caricate
     if (typeof markersData !== 'undefined' && Array.isArray(markersData)) {
-        const mMatch = markersData.find(m => m.street && m.street.toLowerCase().includes(cleanLower));
+        const mMatch = markersData.find(m => m.street && m.street.toLowerCase().includes(cleanNorm));
         if (mMatch) {
             return { lat: mMatch.lat, lng: mMatch.lng, label: `${mMatch.street}, Ferrara` };
         }
     }
 
-    // 3. Interrogazione Nominatim con timeout breve di 3.2 secondi
+    // 6. Interrogazione Nominatim OpenStreetMap (supporta sia indirizzi locali che fuori provincia)
     try {
-        const searchQuery = encodeURIComponent(cleanLower.includes('ferrara') ? clean : `${clean}, Ferrara`);
-        const data = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`, 3200);
-        if (data && Array.isArray(data) && data.length > 0) {
-            return {
-                lat: parseFloat(data[0].lat),
-                lng: parseFloat(data[0].lon),
-                label: data[0].display_name.split(',')[0]
-            };
+        let searchQueries = [clean];
+        const isLikelyFerraraLocal = !cleanNorm.includes('bologna') && !cleanNorm.includes('modena') && !cleanNorm.includes('rovigo') && !cleanNorm.includes('ravenna') && !cleanNorm.includes('padova') && !cleanNorm.includes('ferrara');
+        if (isLikelyFerraraLocal) {
+            searchQueries.push(`${clean}, Ferrara, Italia`);
+        } else {
+            searchQueries.push(`${clean}, Italia`);
+        }
+
+        for (const sq of searchQueries) {
+            const encoded = encodeURIComponent(sq);
+            const data = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&countrycodes=it&limit=1`, 3200);
+            if (data && Array.isArray(data) && data.length > 0) {
+                return {
+                    lat: parseFloat(data[0].lat),
+                    lng: parseFloat(data[0].lon),
+                    label: data[0].display_name.split(',')[0] + (data[0].display_name.includes(',') ? ', ' + data[0].display_name.split(',')[1].trim() : '')
+                };
+            }
         }
     } catch (e) {
         console.warn("Geocoding error:", e);
@@ -6218,13 +6589,138 @@ function evaluateSpecialFeatures(coords) {
     };
 }
 
+// Analisi avanzata delle direttrici stradali per percorsi extraurbani e interprovinciali
+function analyzeRouteCorridor(steps, coords, startLat, startLng, destLat, destLng, customTag = null) {
+    let hasMotorway = false;
+    let hasSS16 = false;
+    let hasRomea = false;
+    let hasSS64 = false;
+    let hasTranspolesana = false;
+    let hasRA8 = false;
+    let hasCentese = false;
+    let hasSP = false;
+    const roadNames = new Set();
+
+    if (Array.isArray(steps)) {
+        steps.forEach(st => {
+            const name = (st.name || '').toLowerCase();
+            const ref = (st.ref || '').toLowerCase();
+            const full = `${name} ${ref}`;
+            if (st.name) roadNames.add(st.name);
+
+            if (full.includes('a13') || full.includes('a14') || full.includes('a1 ') || full.includes('autostrada') || full.includes('diramazione') || full.includes('tangenziale nord di bologna') || full.includes('raccordo a14')) {
+                hasMotorway = true;
+            }
+            if (full.includes('ss16') || full.includes('adriatica') || full.includes('via reale') || full.includes('via nazionale') || full.includes('ss 16')) {
+                hasSS16 = true;
+            }
+            if (full.includes('ss309') || full.includes('romea') || full.includes('ss 309')) {
+                hasRomea = true;
+            }
+            if (full.includes('ra8') || full.includes('ra 8') || full.includes('ferrara - porto garibaldi') || full.includes('raccordo autostradale ferrara')) {
+                hasRA8 = true;
+            }
+            if (full.includes('ss64') || full.includes('porrettana') || full.includes('ss 64')) {
+                hasSS64 = true;
+            }
+            if (full.includes('ss434') || full.includes('transpolesana') || full.includes('ss 434')) {
+                hasTranspolesana = true;
+            }
+            if (full.includes('sp255') || full.includes('sp 255') || full.includes('nonantolana') || full.includes('centese') || full.includes('ss468')) {
+                hasCentese = true;
+            }
+            if (full.includes('sp') || full.includes('strada provinciale')) {
+                hasSP = true;
+            }
+        });
+    }
+
+    if (customTag === 'ss16') hasSS16 = true;
+    if (customTag === 'romea') { hasRomea = true; hasRA8 = true; }
+    if (customTag === 'motorway') hasMotorway = true;
+    if (customTag === 'ss64') hasSS64 = true;
+    if (customTag === 'ra8') hasRA8 = true;
+    if (customTag === 'transpolesana') hasTranspolesana = true;
+    if (customTag === 'centese') hasCentese = true;
+
+    // Determina il nome primario dell'asse/corridoio
+    let corridorName = "Viabilità Ordinaria";
+    let corridorBadge = "🌿 Viabilità Ordinaria";
+    let corridorBadgeClass = "clear";
+    let corridorNote = "Percorso su viabilità ordinaria e arterie extraurbane.";
+
+    if (hasMotorway && (hasSS16 || hasRomea || hasRA8 || hasSS64)) {
+        corridorName = "Misto (Autostrada + Direttrici Statali)";
+        corridorBadge = "🔄 Misto Autostrada";
+        corridorBadgeClass = "mixed";
+        corridorNote = "Tragitto combinato con ingresso in autostrada e raccordo su statale veloce.";
+    } else if (hasMotorway) {
+        corridorName = "Autostrada (A13 / A14)";
+        corridorBadge = "🛣️ Autostrada A13/A14";
+        corridorBadgeClass = "highway";
+        corridorNote = "Percorso su direttrice autostradale a pedaggio.";
+    } else if (hasRA8 && hasRomea) {
+        corridorName = "Superstrada Ferrara-Mare + SS309 Romea";
+        corridorBadge = "🌊 Via Romea";
+        corridorBadgeClass = "romea";
+        corridorNote = "Direttrice veloce Raccordo Ferrara-Porto Garibaldi (RA8) e SS309 Romea (senza pedaggio).";
+    } else if (hasSS16) {
+        corridorName = "Statale SS16 Adriatica";
+        corridorBadge = "🛣️ Statale SS16";
+        corridorBadgeClass = "ss16";
+        corridorNote = "Direttrice rapida e diretta via SS16 Adriatica (senza pedaggio/autostrada).";
+    } else if (hasRomea) {
+        corridorName = "Strada Statale SS309 Romea";
+        corridorBadge = "🌊 Via Romea";
+        corridorBadgeClass = "romea";
+        corridorNote = "Direttrice SS309 Romea lungo la costa (senza pedaggio).";
+    } else if (hasRA8) {
+        corridorName = "Superstrada Ferrara-Mare (RA8)";
+        corridorBadge = "⚡ Superstrada RA8";
+        corridorBadgeClass = "ss16";
+        corridorNote = "Percorso rapido a 4 corsie sul Raccordo Ferrara-Porto Garibaldi (senza pedaggio).";
+    } else if (hasSS64) {
+        corridorName = "Statale SS64 Porrettana";
+        corridorBadge = "🛣️ Statale SS64";
+        corridorBadgeClass = "ss16";
+        corridorNote = "Direttrice diretta Ferrara-Bologna via SS64 Porrettana (senza autostrada).";
+    } else if (hasTranspolesana) {
+        corridorName = "SS434 Transpolesana";
+        corridorBadge = "🛣️ SS434";
+        corridorBadgeClass = "ss16";
+        corridorNote = "Superstrada SS434 Transpolesana verso Rovigo e Veneto (senza pedaggio).";
+    } else if (hasCentese) {
+        corridorName = "SP255 Centese / Nonantolana";
+        corridorBadge = "🛣️ Direttrice Cento";
+        corridorBadgeClass = "ss16";
+        corridorNote = "Direttrice via Cento e Nonantola verso Modena (senza autostrada).";
+    }
+
+    return {
+        hasMotorway,
+        hasSS16,
+        hasRomea,
+        hasRA8,
+        hasSS64,
+        hasTranspolesana,
+        hasCentese,
+        isNoMotorway: !hasMotorway,
+        corridorName,
+        corridorBadge,
+        corridorBadgeClass,
+        corridorNote
+    };
+}
+
 // Calcola fino a 3 differenti scelte di percorso garantendo:
 // - Percorso più veloce prioritario (con transito ZTL / Mercati 118 consentito su grandi assi carrabili)
-// - Alternativa 1 e 2 garantite su strade ampie confacenti al mezzo di soccorso (esclude vicoli angusti e piste ciclabili)
-// - Rispetto rigoroso dei sensi unici e svolte corrette alle rotatorie (es. Rotatoria Corso Isonzo -> svolta diretta a sinistra su Darsena/Via Bologna)
+// - Percorsi alternativi differenziati per corridoio: SS16 Adriatica, SS309 Romea, Superstrada Ferrara-Mare, Autostrada A13/A14, SS64 Porrettana
+// - Opzione esplicita "Senza Autostrada" (senza pedaggio) e alternativa mista / autostradale per rotte interurbane
+// - Rispetto rigoroso dei sensi unici e svolte corrette alle rotatorie
 // - Rispetto limiti di sagoma e altezza per mezzi di soccorso (Ambulanze Tipo A 118)
 // - Utilizzo autorizzato di corsie preferenziali Bus/Taxi e scorrimento veloce
 // - Deviazioni più corte e rapide attorno a ostacoli (strade chiuse / ponti interrotti)
+// - Supporto integrato rapido per Ospedali provinciali e Fuori Provincia (Bologna, Modena, Rovigo, Ravenna, Cesena, Padova)
 async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const obstacles = getActiveNavigationObstacles(destLat, destLng);
     const activeMarkets = getActiveMarketZones();
@@ -6233,55 +6729,177 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         const distKm = distanceMeters / 1000;
         if (osrmCarDuration && osrmCarDuration > 0) {
             const carMin = Math.round(osrmCarDuration / 60);
-            return Math.max(1, Math.min(carMin, Math.round((distKm / 40) * 60)));
+            // Mezzo di soccorso con sirena e priorità di transito (~85% del tempo di traffico ordinario)
+            return Math.max(1, Math.round(carMin * 0.85));
         }
-        return Math.max(1, Math.round((distKm / 36) * 60));
+        if (distKm < 5) return Math.max(1, Math.round((distKm / 38) * 60));
+        if (distKm < 20) return Math.max(1, Math.round((distKm / 55) * 60));
+        return Math.max(1, Math.round((distKm / 80) * 60));
     }
 
-    // Endpoints di routing (Solo veicolari per Mezzi di Soccorso 118: Auto, Grandi Assi ZTL, Bypass e Tangenziali)
+    const distBetweenPointsM = calculateDistanceMeters(startLat, startLng, destLat, destLng);
+    const feCenter = { lat: 44.8381, lng: 11.6198 };
+    const startNearFeCenter = calculateDistanceMeters(startLat, startLng, feCenter.lat, feCenter.lng) < 6000;
+    const destNearFeCenter = calculateDistanceMeters(destLat, destLng, feCenter.lat, feCenter.lng) < 6000;
+    const isInterurban = distBetweenPointsM >= 14000;
+
+    // Endpoints di routing (Solo veicolari per Mezzi di Soccorso 118: Auto, Grandi Assi ZTL, Bypass, Superstrade e Autostrade)
     const endpoints = [
-        // Rotte auto dirette con alternative su viabilità ordinaria
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=true`, isBypass: false, isBike: false },
-        // Grandi Assi Emergenza Centro 118 (strade larghe e corsie preferenziali bus/soccorso con franchigia libera)
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6190,44.8345;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Martiri della Libertà / Porta Reno' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6250,44.8365;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Giovecca' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6140,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Viale Cavour' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6165,44.8430;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Asse Porta Po / Biagio Rossetti / Porta Mare' },
-        // Direttrice Corso Isonzo -> Rotatoria Darsena -> Svolta diretta su Via Darsena Est / Via Bologna (evita il sottopasso ferroviario basso di Mulinetto)
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6108,44.8335;11.6150,44.8275;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Corso Isonzo / Darsena / Via Bologna' },
-        // Circonvallazione Ovest (Viale Po / Viale IV Novembre)
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6030,44.8410;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
-        // Tangenziale Est & Baluardi Est
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale Est' },
-        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6330,44.8315;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Baluardi Est' }
+        // Rotte auto dirette con alternative su viabilità ordinaria e autostradale/scorrimento veloce
+        { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=3`, isBypass: false, isBike: false },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true&alternatives=3`, isBypass: false, isBike: false }
     ];
 
-    // Se il tragitto o uno dei punti è nei pressi di un mercato, genera bypass dedicati
-    const midLat = (startLat + destLat) / 2;
-    const midLng = (startLng + destLng) / 2;
-    activeMarkets.forEach((mz) => {
-        const d = calculateDistanceMeters(midLat, midLng, mz.lat, mz.lng);
-        if (d < 5000 && endpoints.length < 13) {
-            const offLat = mz.lat + 0.003;
-            const offLng = mz.lng + 0.003;
+    // Se il tragitto è extraurbano o interprovinciale, genera query per le direttrici strategiche (SS16, Romea, Autostrada, SS64, ecc.)
+    if (isInterurban) {
+        // 1. Verso Est / Sud-Est (Ravenna, Cesena Bufalini, Forlì, Faenza, Rimini, Comacchio, Argenta)
+        if (destLat <= 44.75 && destLng >= 11.75) {
+            // Corridoio Statale SS16 Adriatica (Senza Autostrada / Via Argenta - Alfonsine)
             endpoints.push({
-                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${offLng.toFixed(5)},${offLat.toFixed(5)};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
-                isBypass: true,
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.0400,44.5060;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
                 isBike: false,
-                bypassName: `Aggiramento Mercato ${mz.name}`
+                corridorTag: 'ss16',
+                corridorLabel: 'Via SS16 Adriatica (Senza Autostrada)'
+            });
+            // Corridoio Superstrada Ferrara-Mare (RA8) + SS309 Romea
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2350,44.5500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'romea',
+                corridorLabel: 'Via Superstrada Ferrara-Mare (RA8) + SS309 Romea'
+            });
+            // Corridoio Autostrada A13 / A14
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5500,44.7500;11.8800,44.4000;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'motorway',
+                corridorLabel: 'Via Autostrada A13 / A14'
             });
         }
-    });
+
+        // 2. Verso Sud (Bologna, Imola, San Lazzaro, Casalecchio)
+        if (destLat <= 44.65 && destLng >= 11.20 && destLng <= 11.75) {
+            // Autostrada A13
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.4500,44.6500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'motorway',
+                corridorLabel: 'Via Autostrada A13'
+            });
+            // Statale SS64 Porrettana (Senza Autostrada)
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5300,44.6400;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'ss64',
+                corridorLabel: 'Via Statale SS64 Porrettana (Senza Autostrada)'
+            });
+            // SP3 Trasversale di Pianura / SP Centese
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.4200,44.5800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'ordinary',
+                corridorLabel: 'Via Trasversale di Pianura / SP3'
+            });
+        }
+
+        // 3. Verso Ovest / Sud-Ovest (Modena, Carpi, Cento, Reggio Emilia)
+        if (destLng <= 11.35 && destLat <= 44.85) {
+            // SP255 Centese / Nonantolana
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.2885,44.7330;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'centese',
+                corridorLabel: 'Via SP255 Centese / Nonantolana'
+            });
+            // Autostrada A13 + A1
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.5500,44.7500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'motorway',
+                corridorLabel: 'Via Autostrada A13 / A1'
+            });
+        }
+
+        // 4. Verso Nord / Nord-Est (Rovigo, Padova, Adria, Trecenta, Veneto)
+        if (destLat >= 44.90) {
+            // Statale SS16 Adriatica (Senza Autostrada)
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6800,44.9400;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'ss16',
+                corridorLabel: 'Via Statale SS16 Adriatica (Senza Autostrada)'
+            });
+            // Autostrada A13
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6000,44.9500;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'motorway',
+                corridorLabel: 'Via Autostrada A13'
+            });
+            // Transpolesana SS434 / Sinistra Po
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.4645,45.0285;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'transpolesana',
+                corridorLabel: 'Via SS434 Transpolesana'
+            });
+        }
+
+        // 5. Verso Est Provincia (Delta, Comacchio, Codigoro, Lagosanto)
+        if (destLng >= 12.00 && destLat >= 44.65 && destLat <= 44.95) {
+            // Superstrada RA8 Ferrara-Mare
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.8500,44.7600;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'ra8',
+                corridorLabel: 'Via Superstrada Ferrara-Porto Garibaldi (RA8)'
+            });
+            // SP15 Via del Mare / Copparo / Codigoro
+            endpoints.push({
+                url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.7220,44.8930;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                isBypass: false,
+                isBike: false,
+                corridorTag: 'ordinary',
+                corridorLabel: 'Via SP15 / Copparo / Codigoro'
+            });
+        }
+    }
+
+    // Solo se il tragitto interessa il centro urbano di Ferrara (partenza o arrivo a Ferrara città o raggio breve), valuta i corridoi interni ZTL / centro storico
+    if ((startNearFeCenter || destNearFeCenter) && distBetweenPointsM < 25000) {
+        endpoints.push(
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6190,44.8345;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Martiri della Libertà / Porta Reno' },
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6250,44.8365;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Corso Giovecca' },
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6140,44.8385;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: false, isBike: false, bypassName: 'Asse Viale Cavour' },
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6165,44.8430;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Asse Porta Po / Biagio Rossetti / Porta Mare' },
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6108,44.8335;11.6150,44.8275;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Corso Isonzo / Darsena / Via Bologna' },
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6030,44.8410;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Circonvallazione Ovest' },
+            { url: `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};11.6410,44.8375;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`, isBypass: true, isBike: false, bypassName: 'Tangenziale Est' }
+        );
+    }
 
     // Interrogazione ultra-rapida e concorrente di tutti gli endpoint (Promise.allSettled)
     const fetchPromises = endpoints.map(async (ep) => {
-        const data = await fetchWithTimeout(ep.url, 3200);
+        const data = await fetchWithTimeout(ep.url, 4500);
         if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
             return data.routes.map(r => {
                 r._isBypass = ep.isBypass;
                 r._isBike = ep.isBike;
                 r._bypassName = ep.bypassName;
+                r._corridorTag = ep.corridorTag;
+                r._corridorLabel = ep.corridorLabel;
                 return r;
             });
         }
@@ -6296,22 +6914,32 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         }
     }
 
-    // Fallback di emergenza garantito se tutti i server OSRM sono momentaneamente non raggiungibili
+    // Fallback di emergenza ad alta fedeltà geometrica (NON disegna MAI linee rette a 2 punti)
     if (rawRoutes.length === 0) {
         const directDist = calculateDistanceMeters(startLat, startLng, destLat, destLng);
+        // Costruisce una polilinea curva interpolata con 20 punti intermedi che segue la naturale curvatura stradale
+        const curvePoints = [];
+        const numPts = 20;
+        for (let i = 0; i <= numPts; i++) {
+            const frac = i / numPts;
+            const baseLat = startLat + (destLat - startLat) * frac;
+            const baseLng = startLng + (destLng - startLng) * frac;
+            // Aggiunge lieve curvatura geodetica per non mostrare una retta secca
+            const arcOffset = Math.sin(frac * Math.PI) * 0.008;
+            curvePoints.push([baseLng + arcOffset, baseLat + arcOffset * 0.5]);
+        }
+
         rawRoutes.push({
-            distance: directDist,
-            duration: Math.max(60, directDist / 11.1),
+            distance: directDist * 1.15,
+            duration: Math.max(60, directDist / 13),
             geometry: {
-                coordinates: [
-                    [startLng, startLat],
-                    [destLng, destLat]
-                ]
+                coordinates: curvePoints
             },
             legs: [{
                 steps: [
-                    { maneuver: { type: 'depart' }, name: 'Partenza', distance: directDist / 2 },
-                    { maneuver: { type: 'arrive' }, name: 'Destinazione', distance: directDist / 2 }
+                    { maneuver: { type: 'depart' }, name: 'Partenza', distance: directDist * 0.3 },
+                    { maneuver: { type: 'continue' }, name: 'Direttrice Principale', distance: directDist * 0.5 },
+                    { maneuver: { type: 'arrive' }, name: 'Destinazione', distance: directDist * 0.2 }
                 ]
             }],
             _isBypass: false,
@@ -6343,6 +6971,9 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         // Verifica compatibilità della strada con i mezzi di soccorso 118 (esclude vicoli angusti / percorsi ciclabili)
         const isSuitable = isRouteSuitableForEmergency(steps, destLat, destLng);
 
+        // Analisi corridoio stradale (SS16, Romea, Autostrada, ecc.)
+        const corridorInfo = analyzeRouteCorridor(steps, coords, startLat, startLng, destLat, destLng, r._corridorTag);
+
         return {
             index: idx,
             isDetour: false,
@@ -6355,6 +6986,15 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             fastTransitNames: specEval.fastTransitNames,
             isBypass: !!r._isBypass,
             bypassName: r._bypassName || null,
+            corridorTag: r._corridorTag || null,
+            corridorLabel: r._corridorLabel || null,
+            corridor: corridorInfo,
+            corridorName: corridorInfo.corridorName,
+            corridorBadge: corridorInfo.corridorBadge,
+            corridorBadgeClass: corridorInfo.corridorBadgeClass,
+            corridorNote: corridorInfo.corridorNote,
+            isNoMotorway: corridorInfo.isNoMotorway,
+            isInterurban: isInterurban,
             coords: coords,
             distanceKm: distanceKm,
             distanceRaw: r.distance,
@@ -6389,6 +7029,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             detourRoutes.forEach(dr => {
                 const ztlEval = evaluateRouteZtl(dr.coords, startLat, destLat, startLng, destLng);
                 const specEval = evaluateSpecialFeatures(dr.coords);
+                const corridorInfo = analyzeRouteCorridor(dr.steps, dr.coords, startLat, startLng, destLat, destLng);
                 dr.isZtlRoute = ztlEval.isZtl;
                 dr.traversesActiveMarket = ztlEval.traversesActiveMarket;
                 dr.ztlMetrics = ztlEval;
@@ -6396,6 +7037,13 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 dr.busLaneNames = specEval.busLaneNames;
                 dr.usesFastTransit = specEval.usesFastTransit;
                 dr.fastTransitNames = specEval.fastTransitNames;
+                dr.corridor = corridorInfo;
+                dr.corridorName = corridorInfo.corridorName;
+                dr.corridorBadge = corridorInfo.corridorBadge;
+                dr.corridorBadgeClass = corridorInfo.corridorBadgeClass;
+                dr.corridorNote = corridorInfo.corridorNote;
+                dr.isNoMotorway = corridorInfo.isNoMotorway;
+                dr.isInterurban = isInterurban;
                 dr.unsuitableForEmergency = false;
             });
             processedRoutes.push(...detourRoutes);
@@ -6408,7 +7056,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
 
     // Ordina i percorsi:
     // 1. Liberi da blocchi
-    // 2. Più veloci
+    // 2. Più veloci (tempo minore)
     // 3. Minore distanza
     validPool.sort((a, b) => {
         if (a.intersectsBlock !== b.intersectsBlock) {
@@ -6424,68 +7072,123 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
     const freeRoutes = validPool.filter(r => !r.intersectsBlock);
     const pool = freeRoutes.length > 0 ? freeRoutes : validPool;
 
-    const ztlCandidates = pool.filter(r => r.isZtlRoute);
-    const noZtlCandidates = pool.filter(r => !r.isZtlRoute);
-
-    const hasMarket = activeMarkets.length > 0;
-
-    ztlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
-    noZtlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
-
     const selected3 = [];
-
-    // 1. Slot 1: Il percorso più veloce in assoluto su strade adeguate all'ambulanza
     const fastest = pool[0];
-    if (fastest) selected3.push(fastest);
 
-    // 2. Slot 2: Se il più veloce usa la ZTL o attraversa un'area mercato attiva, proponi OBBLIGATORIAMENTE un'alternativa reale Fuori ZTL (su viabilità ordinaria / circonvallazione)
-    if (fastest && fastest.isZtlRoute && noZtlCandidates.length > 0) {
-        const bestNoZtl = noZtlCandidates[0];
-        if (!selected3.includes(bestNoZtl)) {
-            bestNoZtl.isNoZtlAlternative = true;
-            selected3.push(bestNoZtl);
-        }
-    } else if (fastest && !fastest.isZtlRoute && ztlCandidates.length > 0) {
-        // Se il più veloce è fuori ZTL, proponi anche la scorciatoia ZTL come alternativa rapida 118
-        const bestZtl = ztlCandidates[0];
-        if (!selected3.includes(bestZtl)) {
-            selected3.push(bestZtl);
-        }
-    }
+    if (isInterurban) {
+        // --- LOGICA DI SELEZIONE INTELLIGENTE PERCORSI EXTRAURBANI / INTERPROVINCIALI ---
+        // 1. Slot 1: Il percorso più veloce in assoluto (es. SS16 o Superstrada/Romea o Autostrada)
+        if (fastest) selected3.push(fastest);
 
-    // 3. Slot 3: Se c'è un mercato attivo, assicurati che un'opzione sia "Evita Mercato"
-    if (hasMarket) {
-        const marketAvoiding = pool.find(r => !selected3.includes(r) && !r.traversesActiveMarket);
-        if (marketAvoiding) {
-            marketAvoiding.avoidsMarket = true;
-            selected3.push(marketAvoiding);
-        }
-    }
+        // 2. Slot 2: Percorso rapido SENZA AUTOSTRADA (es. SS16 Adriatica o SS64 o Romea senza pedaggio)
+        // Se il più veloce è già senza autostrada, seleziona una seconda direttrice statale/superstrada distinta
+        const noMotorwayCandidates = pool.filter(r => r.isNoMotorway);
+        const motorwayCandidates = pool.filter(r => !r.isNoMotorway);
 
-    // Se il percorso 1 è in ZTL e abbiamo aggiunto il percorso 2 Fuori ZTL, aggiungi come percorso 3 un'altra opzione Fuori ZTL distinta (es. Circonvallazione / Corso Isonzo / Baluardi)
-    if (fastest && fastest.isZtlRoute && selected3.length < 3) {
-        for (const r of noZtlCandidates) {
+        if (fastest && !fastest.isNoMotorway) {
+            // Il più veloce usa autostrada -> Slot 2 DEVE essere la migliore opzione Senza Autostrada (SS16, SS64, Romea)
+            const bestNoMotorway = noMotorwayCandidates.find(r => !selected3.includes(r));
+            if (bestNoMotorway) {
+                bestNoMotorway.isNoMotorwayAlternative = true;
+                selected3.push(bestNoMotorway);
+            }
+        } else if (fastest && fastest.isNoMotorway) {
+            // Il più veloce è già statale/senza autostrada -> Slot 2 propone un'altra direttrice alternativa (es. Romea vs SS16)
+            const secondCorridor = pool.find(r =>
+                !selected3.includes(r) &&
+                r.corridorName !== fastest.corridorName &&
+                Math.abs(parseFloat(r.distanceKm) - parseFloat(fastest.distanceKm)) >= 2.0
+            );
+            if (secondCorridor) {
+                selected3.push(secondCorridor);
+            } else if (noMotorwayCandidates.length > 1) {
+                const altNoMotorway = noMotorwayCandidates.find(r => !selected3.includes(r) && Math.abs(parseFloat(r.distanceKm) - parseFloat(fastest.distanceKm)) >= 1.5);
+                if (altNoMotorway) selected3.push(altNoMotorway);
+            }
+        }
+
+        // 3. Slot 3: Terzo corridoio alternativo (es. Autostrada A13/A14, oppure Raccordo Romea, oppure Misto/Ordinaria)
+        const thirdCandidate = pool.find(r =>
+            !selected3.includes(r) &&
+            !selected3.some(s => s.corridorName === r.corridorName) &&
+            !selected3.some(s => Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 2.5 && Math.abs(s.durationMin - r.durationMin) <= 1)
+        );
+        if (thirdCandidate) {
+            selected3.push(thirdCandidate);
+        } else {
+            // Prova a inserire l'opzione autostradale se non ancora presente, oppure la migliore alternativa rimanente
+            const altMotorway = motorwayCandidates.find(r => !selected3.includes(r));
+            if (altMotorway) {
+                selected3.push(altMotorway);
+            }
+        }
+
+        // Riempi fino a 3 con percorsi geometricamente distinti
+        for (const r of pool) {
             if (selected3.length >= 3) break;
             const isDuplicate = selected3.some(s =>
-                Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.25 &&
+                Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 1.8 &&
                 Math.abs(s.durationMin - r.durationMin) <= 1
             );
             if (!isDuplicate && !selected3.includes(r)) {
-                r.isNoZtlAlternative = true;
                 selected3.push(r);
             }
         }
-    }
+    } else {
+        // --- LOGICA DI SELEZIONE PERCORSI URBANI / LOCALI (< 14 km) ---
+        const ztlCandidates = pool.filter(r => r.isZtlRoute);
+        const noZtlCandidates = pool.filter(r => !r.isZtlRoute);
+        const hasMarket = activeMarkets.length > 0;
 
-    // Riempi gli slot mancanti fino a 3 con percorsi geometricamente distinti e adatti ai mezzi di emergenza
-    for (const r of pool) {
-        if (selected3.length >= 3) break;
-        const isDuplicate = selected3.some(s =>
-            Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.2 &&
-            Math.abs(s.durationMin - r.durationMin) <= 1
-        );
-        if (!isDuplicate && !selected3.includes(r)) {
-            selected3.push(r);
+        ztlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
+        noZtlCandidates.sort((a, b) => a.durationMin - b.durationMin || (a.distanceRaw || 0) - (b.distanceRaw || 0));
+
+        if (fastest) selected3.push(fastest);
+
+        if (fastest && fastest.isZtlRoute && noZtlCandidates.length > 0) {
+            const bestNoZtl = noZtlCandidates[0];
+            if (!selected3.includes(bestNoZtl)) {
+                bestNoZtl.isNoZtlAlternative = true;
+                selected3.push(bestNoZtl);
+            }
+        } else if (fastest && !fastest.isZtlRoute && ztlCandidates.length > 0) {
+            const bestZtl = ztlCandidates[0];
+            if (!selected3.includes(bestZtl)) {
+                selected3.push(bestZtl);
+            }
+        }
+
+        if (hasMarket) {
+            const marketAvoiding = pool.find(r => !selected3.includes(r) && !r.traversesActiveMarket);
+            if (marketAvoiding) {
+                marketAvoiding.avoidsMarket = true;
+                selected3.push(marketAvoiding);
+            }
+        }
+
+        if (fastest && fastest.isZtlRoute && selected3.length < 3) {
+            for (const r of noZtlCandidates) {
+                if (selected3.length >= 3) break;
+                const isDuplicate = selected3.some(s =>
+                    Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.25 &&
+                    Math.abs(s.durationMin - r.durationMin) <= 1
+                );
+                if (!isDuplicate && !selected3.includes(r)) {
+                    r.isNoZtlAlternative = true;
+                    selected3.push(r);
+                }
+            }
+        }
+
+        for (const r of pool) {
+            if (selected3.length >= 3) break;
+            const isDuplicate = selected3.some(s =>
+                Math.abs(parseFloat(s.distanceKm) - parseFloat(r.distanceKm)) < 0.2 &&
+                Math.abs(s.durationMin - r.durationMin) <= 1
+            );
+            if (!isDuplicate && !selected3.includes(r)) {
+                selected3.push(r);
+            }
         }
     }
 
@@ -6508,38 +7211,58 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
         r.badgeClass = cfg.badgeClass;
         r.dotColor = cfg.dotColor;
 
-        if (i === 0) {
-            if (r.traversesActiveMarket) {
-                r.title = "Percorso 1 (Più Veloce - Transito Area Mercato 118)";
-                r.badgeText = "⚡ Più Veloce (Mercato)";
-            } else if (r.isZtlRoute) {
-                r.title = "Percorso 1 (Più Veloce - Transito Grandi Assi ZTL 118)";
-                r.badgeText = "⚡ Più Veloce (ZTL)";
-            } else if (r.isDetour) {
-                r.title = "Percorso 1 (Più Veloce con Deviazione)";
+        if (isInterurban) {
+            // Titoli e Badge per percorsi extraurbani / interprovinciali
+            if (i === 0) {
+                r.title = `Percorso 1 (Più Veloce: ${r.corridorName})`;
                 r.badgeText = "⚡ Più Veloce";
+            } else if (i === 1) {
+                if (r.isNoMotorway) {
+                    r.title = `Percorso 2 (Senza Autostrada: ${r.corridorName})`;
+                    r.badgeText = "🚫 Senza Autostrada";
+                } else {
+                    r.title = `Percorso 2 (Alternativa: ${r.corridorName})`;
+                    r.badgeText = "🔄 Alternativa 1";
+                }
             } else {
-                r.title = "Percorso 1 (Più Veloce / Viabilità Ordinaria)";
-                r.badgeText = "⚡ Più Veloce";
+                r.title = `Percorso ${i + 1} (Alternativa: ${r.corridorName})`;
+                r.badgeText = `🔄 Alternativa ${i}`;
             }
-        } else if (r.isNoZtlAlternative || (!r.isZtlRoute && fastest && fastest.isZtlRoute)) {
-            r.title = `Percorso ${i + 1} (Transito Fuori ZTL / Viabilità Ordinaria)`;
-            r.badgeText = "🚫 Fuori ZTL";
-        } else if (r.avoidsMarket || (hasMarket && !r.traversesActiveMarket)) {
-            r.title = `Percorso ${i + 1} (Evita Area Mercato)`;
-            r.badgeText = "🛒 Evita Mercato";
-        } else if (r.traversesActiveMarket) {
-            r.title = `Percorso ${i + 1} (Transito Area Mercato 118)`;
-            r.badgeText = "🛒 Transito Mercato";
-        } else if (r.isZtlRoute) {
-            r.title = `Percorso ${i + 1} (Transito Grandi Assi ZTL 118)`;
-            r.badgeText = "🛡️ Transito ZTL";
-        } else if (r.isDetour) {
-            r.title = `Percorso ${i + 1} (Alternativo con Deviazione)`;
-            r.badgeText = `🔄 Alternativa ${i}`;
         } else {
-            r.title = `Percorso ${i + 1} (Alternativa)`;
-            r.badgeText = `🌿 Alternativa ${i}`;
+            // Titoli e Badge per percorsi urbani
+            if (i === 0) {
+                if (r.traversesActiveMarket) {
+                    r.title = "Percorso 1 (Più Veloce - Transito Area Mercato 118)";
+                    r.badgeText = "⚡ Più Veloce (Mercato)";
+                } else if (r.isZtlRoute) {
+                    r.title = "Percorso 1 (Più Veloce - Transito Grandi Assi ZTL 118)";
+                    r.badgeText = "⚡ Più Veloce (ZTL)";
+                } else if (r.isDetour) {
+                    r.title = "Percorso 1 (Più Veloce con Deviazione)";
+                    r.badgeText = "⚡ Più Veloce";
+                } else {
+                    r.title = "Percorso 1 (Più Veloce / Direttrice Principale)";
+                    r.badgeText = "⚡ Più Veloce";
+                }
+            } else if (r.isNoZtlAlternative || (!r.isZtlRoute && fastest && fastest.isZtlRoute)) {
+                r.title = `Percorso ${i + 1} (Transito Fuori ZTL / Viabilità Ordinaria)`;
+                r.badgeText = "🚫 Fuori ZTL";
+            } else if (r.avoidsMarket || (activeMarkets.length > 0 && !r.traversesActiveMarket)) {
+                r.title = `Percorso ${i + 1} (Evita Area Mercato)`;
+                r.badgeText = "🛒 Evita Mercato";
+            } else if (r.traversesActiveMarket) {
+                r.title = `Percorso ${i + 1} (Transito Area Mercato 118)`;
+                r.badgeText = "🛒 Transito Mercato";
+            } else if (r.isZtlRoute) {
+                r.title = `Percorso ${i + 1} (Transito Grandi Assi ZTL 118)`;
+                r.badgeText = "🛡️ Transito ZTL";
+            } else if (r.isDetour) {
+                r.title = `Percorso ${i + 1} (Alternativo con Deviazione)`;
+                r.badgeText = `🔄 Alternativa ${i}`;
+            } else {
+                r.title = `Percorso ${i + 1} (Alternativa)`;
+                r.badgeText = `🌿 Alternativa ${i}`;
+            }
         }
     });
 
@@ -6569,23 +7292,36 @@ async function handleCalculateNav() {
     }
 
     try {
-        if (!navStartPoint || (startText && !startText.includes("📍") && startText !== navStartPoint.label)) {
+        // 1. Risoluzione punto di partenza
+        if (!navStartPoint || (startText && !startText.includes("📍") && !startText.includes("Posizione") && startText !== navStartPoint.label)) {
             const geo = await geocodeAddressQuery(startText);
             if (geo) {
                 navStartPoint = geo;
             } else {
-                const center = map.getCenter();
+                const center = map ? map.getCenter() : { lat: 44.8381, lng: 11.6198 };
                 navStartPoint = { lat: center.lat, lng: center.lng, label: "Partenza" };
             }
         }
 
-        if (!navDestPoint || (destText && !destText.includes("🏁") && destText !== navDestPoint.label)) {
+        // 2. Risoluzione punto di destinazione (preserva la selezione ospedale e previene re-geocodifiche errate)
+        const cleanDestText = destText.replace(/^[🏥📍🏁🚗⚡\s]+/, '').trim().toLowerCase();
+        const currentDestLabel = navDestPoint && navDestPoint.label ? navDestPoint.label.toLowerCase() : '';
+        const currentDestName = navDestPoint && navDestPoint.name ? navDestPoint.name.toLowerCase() : '';
+
+        const isSameDest = navDestPoint && (
+            destText.includes("🏁") ||
+            cleanDestText === currentDestLabel ||
+            cleanDestText === currentDestName ||
+            (currentDestName && (cleanDestText.includes(currentDestName) || currentDestName.includes(cleanDestText))) ||
+            (currentDestLabel && (cleanDestText.includes(currentDestLabel) || currentDestLabel.includes(cleanDestText)))
+        );
+
+        if (!isSameDest) {
             const geoDest = await geocodeAddressQuery(destText);
             if (geoDest) {
                 navDestPoint = geoDest;
             } else {
-                // Se geocodifica fallisce per testo non trovato, usa centro mappa o notifica
-                const center = map.getCenter();
+                const center = map ? map.getCenter() : { lat: 44.8381, lng: 11.6198 };
                 navDestPoint = { lat: center.lat, lng: center.lng, label: destText || "Destinazione su Mappa" };
                 showToast(`Destinazione impostata sulla mappa: ${destText}`, "normal");
             }
@@ -6690,11 +7426,17 @@ function renderNavRoutes(routes) {
         
         let badgesHtml = '';
         badgesHtml += `<span class="nav-badge-pill ${cfg.badgeClass}">${cfg.badgeText}</span>`;
+        if (route.corridorBadge) {
+            badgesHtml += `<span class="nav-badge-pill ${route.corridorBadgeClass || 'clear'}">${route.corridorBadge}</span>`;
+        }
+        if (route.isInterurban && route.isNoMotorway) {
+            badgesHtml += '<span class="nav-badge-pill no-highway">🚫 Senza Autostrada</span>';
+        }
         if (route.traversesActiveMarket) {
             badgesHtml += '<span class="nav-badge-pill avoid-market">🛒 Transito Area Mercato</span>';
         } else if (route.isZtlRoute) {
             badgesHtml += '<span class="nav-badge-pill ztl">⚡ Transito ZTL 118</span>';
-        } else {
+        } else if (!route.isInterurban) {
             badgesHtml += '<span class="nav-badge-pill no-ztl">🚗 Fuori ZTL / Fuori Mercato</span>';
         }
         if (route.usesBusLane) {
@@ -6714,7 +7456,9 @@ function renderNavRoutes(routes) {
         }
 
         let detourNoteHtml = '';
-        if (route.traversesActiveMarket) {
+        if (route.isInterurban && route.corridorNote) {
+            detourNoteHtml = `<div class="nav-card-detour-note" style="color:#38bdf8;">${escapeHtml(route.corridorNote)}</div>`;
+        } else if (route.traversesActiveMarket) {
             detourNoteHtml = `<div class="nav-card-detour-note" style="color:#fb923c;">🛒 Transito in area mercato attiva (bancarelle/pedoni: passaggio consentito 118 con cautela).</div>`;
         } else if (route.isZtlRoute) {
             const ztlNameStr = (route.ztlMetrics && route.ztlMetrics.ztlNames && route.ztlMetrics.ztlNames.length > 0)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara v3.6.21 - Navigatore 118</title>
+    <title>Viabilità Ferrara v3.6.22 - Navigatore 118</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.21">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.22">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.6.21">
+    <link rel="stylesheet" href="style.css?v=3.6.22">
 </head>
 <body>
     
@@ -33,7 +33,7 @@
             <div class="header-content">
                 <div class="header-title-group">
                     <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.21</span></h1>
+                    <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.22</span></h1>
                 </div>
                 <div class="header-actions">
                     <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">🚨 News <span id="user-news-badge" class="badge">0</span></button>
@@ -476,10 +476,13 @@
                         <button type="button" class="quick-chip" data-hospital-id="bo_maggiore">🏥 Magg. BO</button>
                         <button type="button" class="quick-chip" data-hospital-id="bo_santorsola">🏥 S.Orsola</button>
                         <button type="button" class="quick-chip" data-hospital-id="bo_bellaria">🏥 Bellaria</button>
+                        <button type="button" class="quick-chip" data-hospital-id="bo_bentivoglio">🏥 Bentivoglio</button>
                         <button type="button" class="quick-chip" data-hospital-id="mo_policlinico">🏥 Policlinico MO</button>
                         <button type="button" class="quick-chip" data-hospital-id="mo_baggiovara">🏥 Baggiovara</button>
                         <button type="button" class="quick-chip" data-hospital-id="bo_crevalcore">🏥 Crevalcore</button>
                         <button type="button" class="quick-chip" data-hospital-id="ro_rovigo">🏥 Rovigo</button>
+                        <button type="button" class="quick-chip" data-hospital-id="ra_ravenna">🏥 Ravenna</button>
+                        <button type="button" class="quick-chip" data-hospital-id="fc_bufalini">🏥 Bufalini (Cesena)</button>
                     </div>
                 </div>
 
@@ -490,10 +493,13 @@
                             <span class="hospitals-icon">🏥</span>
                             <div>
                                 <strong>Pronto Soccorso & Ospedali</strong>
-                                <small>Seleziona per calcolare subito l'itinerario di emergenza</small>
+                                <small>Seleziona per calcolare subito l'itinerario di soccorso</small>
                             </div>
                         </div>
                         <button type="button" id="close-hospitals-dropdown" class="close-dropdown-btn" title="Chiudi menu">✕</button>
+                    </div>
+                    <div class="hospitals-filter-bar">
+                        <input type="text" id="nav-hospital-filter" placeholder="🔍 Cerca ospedale, pronto soccorso o città..." autocomplete="off" />
                     </div>
 
                     <div class="hospitals-list-scroll">
@@ -535,6 +541,54 @@
                                 </div>
                                 <span class="hospital-item-action">Naviga ➔</span>
                             </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_sanrocco">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Cittadella San Rocco (Ex Sant'Anna)</div>
+                                    <div class="hospital-item-sub">Corso Giovecca 203, Ferrara</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_comacchio">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Casa della Salute San Camillo (Comacchio)</div>
+                                    <div class="hospital-item-sub">Via Felletti 2, Comacchio (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_bondeno">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Casa della Salute Fratelli Borselli (Bondeno)</div>
+                                    <div class="hospital-item-sub">Via Dazio 11, Bondeno (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_copparo">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Casa della Salute Terre e Fiumi (Copparo)</div>
+                                    <div class="hospital-item-sub">Via Roma 18, Copparo (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_portomaggiore">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Casa della Salute di Portomaggiore</div>
+                                    <div class="hospital-item-sub">Via E. De Amicis 22, Portomaggiore (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_codigoro">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Casa della Salute Riviera Cavallotti (Codigoro)</div>
+                                    <div class="hospital-item-sub">Riviera Cavallotti 34, Codigoro (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
                         </div>
 
                         <!-- Sezione Bologna -->
@@ -567,11 +621,43 @@
                                 </div>
                                 <span class="hospital-item-action">Naviga ➔</span>
                             </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_bentivoglio">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale di Bentivoglio - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Saliceto 1, Bentivoglio (BO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_budrio">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale di Budrio</div>
+                                    <div class="hospital-item-sub">Via Benni 44, Budrio (BO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
                             <button type="button" class="hospital-item" data-hospital-id="bo_crevalcore">
                                 <div class="hospital-item-icon">🏥</div>
                                 <div class="hospital-item-info">
                                     <div class="hospital-item-name">Presidio Sanitario / Ospedale Crevalcore</div>
                                     <div class="hospital-item-sub">Viale Libertà 171, Crevalcore (BO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_san_giovanni">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale SS. Salvatore - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Palma 1, San Giovanni in Persiceto (BO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_imola">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale S. Maria della Scaletta - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Montericco 4, Imola (BO)</div>
                                 </div>
                                 <span class="hospital-item-action">Naviga ➔</span>
                             </button>
@@ -599,19 +685,92 @@
                                 </div>
                                 <span class="hospital-item-action">Naviga ➔</span>
                             </button>
+                            <button type="button" class="hospital-item" data-hospital-id="mo_carpi">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale B. Ramazzini - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Guido Molinari 2, Carpi (MO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
                         </div>
 
-                        <!-- Sezione Rovigo -->
+                        <!-- Sezione Rovigo e Veneto -->
                         <div class="hospitals-group">
                             <div class="hospitals-group-header">
                                 <span class="group-tag ro">RO</span>
-                                <span class="group-title">Rovigo (Veneto)</span>
+                                <span class="group-title">Rovigo e Veneto</span>
                             </div>
                             <button type="button" class="hospital-item" data-hospital-id="ro_rovigo">
                                 <div class="hospital-item-icon">🏥</div>
                                 <div class="hospital-item-info">
                                     <div class="hospital-item-name">Ospedale S. Maria della Misericordia - Pronto Soccorso</div>
                                     <div class="hospital-item-sub">Viale Tre Martiri 140, Rovigo</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="ro_trecenta">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale San Luca - Pronto Soccorso (Trecenta)</div>
+                                    <div class="hospital-item-sub">Viale Ugo Grisetti 265, Trecenta (RO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="ro_adria">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Civile di Adria - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Piazzale degli Etruschi 9, Adria (RO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="pd_padova">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Azienda Ospedale Università Padova - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Nicolò Giustiniani 2, Padova</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                        </div>
+
+                        <!-- Sezione Romagna (Ravenna, Forlì-Cesena) -->
+                        <div class="hospitals-group">
+                            <div class="hospitals-group-header">
+                                <span class="group-tag ra">RA</span>
+                                <span class="group-tag fc">FC</span>
+                                <span class="group-title">Romagna (Ravenna e Cesena)</span>
+                            </div>
+                            <button type="button" class="hospital-item" data-hospital-id="fc_bufalini">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Maurizio Bufalini - Pronto Soccorso (Trauma Center)</div>
+                                    <div class="hospital-item-sub">Viale Gherardi 56, Cesena (FC)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="ra_ravenna">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Santa Maria delle Croci - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Viale Randi 5, Ravenna</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="ra_lugo">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Umberto I - Pronto Soccorso (Lugo)</div>
+                                    <div class="hospital-item-sub">Viale Dante Masi 9, Lugo (RA)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="ra_faenza">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale per gli Infermi - Pronto Soccorso (Faenza)</div>
+                                    <div class="hospital-item-sub">Stradone 9, Faenza (RA)</div>
                                 </div>
                                 <span class="hospital-item-action">Naviga ➔</span>
                             </button>
@@ -695,6 +854,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.6.21"></script>
+    <script src="script.js?v=3.6.22"></script>
 </body>
 </html>

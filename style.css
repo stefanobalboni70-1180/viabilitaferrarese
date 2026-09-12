@@ -1969,6 +1969,30 @@ h1 span.city-name {
     color: #fff;
 }
 
+.hospitals-filter-bar {
+    padding: 6px 10px;
+    background: rgba(15, 23, 42, 0.75);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hospitals-filter-bar input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    color: #f8fafc;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.hospitals-filter-bar input:focus {
+    border-color: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+}
+
 .hospitals-list-scroll {
     max-height: 280px;
     overflow-y: auto;
@@ -2014,6 +2038,9 @@ h1 span.city-name {
 .group-tag.bo { background: #b91c1c; color: #fff; }
 .group-tag.mo { background: #d97706; color: #fff; }
 .group-tag.ro { background: #059669; color: #fff; }
+.group-tag.pd { background: #0891b2; color: #fff; }
+.group-tag.ra { background: #7c3aed; color: #fff; }
+.group-tag.fc { background: #0d9488; color: #fff; }
 
 .group-title {
     font-size: 0.72rem;
@@ -2244,6 +2271,13 @@ h1 span.city-name {
 .nav-badge-pill.clear { background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); }
 .nav-badge-pill.detour { background: rgba(245, 158, 11, 0.25); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.5); }
 .nav-badge-pill.avoided { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+.nav-badge-pill.alt1 { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+.nav-badge-pill.alt2 { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
+.nav-badge-pill.ss16 { background: rgba(14, 165, 233, 0.2); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); }
+.nav-badge-pill.romea { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); }
+.nav-badge-pill.highway { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
+.nav-badge-pill.no-highway { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+.nav-badge-pill.mixed { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
 
 .nav-card-detour-note {
     font-size: 0.74rem;
