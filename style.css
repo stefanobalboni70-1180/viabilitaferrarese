@@ -1739,9 +1739,53 @@ h1 span.city-name {
 .point-badge.start { background: #10b981; }
 .point-badge.dest { background: #ef4444; }
 
+.nav-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.nav-label-row .nav-label {
+    margin-bottom: 0;
+}
+
+.nav-fav-toggle-btn {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.35) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    color: #fca5a5;
+    padding: 3px 9px;
+    border-radius: 8px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-fav-toggle-btn:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(185, 28, 28, 0.55) 100%);
+    border-color: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    transform: translateY(-1px);
+}
+
+.nav-fav-toggle-btn .fav-chevron {
+    font-size: 0.65rem;
+    transition: transform 0.25s ease;
+}
+
+.nav-fav-toggle-btn.open .fav-chevron {
+    transform: rotate(180deg);
+}
+
 .nav-input-wrapper {
     display: flex;
     gap: 6px;
+    position: relative;
 }
 
 .nav-input-wrapper input {
@@ -1777,6 +1821,270 @@ h1 span.city-name {
 .nav-inline-btn:hover {
     background: rgba(71, 85, 105, 1);
     border-color: rgba(255, 255, 255, 0.3);
+}
+
+.nav-inline-btn.nav-fav-btn {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    font-weight: 700;
+}
+
+.nav-inline-btn.nav-fav-btn:hover {
+    background: rgba(239, 68, 68, 0.4);
+    border-color: #ef4444;
+    color: #fff;
+}
+
+/* Chips Rapide Ospedali */
+.nav-quick-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 2px 0;
+    overflow: hidden;
+}
+
+.chips-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #94a3b8;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chips-scroll {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.chips-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+
+.chips-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.quick-chip {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f1f5f9;
+    border-radius: 14px;
+    padding: 3px 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.18s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.quick-chip:hover, .quick-chip:active {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border-color: #f87171;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+}
+
+/* Menu a Tendina / Popup Pronto Soccorso & Ospedali */
+.nav-hospitals-dropdown {
+    margin-top: 8px;
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 15px rgba(239, 68, 68, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow: hidden;
+    animation: slideDownMenu 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 100;
+}
+
+@keyframes slideDownMenu {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.hospitals-dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.1) 100%);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.hospitals-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hospitals-icon {
+    font-size: 1.2rem;
+}
+
+.hospitals-header-title strong {
+    display: block;
+    font-size: 0.85rem;
+    color: #f8fafc;
+}
+
+.hospitals-header-title small {
+    display: block;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+.close-dropdown-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.close-dropdown-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.hospitals-list-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.hospitals-list-scroll::-webkit-scrollbar {
+    width: 5px;
+}
+
+.hospitals-list-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+}
+
+.hospitals-group {
+    margin-bottom: 8px;
+}
+
+.hospitals-group:last-child {
+    margin-bottom: 2px;
+}
+
+.hospitals-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    margin-bottom: 3px;
+}
+
+.group-tag {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.group-tag.fe { background: #0284c7; color: #fff; }
+.group-tag.bo { background: #b91c1c; color: #fff; }
+.group-tag.mo { background: #d97706; color: #fff; }
+.group-tag.ro { background: #059669; color: #fff; }
+
+.group-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.hospital-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    color: #f8fafc;
+    text-align: left;
+    cursor: pointer;
+    margin-bottom: 4px;
+    transition: all 0.18s ease;
+}
+
+.hospital-item:hover, .hospital-item:focus {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.22) 0%, rgba(30, 41, 59, 0.9) 100%);
+    border-color: rgba(239, 68, 68, 0.5);
+    transform: translateX(2px);
+}
+
+.hospital-item-icon {
+    font-size: 1.05rem;
+    flex-shrink: 0;
+}
+
+.hospital-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.hospital-item-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hospital-item-sub {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hospital-item-action {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #38bdf8;
+    white-space: nowrap;
+    opacity: 0.8;
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.hospital-item:hover .hospital-item-action {
+    opacity: 1;
+    transform: translateX(2px);
+    color: #fca5a5;
 }
 
 .nav-calc-btn {

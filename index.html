@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viabilità Ferrara v3.6.20 - Navigatore 118</title>
+    <title>Viabilità Ferrara v3.6.21 - Navigatore 118</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
     <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.20">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.6.21">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.6.20">
+    <link rel="stylesheet" href="style.css?v=3.6.21">
 </head>
 <body>
     
@@ -33,7 +33,7 @@
             <div class="header-content">
                 <div class="header-title-group">
                     <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.20</span></h1>
+                    <h1>Gestione Viabilità <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">Versione 3.6.21</span></h1>
                 </div>
                 <div class="header-actions">
                     <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">🚨 News <span id="user-news-badge" class="badge">0</span></button>
@@ -451,10 +451,172 @@
 
             <!-- Punto di Arrivo -->
             <div class="nav-input-group">
-                <label class="nav-label"><span class="point-badge dest">B</span> Destinazione</label>
+                <div class="nav-label-row">
+                    <label class="nav-label"><span class="point-badge dest">B</span> Destinazione</label>
+                    <button type="button" id="nav-fav-hospitals-btn" class="nav-fav-toggle-btn" title="Apri menu rapido Pronto Soccorso e Ospedali">
+                        <span class="fav-icon">🏥</span>
+                        <span class="fav-text">Pronto Soccorso</span>
+                        <span class="fav-chevron" id="nav-fav-chevron">▼</span>
+                    </button>
+                </div>
                 <div class="nav-input-wrapper">
-                    <input type="text" id="nav-dest-input" placeholder="Destinazione (es. Via Garibaldi, Ferrara)..." />
-                    <button id="nav-dest-map-btn" class="nav-inline-btn" title="Scegli su mappa">🗺️ Mappa</button>
+                    <input type="text" id="nav-dest-input" placeholder="Destinazione o seleziona un PS..." />
+                    <button type="button" id="nav-dest-fav-btn" class="nav-inline-btn nav-fav-btn" title="Destinazioni Rapide Pronto Soccorso">🏥 PS</button>
+                    <button type="button" id="nav-dest-map-btn" class="nav-inline-btn" title="Scegli su mappa">🗺️ Mappa</button>
+                </div>
+
+                <!-- Chips Rapide Ospedali / Pronto Soccorso ad accesso immediato -->
+                <div class="nav-quick-chips" id="nav-quick-chips">
+                    <span class="chips-label">⚡ Rapidi:</span>
+                    <div class="chips-scroll">
+                        <button type="button" class="quick-chip" data-hospital-id="fe_cona">🏥 Cona</button>
+                        <button type="button" class="quick-chip" data-hospital-id="fe_delta">🏥 Delta</button>
+                        <button type="button" class="quick-chip" data-hospital-id="fe_cento">🏥 Cento</button>
+                        <button type="button" class="quick-chip" data-hospital-id="fe_argenta">🏥 Argenta</button>
+                        <button type="button" class="quick-chip" data-hospital-id="bo_maggiore">🏥 Magg. BO</button>
+                        <button type="button" class="quick-chip" data-hospital-id="bo_santorsola">🏥 S.Orsola</button>
+                        <button type="button" class="quick-chip" data-hospital-id="bo_bellaria">🏥 Bellaria</button>
+                        <button type="button" class="quick-chip" data-hospital-id="mo_policlinico">🏥 Policlinico MO</button>
+                        <button type="button" class="quick-chip" data-hospital-id="mo_baggiovara">🏥 Baggiovara</button>
+                        <button type="button" class="quick-chip" data-hospital-id="bo_crevalcore">🏥 Crevalcore</button>
+                        <button type="button" class="quick-chip" data-hospital-id="ro_rovigo">🏥 Rovigo</button>
+                    </div>
+                </div>
+
+                <!-- Menu a Tendina / Pannello Rapido Pronto Soccorso & Ospedali -->
+                <div id="nav-hospitals-dropdown" class="nav-hospitals-dropdown hidden">
+                    <div class="hospitals-dropdown-header">
+                        <div class="hospitals-header-title">
+                            <span class="hospitals-icon">🏥</span>
+                            <div>
+                                <strong>Pronto Soccorso & Ospedali</strong>
+                                <small>Seleziona per calcolare subito l'itinerario di emergenza</small>
+                            </div>
+                        </div>
+                        <button type="button" id="close-hospitals-dropdown" class="close-dropdown-btn" title="Chiudi menu">✕</button>
+                    </div>
+
+                    <div class="hospitals-list-scroll">
+                        <!-- Sezione Ferrara -->
+                        <div class="hospitals-group">
+                            <div class="hospitals-group-header">
+                                <span class="group-tag fe">FE</span>
+                                <span class="group-title">Ferrara e Provincia</span>
+                            </div>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_cona">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale di Cona - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Aldo Moro 8, Cona (Ferrara)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_delta">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale del Delta - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Delta (Lagosanto) - Via Valle Oppio 2</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_argenta">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale di Argenta - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Nazionale 5, Argenta (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="fe_cento">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale SS. Annunziata - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Vicini 2, Cento (FE)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                        </div>
+
+                        <!-- Sezione Bologna -->
+                        <div class="hospitals-group">
+                            <div class="hospitals-group-header">
+                                <span class="group-tag bo">BO</span>
+                                <span class="group-title">Bologna e Provincia</span>
+                            </div>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_maggiore">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Maggiore C.A. Pizzardi - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Largo Bartolo Nigrisoli 2, Bologna</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_santorsola">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Policlinico S. Orsola-Malpighi - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Albertoni 15 (Pad. 5 PS Generale), Bologna</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_bellaria">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Bellaria - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Altura 3, Bologna</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="bo_crevalcore">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Presidio Sanitario / Ospedale Crevalcore</div>
+                                    <div class="hospital-item-sub">Viale Libertà 171, Crevalcore (BO)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                        </div>
+
+                        <!-- Sezione Modena -->
+                        <div class="hospitals-group">
+                            <div class="hospitals-group-header">
+                                <span class="group-tag mo">MO</span>
+                                <span class="group-title">Modena e Provincia</span>
+                            </div>
+                            <button type="button" class="hospital-item" data-hospital-id="mo_policlinico">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">AOU Policlinico di Modena - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via del Pozzo 71, Modena</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                            <button type="button" class="hospital-item" data-hospital-id="mo_baggiovara">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale Civile di Baggiovara - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Via Pietro Giardini 1355, Baggiovara (Modena)</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                        </div>
+
+                        <!-- Sezione Rovigo -->
+                        <div class="hospitals-group">
+                            <div class="hospitals-group-header">
+                                <span class="group-tag ro">RO</span>
+                                <span class="group-title">Rovigo (Veneto)</span>
+                            </div>
+                            <button type="button" class="hospital-item" data-hospital-id="ro_rovigo">
+                                <div class="hospital-item-icon">🏥</div>
+                                <div class="hospital-item-info">
+                                    <div class="hospital-item-name">Ospedale S. Maria della Misericordia - Pronto Soccorso</div>
+                                    <div class="hospital-item-sub">Viale Tre Martiri 140, Rovigo</div>
+                                </div>
+                                <span class="hospital-item-action">Naviga ➔</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -533,6 +695,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.6.20"></script>
+    <script src="script.js?v=3.6.21"></script>
 </body>
 </html>

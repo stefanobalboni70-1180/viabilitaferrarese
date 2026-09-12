@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.6.20';
+const APP_VERSION = '3.6.21';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -4773,6 +4773,11 @@ function initNavigationModule() {
     const navStartInput = document.getElementById('nav-start-input');
     const navDestInput = document.getElementById('nav-dest-input');
 
+    // Pulsanti e componenti Destinazioni Rapide Ospedali / Pronto Soccorso
+    const navFavHospitalsBtn = document.getElementById('nav-fav-hospitals-btn');
+    const navDestFavBtn = document.getElementById('nav-dest-fav-btn');
+    const closeHospitalsDropdownBtn = document.getElementById('close-hospitals-dropdown');
+
     if (navBtn) navBtn.addEventListener('click', toggleNavPanel);
     if (closeNavBtn) closeNavBtn.addEventListener('click', closeNavPanel);
     if (navStartGpsBtn) navStartGpsBtn.addEventListener('click', setNavStartToGps);
@@ -4785,6 +4790,40 @@ function initNavigationModule() {
     if (hudStopBtn) hudStopBtn.addEventListener('click', stopTurnByTurnGuidance);
     if (hudVoiceBtn) hudVoiceBtn.addEventListener('click', () => VoiceNavigator.toggleMute());
 
+    // Listener per menu a tendina e chips Pronto Soccorso
+    if (navFavHospitalsBtn) {
+        navFavHospitalsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleHospitalsDropdown();
+        });
+    }
+    if (navDestFavBtn) {
+        navDestFavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleHospitalsDropdown();
+        });
+    }
+    if (closeHospitalsDropdownBtn) {
+        closeHospitalsDropdownBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeHospitalsDropdown();
+        });
+    }
+
+    // Listener per tutte le voci del menu e le chips rapide dei Pronto Soccorso
+    document.querySelectorAll('[data-hospital-id]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const hId = btn.getAttribute('data-hospital-id');
+            if (hId) {
+                selectHospitalDestination(hId, true);
+            }
+        });
+    });
+
     if (navStartInput) {
         navStartInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCalculateNav();
@@ -4793,6 +4832,9 @@ function initNavigationModule() {
     if (navDestInput) {
         navDestInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCalculateNav();
+        });
+        navDestInput.addEventListener('focus', () => {
+            // Non apre forzatamente ma se si vuole si può chiudere
         });
     }
 
@@ -4825,8 +4867,212 @@ function closeNavPanel() {
     if (!navPanel) return;
     navPanel.classList.add('hidden');
     navPickerMode = null;
+    closeHospitalsDropdown();
     const pickerBanner = document.getElementById('picker-banner');
     if (pickerBanner) pickerBanner.classList.add('hidden');
+}
+
+// --- GESTIONE MENU A TENDINA E SELEZIONE RAPIDA PRONTO SOCCORSO ---
+const HOSPITAL_DESTINATIONS = {
+    fe_cona: {
+        id: 'fe_cona',
+        name: "Ospedale di Cona - Pronto Soccorso",
+        shortName: "PS Ospedale Cona",
+        city: "Cona (Ferrara)",
+        address: "Via Aldo Moro 8, Cona (FE)",
+        lat: 44.8015,
+        lng: 11.6960,
+        province: "FE"
+    },
+    fe_delta: {
+        id: 'fe_delta',
+        name: "Ospedale del Delta - Pronto Soccorso",
+        shortName: "PS Ospedale Delta",
+        city: "Delta (Lagosanto)",
+        address: "Via Valle Oppio 2, Lagosanto (FE)",
+        lat: 44.7578,
+        lng: 12.1394,
+        province: "FE"
+    },
+    fe_argenta: {
+        id: 'fe_argenta',
+        name: "Ospedale di Argenta - Pronto Soccorso",
+        shortName: "PS Ospedale Argenta",
+        city: "Argenta (FE)",
+        address: "Via Nazionale 5, Argenta (FE)",
+        lat: 44.6146,
+        lng: 11.8347,
+        province: "FE"
+    },
+    fe_cento: {
+        id: 'fe_cento',
+        name: "Ospedale SS. Annunziata - Pronto Soccorso",
+        shortName: "PS Ospedale Cento",
+        city: "Cento (FE)",
+        address: "Via Vicini 2, Cento (FE)",
+        lat: 44.7330,
+        lng: 11.2885,
+        province: "FE"
+    },
+    bo_maggiore: {
+        id: 'bo_maggiore',
+        name: "Ospedale Maggiore C.A. Pizzardi - Pronto Soccorso",
+        shortName: "PS Ospedale Maggiore BO",
+        city: "Bologna",
+        address: "Largo Bartolo Nigrisoli 2, Bologna",
+        lat: 44.5055,
+        lng: 11.3142,
+        province: "BO"
+    },
+    bo_santorsola: {
+        id: 'bo_santorsola',
+        name: "Policlinico S. Orsola-Malpighi - Pronto Soccorso",
+        shortName: "PS Policlinico S.Orsola",
+        city: "Bologna",
+        address: "Via Albertoni 15 (Pad. 5 PS Generale), Bologna",
+        lat: 44.4925,
+        lng: 11.3620,
+        province: "BO"
+    },
+    bo_bellaria: {
+        id: 'bo_bellaria',
+        name: "Ospedale Bellaria - Pronto Soccorso",
+        shortName: "PS Ospedale Bellaria",
+        city: "Bologna",
+        address: "Via Altura 3, Bologna",
+        lat: 44.4715,
+        lng: 11.3980,
+        province: "BO"
+    },
+    bo_crevalcore: {
+        id: 'bo_crevalcore',
+        name: "Presidio Sanitario / Ospedale Crevalcore",
+        shortName: "Polo Sanitario Crevalcore",
+        city: "Crevalcore (BO)",
+        address: "Viale Libertà 171, Crevalcore (BO)",
+        lat: 44.7214,
+        lng: 11.1448,
+        province: "BO"
+    },
+    mo_policlinico: {
+        id: 'mo_policlinico',
+        name: "AOU Policlinico di Modena - Pronto Soccorso",
+        shortName: "PS Policlinico Modena",
+        city: "Modena",
+        address: "Via del Pozzo 71, Modena",
+        lat: 44.6365,
+        lng: 10.9490,
+        province: "MO"
+    },
+    mo_baggiovara: {
+        id: 'mo_baggiovara',
+        name: "Ospedale Civile di Baggiovara - Pronto Soccorso",
+        shortName: "PS Ospedale Baggiovara",
+        city: "Baggiovara (Modena)",
+        address: "Via Pietro Giardini 1355, Baggiovara (MO)",
+        lat: 44.6062,
+        lng: 10.8718,
+        province: "MO"
+    },
+    ro_rovigo: {
+        id: 'ro_rovigo',
+        name: "Ospedale S. Maria della Misericordia - Pronto Soccorso",
+        shortName: "PS Ospedale Rovigo",
+        city: "Rovigo",
+        address: "Viale Tre Martiri 140, Rovigo",
+        lat: 45.0682,
+        lng: 11.7805,
+        province: "RO"
+    }
+};
+
+function toggleHospitalsDropdown() {
+    const dropdown = document.getElementById('nav-hospitals-dropdown');
+    const toggleBtn = document.getElementById('nav-fav-hospitals-btn');
+    if (!dropdown) return;
+
+    if (dropdown.classList.contains('hidden')) {
+        openHospitalsDropdown();
+    } else {
+        closeHospitalsDropdown();
+    }
+}
+
+function openHospitalsDropdown() {
+    const dropdown = document.getElementById('nav-hospitals-dropdown');
+    const toggleBtn = document.getElementById('nav-fav-hospitals-btn');
+    if (!dropdown) return;
+    dropdown.classList.remove('hidden');
+    if (toggleBtn) toggleBtn.classList.add('open');
+}
+
+function closeHospitalsDropdown() {
+    const dropdown = document.getElementById('nav-hospitals-dropdown');
+    const toggleBtn = document.getElementById('nav-fav-hospitals-btn');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (toggleBtn) toggleBtn.classList.remove('open');
+}
+
+// Selezione immediata di un Pronto Soccorso o Ospedale
+async function selectHospitalDestination(hospitalId, autoCalculate = true) {
+    const hospital = HOSPITAL_DESTINATIONS[hospitalId];
+    if (!hospital) return;
+
+    const destInput = document.getElementById('nav-dest-input');
+    navDestPoint = {
+        lat: hospital.lat,
+        lng: hospital.lng,
+        label: `${hospital.name} (${hospital.address})`
+    };
+
+    if (destInput) {
+        destInput.value = `🏥 ${hospital.name}`;
+    }
+
+    closeHospitalsDropdown();
+    showToast(`🏥 Destinazione: ${hospital.shortName}`, "success", 2800);
+
+    // Se la partenza non è ancora definita, prova a prenderla da GPS o centro mappa
+    if (!navStartPoint) {
+        const startInput = document.getElementById('nav-start-input');
+        if (navigator.geolocation) {
+            try {
+                await new Promise((resolve) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            navStartPoint = {
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude,
+                                label: "Posizione GPS attuale"
+                            };
+                            if (startInput) startInput.value = "📍 La mia posizione";
+                            resolve();
+                        },
+                        () => {
+                            const c = map ? map.getCenter() : { lat: 44.8381, lng: 11.6198 };
+                            navStartPoint = { lat: c.lat, lng: c.lng, label: "Ferrara Centro" };
+                            if (startInput) startInput.value = "📍 Ferrara Centro";
+                            resolve();
+                        },
+                        { enableHighAccuracy: true, timeout: 3500 }
+                    );
+                });
+            } catch (e) {
+                const c = map ? map.getCenter() : { lat: 44.8381, lng: 11.6198 };
+                navStartPoint = { lat: c.lat, lng: c.lng, label: "Ferrara Centro" };
+                if (startInput) startInput.value = "📍 Ferrara Centro";
+            }
+        } else {
+            const c = map ? map.getCenter() : { lat: 44.8381, lng: 11.6198 };
+            navStartPoint = { lat: c.lat, lng: c.lng, label: "Ferrara Centro" };
+            if (startInput) startInput.value = "📍 Ferrara Centro";
+        }
+    }
+
+    // Calcolo automatico della rotta di soccorso
+    if (autoCalculate) {
+        handleCalculateNav();
+    }
 }
 
 // Imposta la partenza sulla posizione GPS attuale
@@ -4907,9 +5153,28 @@ async function fetchWithTimeout(url, timeoutMs = 3200) {
     return null;
 }
 
-// Database locale POI Ferrara e Provincia per geocodifica istantanea (0ms, offline)
+// Database locale POI Ferrara, Ospedali e Presidi Provinciali per geocodifica istantanea (0ms, offline)
 const FERRARA_LOCAL_POI = [
-    { keys: ['cona', 'ospedale cona', 'ospedale di cona', 'pronto soccorso cona', 'pronto soccorso'], lat: 44.8015, lng: 11.6960, label: "Ospedale di Cona (Ferrara)" },
+    // 1. Ospedali & Pronto Soccorso Ferrara e Limitrofi
+    { keys: ['cona', 'ospedale cona', 'ospedale di cona', 'pronto soccorso cona', 'pronto soccorso', 'ps cona', 'aldo moro cona'], lat: 44.8015, lng: 11.6960, label: "Ospedale di Cona - Pronto Soccorso (Ferrara)" },
+    { keys: ['delta', 'ospedale delta', 'ospedale del delta', 'ps delta', 'lagosanto', 'valle oppio', 'via valle oppio', 'ospedale lagosanto'], lat: 44.7578, lng: 12.1394, label: "Ospedale del Delta - Pronto Soccorso (Delta)" },
+    { keys: ['ospedale argenta', 'argenta ospedale', 'mazzolani', 'argenta pronto soccorso', 'pronto soccorso argenta', 'ps argenta'], lat: 44.6146, lng: 11.8347, label: "Ospedale di Argenta - Pronto Soccorso" },
+    { keys: ['ospedale cento', 'cento ospedale', 'ss annunziata cento', 'pronto soccorso cento', 'ps cento', 'via vicini cento'], lat: 44.7330, lng: 11.2885, label: "Ospedale SS. Annunziata - Pronto Soccorso (Cento)" },
+    
+    // 2. Ospedali & Pronto Soccorso Bologna e Provincia
+    { keys: ['ospedale maggiore', 'maggiore bologna', 'ospedale maggiore bologna', 'pronto soccorso maggiore', 'ps maggiore', 'largo nigrisoli', 'ospedale maggiore pizzardi'], lat: 44.5055, lng: 11.3142, label: "Ospedale Maggiore - Pronto Soccorso (Bologna)" },
+    { keys: ['sant orsola', 'sant\'orsola', 's. orsola', 'policlinico sant orsola', 'sant orsola bologna', 'pronto soccorso sant orsola', 'ps sant orsola', 'malpighi', 'via albertoni'], lat: 44.4925, lng: 11.3620, label: "Policlinico S. Orsola-Malpighi - Pronto Soccorso (Bologna)" },
+    { keys: ['bellaria', 'ospedale bellaria', 'bellaria bologna', 'pronto soccorso bellaria', 'ps bellaria', 'via altura'], lat: 44.4715, lng: 11.3980, label: "Ospedale Bellaria - Pronto Soccorso (Bologna)" },
+    { keys: ['crevalcore', 'ospedale crevalcore', 'polo sanitario crevalcore', 'sanitario crevalcore', 'viale liberta crevalcore', 'pronto soccorso crevalcore'], lat: 44.7214, lng: 11.1448, label: "Presidio Sanitario / Ospedale Crevalcore" },
+
+    // 3. Ospedali & Pronto Soccorso Modena e Provincia
+    { keys: ['policlinico modena', 'policlinico di modena', 'modena policlinico', 'pronto soccorso policlinico modena', 'ps policlinico modena', 'via del pozzo modena'], lat: 44.6365, lng: 10.9490, label: "AOU Policlinico di Modena - Pronto Soccorso" },
+    { keys: ['baggiovara', 'ospedale baggiovara', 'baggiovara modena', 'pronto soccorso baggiovara', 'ps baggiovara', 'sant\'agostino estense', 'ospedale civile baggiovara'], lat: 44.6062, lng: 10.8718, label: "Ospedale Civile di Baggiovara - Pronto Soccorso (Modena)" },
+
+    // 4. Ospedali Rovigo (Veneto)
+    { keys: ['rovigo', 'ospedale rovigo', 'ospedale di rovigo', 'pronto soccorso rovigo', 'ps rovigo', 'misericordia rovigo', 'santa maria della misericordia rovigo'], lat: 45.0682, lng: 11.7805, label: "Ospedale S. Maria della Misericordia - Pronto Soccorso (Rovigo)" },
+
+    // 5. Presidi e Punti di Riferimento Ferrara
     { keys: ['sant\'anna', 'santanna', 'san rocco', 'cittadella san rocco', 'ex sant\'anna', 'giovecca'], lat: 44.8360, lng: 11.6285, label: "Cittadella San Rocco (Ex Sant'Anna, Ferrara)" },
     { keys: ['stazione', 'stazione fs', 'stazione ferroviaria', 'piazzale stazione'], lat: 44.8430, lng: 11.6030, label: "Stazione Ferroviaria di Ferrara" },
     { keys: ['castello', 'castello estense', 'largo castello', 'centro storico'], lat: 44.8375, lng: 11.6190, label: "Castello Estense, Ferrara" },
@@ -4919,9 +5184,6 @@ const FERRARA_LOCAL_POI = [
     { keys: ['piazza municipale', 'comune', 'municipio'], lat: 44.8360, lng: 11.6185, label: "Piazza Municipale, Ferrara" },
     { keys: ['stadio', 'stadio paolo mazza', 'stadio mazza', 'spal'], lat: 44.8400, lng: 11.6070, label: "Stadio Paolo Mazza, Ferrara" },
     { keys: ['fiera', 'fiera ferrara', 'quartiere fieristico'], lat: 44.8050, lng: 11.5830, label: "Fiera di Ferrara" },
-    { keys: ['ospedale cento', 'cento ospedale', 'ss annunziata cento', 'pronto soccorso cento'], lat: 44.7330, lng: 11.2880, label: "Ospedale SS. Annunziata, Cento" },
-    { keys: ['ospedale delta', 'ospedale del delta', 'lagosanto', 'delta', 'ospedale lagosanto'], lat: 44.7600, lng: 12.1400, label: "Ospedale del Delta, Lagosanto" },
-    { keys: ['ospedale argenta', 'argenta ospedale', 'mazzolani'], lat: 44.6150, lng: 11.8350, label: "Ospedale Mazzolani-Vandini, Argenta" },
     { keys: ['casa della salute comacchio', 'ospedale comacchio', 'san camillo comacchio', 'comacchio'], lat: 44.6930, lng: 12.1810, label: "Casa della Salute San Camillo, Comacchio" },
     { keys: ['casa della salute bondeno', 'ospedale bondeno', 'borselli bondeno', 'bondeno'], lat: 44.8880, lng: 11.4160, label: "Casa della Salute F.lli Borselli, Bondeno" },
     { keys: ['casa della salute copparo', 'ospedale copparo', 'copparo'], lat: 44.8930, lng: 11.7220, label: "Casa della Salute Terre e Fiumi, Copparo" },

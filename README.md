@@ -1,8 +1,9 @@
-# Viabilità Ferrara 118 - Versione 3.6.20
+# Viabilità Ferrara 118 - Versione 3.6.21
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Nuove Funzionalità & Correzioni UI (v3.6.20):
+### Nuove Funzionalità & Correzioni UI (v3.6.21):
+- **Menu Rapido Destinazioni Preferite & Pronto Soccorso (1-Tap Emergency Route):** integrato nel navigatore 118 un menu a tendina e un set di chips rapide con geocodifica istantanea per tutti i Pronto Soccorso e presidi ospedalieri principali (Cona, Delta, Argenta, Cento, Ospedale Maggiore Bologna, Sant'Orsola Bologna, Bellaria Bologna, Policlinico di Modena, Ospedale di Baggiovara, Polo Sanitario Crevalcore, Ospedale di Rovigo). Con un solo tocco viene calcolato istantaneamente il percorso ottimale d'emergenza da qualsiasi posizione.
 - **Risoluzione Sovrapposizione Finestre Admin (PC & Mobile):** riarchitettura del layout della barra superiore con container di flusso unificato (`.top-nav-wrapper`), eliminando le coordinate assolute rigide e garantendo che la barra di ricerca/filtri admin compaia sempre sotto l'header senza alcuna sovrapposizione su qualsiasi risoluzione.
 - **Ottimizzazione Responsive Header & Pulsanti:** disposizione fluida dei pulsanti di azione e controllo (News, Naviga, Segnala Problema, Gestione News, Segnalazioni, Logout) con wrapping pulito e touch targets ottimizzati per smartphone.
 - **Riposizionamento Banner Selezione Mappa:** il banner di selezione punto mappa (`#picker-banner`) è stato riposizionato in basso in modalità fluttuante (`bottom: 30px`) per evitare collisioni con l'header superiore.
