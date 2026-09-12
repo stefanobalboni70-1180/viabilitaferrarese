@@ -6776,7 +6776,7 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
             if (isCesenaOrSouthRomagna) {
                 // Corridoio Richiesto: Ferrara -> Argenta (SS16) -> Ravenna (SS16) -> E45 (SS3bis) -> Cesena Bufalini
                 endpoints.push({
-                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.8350,44.6150;12.1650,44.3850;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.8500,44.6050;12.0800,44.4900;12.2030,44.3720;12.2220,44.1750;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'ss16_e45',
@@ -6784,19 +6784,19 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 });
                 // Corridoio Superstrada Ferrara-Mare (RA8) + SS309 Romea + E45
                 endpoints.push({
-                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2400,44.5400;12.2150,44.2050;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};12.1800,44.6930;12.2400,44.5400;12.2030,44.3720;12.2220,44.1750;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'romea',
                     corridorLabel: 'Via Superstrada Ferrara-Mare (RA8) + SS309 Romea + E45'
                 });
-                // Corridoio Autostrada A13 / A14
+                // Corridoio Autostrada A13 / A14 Diretta al Trauma Center (senza uscite intermedie)
                 endpoints.push({
-                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.5600,44.7800;11.8800,44.3700;12.2100,44.1800;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
+                    url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startLng},${startLat};11.5830,44.7550;12.2220,44.1750;${destLng},${destLat}?overview=full&geometries=geojson&steps=true`,
                     isBypass: false,
                     isBike: false,
                     corridorTag: 'motorway',
-                    corridorLabel: 'Via Autostrada A13 / A14'
+                    corridorLabel: 'Via Autostrada A13 / A14 Diretta Trauma Center'
                 });
             } else {
                 // Ravenna / Bassa Romagna
@@ -7263,8 +7263,8 @@ async function calculateEmergencyRoutes(startLat, startLng, destLat, destLng) {
                 r.title = `Percorso ${i + 1} (Superstrada Ferrara-Mare RA8 + SS309 Romea)`;
                 r.badgeText = "🌊 Via Romea";
             } else if (r.corridorTag === 'motorway' || (r.corridor && r.corridor.hasMotorway)) {
-                r.title = `Percorso ${i + 1} (Autostrada A13 / A14)`;
-                r.badgeText = "🛣️ Autostrada A13/A14";
+                r.title = `Percorso ${i + 1} (Autostrada A13 / A14 Diretta al Trauma Center)`;
+                r.badgeText = "🚨 A13 / A14 Rapida";
             } else if (r.corridorTag === 'ss64' || (r.corridor && r.corridor.hasSS64)) {
                 r.title = `Percorso ${i + 1} (Statale SS64 Porrettana)`;
                 r.badgeText = "🛣️ Statale SS64";
