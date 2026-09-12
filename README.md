@@ -1,8 +1,8 @@
-# Viabilità Ferrara 118 - Versione 3.6.22
+# Viabilità Ferrara 118 - Versione 3.7.0
 
 Applicazione per la gestione della viabilità, segnalazioni stradali e navigazione per i mezzi di soccorso 118 di Ferrara e Provincia.
 
-### Nuove Funzionalità & Correzioni UI (v3.6.22):
+### Nuove Funzionalità & Correzioni UI (v3.7.0):
 - **Calcolo Multi-Corridoio e Scelta Alternativa (Senza Autostrada / Statale SS16 / Romea / Misto / Autostrada):** per tutti i trasferimenti provinciali ed extraurbani (es. Ferrara-Ravenna, Ferrara-Cesena, Ferrara-Bologna, Ferrara-Rovigo, Ferrara-Delta), il navigatore 118 calcola fino a 3 percorsi differenziati per direttrice strategica:
   1. *Percorso 1 (Più Veloce / Direttrice Principale):* il tempo di percorrenza minimo in assoluto (es. SS16 Adriatica diretta per Ravenna / Cesena, oppure Autostrada A13 per Bologna).
   2. *Percorso 2 (Senza Autostrada / Statale Veloce):* direttrice rapida su viabilità statale senza pedaggio (es. SS16 Adriatica via Argenta/Alfonsine, oppure SS64 Porrettana).
