@@ -1797,6 +1797,7 @@ const headerSubtitle = document.getElementById('header-subtitle');
 const searchContainer = document.getElementById('admin-search-container');
 const searchInput = document.getElementById('admin-search-input');
 const searchBtn = document.getElementById('admin-search-btn');
+const adminFilterBar = document.getElementById('admin-filter-bar');
 const filterPills = document.querySelectorAll('.filter-pill');
 const filterCountActive = document.getElementById('filter-count-active');
 const filterCountUpcoming = document.getElementById('filter-count-upcoming');
@@ -1846,20 +1847,22 @@ function showToast(message, type = 'normal', duration = 3500) {
 // Aggiorna UI in base allo stato
 function updateUI() {
     const adminNewsBtn = document.getElementById('admin-news-btn');
+    if (searchContainer) searchContainer.classList.remove('hidden');
+
     if (isAdmin) {
         loginBtn.classList.add('hidden');
         logoutBtn.classList.remove('hidden');
-        searchContainer.classList.remove('hidden');
+        if (adminFilterBar) adminFilterBar.classList.remove('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.remove('hidden');
         if (adminNewsBtn) adminNewsBtn.classList.remove('hidden');
         headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
     } else {
         loginBtn.classList.remove('hidden');
         logoutBtn.classList.add('hidden');
-        searchContainer.classList.add('hidden');
+        if (adminFilterBar) adminFilterBar.classList.add('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.add('hidden');
         if (adminNewsBtn) adminNewsBtn.classList.add('hidden');
-        headerSubtitle.textContent = "Modalità Visualizzazione: clicca sui marker per i dettagli";
+        headerSubtitle.textContent = "Modalità Visualizzazione: cerca una via o tocca i marker per i dettagli";
     }
     // Ridisegna i marker
     refreshMarkers();
@@ -2125,11 +2128,13 @@ logoutBtn.addEventListener('click', async () => {
     updateUI();
 });
 
-// LOGICA RICERCA (Nominatim)
+// LOGICA RICERCA (Nominatim per Utente e Admin)
 searchBtn.addEventListener('click', performSearch);
 searchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') performSearch();
 });
+
+let userSearchMarker = null;
 
 async function performSearch() {
     const query = searchInput.value.trim();
@@ -2139,20 +2144,75 @@ async function performSearch() {
     searchBtn.disabled = true;
 
     try {
-        const searchQuery = encodeURIComponent(query + ', Ferrara');
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
-        const data = await response.json();
+        // 1. Controlla prima se c'è un marker o via chiusa corrispondente già presente sulla mappa
+        const lowerQ = query.toLowerCase();
+        const normQ = normalizeStreetKey(query);
+        const matchingMarker = markersData.find(m => {
+            if (!m.street) return false;
+            const sLower = m.street.toLowerCase();
+            const sNorm = normalizeStreetKey(m.street);
+            return sLower.includes(lowerQ) || lowerQ.includes(sLower) || (normQ && sNorm && (sNorm.includes(normQ) || normQ.includes(sNorm)));
+        });
 
-        if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lon = parseFloat(data[0].lon);
-            map.flyTo([lat, lon], 17);
+        // 2. Geocoding su Ferrara e Provincia
+        const queries = [
+            `${query}, Ferrara`,
+            `${query}, Provincia di Ferrara`,
+            `${query}, Cento`,
+            `${query}, Comacchio`,
+            query
+        ];
+
+        let foundLat = null, foundLon = null, displayName = null;
+
+        for (const q of queries) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        foundLat = parseFloat(data[0].lat);
+                        foundLon = parseFloat(data[0].lon);
+                        displayName = data[0].display_name.split(',')[0];
+                        break;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (foundLat !== null && foundLon !== null) {
+            map.flyTo([foundLat, foundLon], 17, { duration: 1.2 });
+
+            if (userSearchMarker) {
+                map.removeLayer(userSearchMarker);
+            }
+
+            userSearchMarker = L.marker([foundLat, foundLon], {
+                icon: L.divIcon({
+                    className: 'search-result-pin',
+                    html: `<div style="background:#3b82f6; color:white; padding:6px 12px; border-radius:999px; font-weight:bold; font-size:0.82rem; box-shadow:0 4px 12px rgba(0,0,0,0.3); border:2px solid white; display:flex; align-items:center; gap:4px; white-space:nowrap;">📍 ${escapeHtml(displayName || query)}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 20]
+                })
+            }).addTo(map);
+
+            showToast(`📍 Posizione trovata: ${displayName || query}`, "info", 3500);
+
+            setTimeout(() => {
+                if (userSearchMarker) {
+                    map.removeLayer(userSearchMarker);
+                    userSearchMarker = null;
+                }
+            }, 10000);
+        } else if (matchingMarker) {
+            map.flyTo([matchingMarker.lat, matchingMarker.lng], 17, { duration: 1.2 });
+            showToast(`📍 Trovata segnalazione su: ${matchingMarker.street}`, "info", 3500);
         } else {
-            alert("Nessuna via trovata con questo nome.");
+            showToast("Nessuna via trovata con questo nome. Prova a specificare anche il comune (es. Via Roma, Copparo).", "warning", 4500);
         }
     } catch (error) {
         console.error("Errore nella ricerca", error);
-        alert("Errore durante la ricerca. Riprova più tardi.");
+        showToast("Errore durante la ricerca. Riprova più tardi.", "error", 3500);
     } finally {
         searchBtn.textContent = 'Cerca';
         searchBtn.disabled = false;

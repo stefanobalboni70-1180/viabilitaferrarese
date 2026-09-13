@@ -52,13 +52,13 @@
             <p class="subtitle" id="header-subtitle">Modalità Visualizzazione: clicca sui marker per i dettagli</p>
         </header>
 
-        <!-- Admin Search Box & Status Filter -->
-        <div id="admin-search-container" class="search-container hidden">
+        <!-- Search Box & Admin Status Filter -->
+        <div id="admin-search-container" class="search-container">
             <div class="admin-top-row">
-                <input type="text" id="admin-search-input" placeholder="Cerca una via (es. Via Roma)..." />
+                <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna, Via Ruffetta)..." />
                 <button id="admin-search-btn">Cerca</button>
             </div>
-            <div class="admin-filter-bar">
+            <div id="admin-filter-bar" class="admin-filter-bar hidden">
                 <span class="filter-label">Filtro:</span>
                 <button class="filter-pill active" data-filter="active">🟢 Attivi (<span id="filter-count-active">0</span>)</button>
                 <button class="filter-pill" data-filter="upcoming">⏳ Programmati (<span id="filter-count-upcoming">0</span>)</button>
