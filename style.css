@@ -726,6 +726,21 @@ h1 span.city-name {
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.user-report-btn .btn-text {
+    display: inline !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    vertical-align: middle;
+}
+
+.user-report-btn .report-icon {
+    font-size: 1rem;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .user-report-btn:hover {
@@ -1608,23 +1623,18 @@ h1 span.city-name {
     }
 
     .user-report-btn {
-        width: 32px;
-        min-width: 32px;
+        padding: 0 10px;
         height: 32px;
-        padding: 0 !important;
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
+        font-size: 0.78rem;
         flex-shrink: 0;
     }
 
     .user-report-btn .btn-text {
-        display: none !important;
+        display: inline !important;
     }
 
     .user-report-btn .report-icon {
-        font-size: 1.05rem;
+        font-size: 1rem;
         margin: 0;
         line-height: 1;
     }
@@ -2223,19 +2233,36 @@ h1 span.city-name {
 
 /* Adattamento Mobile Nav Drawer & Urgent News */
 @media (max-width: 600px) {
-    
     .user-news-btn {
         padding: 5px 8px;
         font-size: 0.76rem;
     }
 
-    
     .urgent-news-content {
         width: 95%;
     }
 
     .admin-news-row-fields {
         flex-direction: column;
+    }
+}
+
+/* Smartphone compatto (sotto 540px): nasconde etichette per massimizzare la barra di ricerca */
+@media (max-width: 540px) {
+    .user-report-btn {
+        width: 32px !important;
+        min-width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        justify-content: center !important;
+    }
+
+    .user-report-btn .btn-text {
+        display: none !important;
+    }
+
+    .user-report-btn .report-icon {
+        font-size: 1.05rem !important;
     }
 }
 
