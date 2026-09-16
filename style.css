@@ -714,7 +714,9 @@ h1 span.city-name {
     color: #ffffff;
     border: none;
     border-radius: 8px;
-    padding: 7px 14px;
+    padding: 0 14px;
+    height: 34px;
+    box-sizing: border-box;
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
@@ -723,6 +725,7 @@ h1 span.city-name {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .user-report-btn:hover {
@@ -1601,51 +1604,93 @@ h1 span.city-name {
     .header-row-controls {
         gap: 5px;
         flex-wrap: nowrap;
+        width: 100%;
+    }
+
+    .user-report-btn {
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        flex-shrink: 0;
+    }
+
+    .user-report-btn .btn-text {
+        display: none !important;
+    }
+
+    .user-report-btn .report-icon {
+        font-size: 1.05rem;
+        margin: 0;
+        line-height: 1;
+    }
+
+    .user-news-btn {
+        padding: 0 6px;
+        height: 32px;
+        font-size: 0.72rem;
+        flex-shrink: 0;
+    }
+
+    .user-news-btn .btn-text {
+        display: none;
     }
 
     .search-in-header {
         flex: 1 1 auto;
-        min-width: 110px;
+        min-width: 0;
+        max-width: none;
+        width: 100%;
     }
 
     .search-in-header input {
-        font-size: 0.76rem;
+        font-size: 0.78rem;
         padding: 4px 8px;
-        height: 30px;
+        height: 32px;
+        width: 100%;
+        min-width: 0;
     }
 
     .search-in-header button {
-        padding: 0 8px;
-        font-size: 0.74rem;
-        height: 30px;
+        padding: 0 10px;
+        font-size: 0.76rem;
+        height: 32px;
+        flex-shrink: 0;
     }
 
     .header-actions {
         width: auto;
         display: flex;
         flex-wrap: nowrap;
-        justify-content: center;
+        align-items: center;
         gap: 4px;
         margin-left: 0;
+        flex-shrink: 0;
     }
 
-    .user-report-btn,
     .admin-reports-btn,
-    .admin-news-btn,
-    .user-news-btn {
+    .admin-news-btn {
         flex: 0 0 auto;
-        padding: 0 8px;
-        height: 30px;
+        padding: 0 6px;
+        height: 32px;
         font-size: 0.72rem;
-        justify-content: center;
-        text-align: center;
         white-space: nowrap;
     }
 
+    .admin-reports-btn .btn-text,
+    .admin-news-btn .btn-text {
+        display: none;
+    }
+
     .icon-btn {
-        width: 30px;
-        min-width: 30px;
-        height: 30px;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        flex-shrink: 0;
     }
     
     .search-container {
