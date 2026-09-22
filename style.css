@@ -1683,6 +1683,8 @@ h1 span.city-name {
         gap: 6px;
         flex-shrink: 0;
         justify-content: flex-start;
+        margin: 0;
+        padding: 0;
     }
 
     .user-report-btn {
@@ -1698,21 +1700,28 @@ h1 span.city-name {
         gap: 4px;
         letter-spacing: -0.2px;
         line-height: 1;
+        box-sizing: border-box;
+        vertical-align: middle;
+        text-align: center;
     }
 
     .user-report-btn .btn-text {
-        display: inline !important;
+        display: inline-flex !important;
+        align-items: center;
         font-size: 0.74rem !important;
         font-weight: 600 !important;
         line-height: 1;
+        letter-spacing: -0.2px;
     }
 
     .user-report-btn .report-icon {
         font-size: 0.88rem;
         margin: 0;
+        padding: 0;
         line-height: 1;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
     }
 
     .user-news-btn {
@@ -1723,12 +1732,17 @@ h1 span.city-name {
         flex-shrink: 0;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 4px;
+        line-height: 1;
+        box-sizing: border-box;
     }
 
     .user-news-btn .btn-text {
-        display: inline;
+        display: inline-flex;
+        align-items: center;
         font-size: 0.74rem;
+        line-height: 1;
     }
 
     .header-actions {
@@ -1739,6 +1753,7 @@ h1 span.city-name {
         align-items: center;
         gap: 6px;
         margin-left: auto;
+        margin-right: 0;
         flex-shrink: 0;
     }
 
@@ -1752,13 +1767,18 @@ h1 span.city-name {
         white-space: nowrap;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 4px;
+        line-height: 1;
+        box-sizing: border-box;
     }
 
     .admin-reports-btn .btn-text,
     .admin-news-btn .btn-text {
-        display: inline;
+        display: inline-flex;
+        align-items: center;
         font-size: 0.74rem;
+        line-height: 1;
     }
 
     .icon-btn {
@@ -1767,6 +1787,10 @@ h1 span.city-name {
         height: 32px;
         border-radius: 8px;
         flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
     }
     
     .search-container {
