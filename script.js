@@ -1,13 +1,11 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.7.8';
+const APP_VERSION = '3.7.9';
 
-// Icone SVG Ufficiali e ad Alta Evidenza per i Marker e le Liste
-const ICON_LAVORI = '<svg class="sign-icon sign-works" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><polygon points="16,3 30,27 2,27" fill="#facc15" stroke="#dc2626" stroke-width="2.6" stroke-linejoin="round"/><circle cx="16" cy="11.5" r="1.8" fill="#1e293b"/><path d="M14.2 14.2 L17.5 15.2 L19 18.5 L17.8 19.3 L16.3 17 L15.2 20.2 L13.2 24.5 L11.8 23.8 L13.5 19 L12.5 16.2 Z" fill="#1e293b"/><path d="M18.8 16.2 L23.5 22.2 L22.2 23.2 L17.5 17.2 Z" fill="#1e293b"/><polygon points="21.5,21.5 25.5,24.5 24,25.5 20,22.5" fill="#1e293b"/><rect x="5.5" y="24" width="7" height="2.2" rx="0.5" fill="#1e293b"/></svg>';
-const ICON_STRADA_CHIUSA = '<svg class="sign-icon sign-closed" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.8"/><rect x="5.5" y="13" width="21" height="6" rx="1.8" fill="#ffffff"/></svg>';
-const ICON_PONTE = '<svg class="sign-icon sign-bridge" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><path d="M3 25 Q9 22 16 25 T29 25" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/><path d="M3 18 Q16 9 29 18" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"/><line x1="3" y1="18" x2="29" y2="18" stroke="#334155" stroke-width="2.5" stroke-linecap="round"/><line x1="8" y1="16" x2="8" y2="23" stroke="#64748b" stroke-width="1.8"/><line x1="24" y1="16" x2="24" y2="23" stroke="#64748b" stroke-width="1.8"/><circle cx="16" cy="16" r="7.5" fill="#ffffff" stroke="#ef4444" stroke-width="1.8"/><line x1="12.5" y1="12.5" x2="19.5" y2="19.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/><line x1="19.5" y1="12.5" x2="12.5" y2="19.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/></svg>';
-const ICON_MERCATO = '<svg class="sign-icon sign-market" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><path d="M3 13 L16 5 L29 13 L27 17 L23 17 L20 17 L16 17 L12 17 L9 17 L5 17 Z" fill="#10b981"/><polygon points="7,11 11.5,8 12.5,17 8.5,17" fill="#ffffff"/><polygon points="16,5 19,7 18.5,17 16,17" fill="#ffffff"/><polygon points="23.5,10 27,12.5 25.5,17 22.5,17" fill="#ffffff"/><line x1="5" y1="17" x2="5" y2="27" stroke="#334155" stroke-width="1.8"/><line x1="27" y1="17" x2="27" y2="27" stroke="#334155" stroke-width="1.8"/><rect x="3" y="19" width="26" height="7" rx="1.5" fill="#f59e0b" stroke="#b45309" stroke-width="1"/></svg>';
-const ICON_SEMAFORO = '<svg class="sign-icon sign-traffic" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="13" height="22" rx="3.5" fill="#1e293b" stroke="#475569" stroke-width="1.2"/><circle cx="9.5" cy="9.5" r="2.3" fill="#ef4444"/><circle cx="9.5" cy="16" r="2.3" fill="#f59e0b"/><circle cx="9.5" cy="22.5" r="2.3" fill="#10b981"/><path d="M22 7 L26 11 L24 11 L24 18 L21 18 L21 11 L19 11 Z" fill="#06b6d4"/><path d="M27 25 L23 21 L25 21 L25 14 L28 14 L28 21 L30 21 Z" fill="#ef4444"/></svg>';
-const ICON_SAGRA = '<svg class="sign-icon sign-sagra" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ec4899" stroke-width="2"/><path d="M12 9 Q12 15 15.5 15.5 L15.5 20 L13 20.5 L13 22 L18 22 L18 20.5 L15.5 20 L15.5 15.5 Q19 15 19 9 Z" fill="#ec4899"/><path d="M13 10.5 Q15.5 12 18 10.5" fill="none" stroke="#fdf2f8" stroke-width="1.2"/><path d="M8 8 L8 13 Q8 15 9.5 15 L9.5 23" fill="none" stroke="#64748b" stroke-width="1.6" stroke-linecap="round"/><line x1="9.5" y1="8" x2="9.5" y2="13" stroke="#64748b" stroke-width="1.6"/><line x1="11" y1="8" x2="11" y2="13" stroke="#64748b" stroke-width="1.6"/><path d="M23 8 Q23 15 21.5 15 L21.5 23" fill="none" stroke="#64748b" stroke-width="1.6" stroke-linecap="round"/></svg>';
+// Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
+const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
+
+// Icona Immagine per "Sagra / Manifestazione" (Bandiere)
+const ICON_SAGRA = '<img src="icon-sagra.png" class="sign-sagra-img" alt="Sagra / Manifestazione" style="width:22px; height:22px; object-fit:contain; vertical-align:middle; display:inline-block;" />';
 
 // Funzione di sanificazione per prevenire attacchi XSS
 function escapeHtml(unsafe) {
@@ -1734,13 +1732,13 @@ const MAP_ZOOM = 11;
 
 // Configurazione Icone
 const ICONS = {
-    lavori: { emoji: ICON_LAVORI, textEmoji: '🚧', label: 'Lavori in corso' },
-    chiusa: { emoji: ICON_STRADA_CHIUSA, textEmoji: '⛔', label: 'Strada chiusa' },
-    ponte: { emoji: ICON_PONTE, textEmoji: '🌉❌', label: 'Ponte interrotto' },
-    incidente: { emoji: '⚠️', textEmoji: '⚠️', label: 'Incidente' },
-    mercato: { emoji: ICON_MERCATO, textEmoji: '🎪', label: 'Mercato settimanale' },
-    semaforo: { emoji: ICON_SEMAFORO, textEmoji: '🔁🚦', label: 'Senso unico alternato' },
-    sagra: { emoji: ICON_SAGRA, textEmoji: '🍷🍴', label: 'Sagra / Manifestazione' }
+    lavori: { emoji: '🚧', label: 'Lavori in corso' },
+    chiusa: { emoji: ICON_STRADA_CHIUSA, label: 'Strada chiusa' },
+    ponte: { emoji: '🌉', label: 'Ponte interrotto' },
+    incidente: { emoji: '⚠️', label: 'Incidente' },
+    mercato: { emoji: '🛒', label: 'Mercato settimanale' },
+    semaforo: { emoji: '🚦', label: 'Senso unico alternato' },
+    sagra: { emoji: ICON_SAGRA, label: 'Sagra / Manifestazione' }
 };
 
 // Stato dell'applicazione
