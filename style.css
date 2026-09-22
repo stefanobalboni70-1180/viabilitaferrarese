@@ -1600,133 +1600,192 @@ h1 span.city-name {
 }
 
 /* Responsive Design per Dispositivi Mobili (Layout a 3 Righe Dedicate) */
+/* Responsive Design per Dispositivi Mobili (Layout a 3 Righe Dedicate & Perfettamente Allineate) */
 @media (max-width: 768px) {
     .top-nav-wrapper {
         top: 8px;
-        width: 96vw;
-        max-width: 96vw;
+        width: 95vw;
+        max-width: 95vw;
         gap: 6px;
     }
 
     .glass-header {
-        width: 100%;
-        padding: 10px 12px;
-        border-radius: 14px;
-        gap: 8px;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        padding: 9px 12px !important;
+        border-radius: 16px !important;
+        gap: 8px !important;
+        background: rgba(255, 255, 255, 0.96) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
     }
     
-    /* Riga 1: Titolo e Logo 118 */
+    /* Riga 1: Titolo e Logo 118 Emilia Romagna */
     .header-row-title {
+        display: flex;
+        align-items: center;
         justify-content: center;
         width: 100%;
+        margin: 0;
+        padding: 0;
     }
     
     .header-title-group {
+        display: flex;
+        align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 7px;
+        width: 100%;
+        flex-wrap: wrap;
     }
 
     .header-logo-118 {
         height: 24px;
+        width: auto;
+        object-fit: contain;
+        flex-shrink: 0;
     }
 
     h1 {
-        font-size: 0.90rem;
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        display: inline-flex;
+        align-items: center;
         justify-content: center;
+        gap: 5px;
+        flex-wrap: wrap;
         text-align: center;
+        white-space: normal;
+        line-height: 1.25;
+        letter-spacing: -0.2px;
     }
     
     .version-tag {
-        font-size: 0.62rem;
-        padding: 1px 5px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--primary);
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 1px 6px;
+        border-radius: 999px;
     }
 
-    /* Container Controlli: si divide in Riga 2 (Ricerca) e Riga 3 (Pulsanti) */
+    /* Container Controlli: Riga 2 (Ricerca) e Riga 3 (Toolbar Azioni) */
     .header-row-controls {
         display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px 6px;
+        flex-direction: column;
+        align-items: stretch;
         width: 100%;
+        gap: 8px;
     }
 
-    /* Riga 2 (Mobile): Massima Priorità alla Digitazione della Ricerca Strada */
+    /* Riga 2: Barra di Ricerca a Piena Larghezza */
     .search-in-header {
         order: 1;
         width: 100%;
-        flex: 1 0 100%;
         max-width: 100%;
         display: flex;
+        align-items: center;
         gap: 6px;
+        margin: 0;
     }
 
     .search-in-header input {
-        font-size: 0.88rem;
-        padding: 7px 12px;
-        height: 38px;
-        width: 100%;
+        flex: 1;
+        height: 36px;
         min-width: 0;
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.06);
+        padding: 0 12px;
+        font-size: 0.85rem;
+        border-radius: 9px;
+        border: 1px solid rgba(0, 0, 0, 0.14);
+        background: rgba(0, 0, 0, 0.05);
+        color: #0f172a;
+        outline: none;
+        box-sizing: border-box;
+        transition: all 0.2s;
     }
 
     .search-in-header input:focus {
         background: #ffffff;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     }
 
     .search-in-header button {
-        padding: 0 16px;
-        font-size: 0.84rem;
+        height: 36px;
+        padding: 0 14px;
+        font-size: 0.82rem;
         font-weight: 700;
-        height: 38px;
+        border-radius: 9px;
+        background: var(--primary);
+        color: #ffffff;
+        border: none;
+        cursor: pointer;
         flex-shrink: 0;
-        border-radius: 8px;
+        transition: background 0.2s, transform 0.1s;
     }
 
-    /* Riga 3 (Mobile): Pulsanti Azione Utente a Sinistra, Strumenti Admin a Destra */
+    .search-in-header button:active {
+        transform: scale(0.96);
+    }
+
+    /* Riga 3: Toolbar Azioni Utente e Admin */
     .user-actions-group {
-        order: 2;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 6px;
-        flex-shrink: 0;
+        flex: 1;
+        min-width: 0;
         justify-content: flex-start;
-        margin: 0;
-        padding: 0;
+    }
+
+    .header-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: flex-end;
+        flex-shrink: 0;
+        margin-left: auto;
+    }
+
+    /* Wrapper per affiancare user-actions-group e header-actions su singola riga sotto la ricerca */
+    .header-row-controls::after {
+        content: none;
     }
 
     .user-report-btn {
-        padding: 0 8px;
-        height: 32px;
-        font-size: 0.72rem;
+        height: 34px;
+        padding: 0 10px;
+        font-size: 0.78rem;
         font-weight: 600;
         border-radius: 8px;
-        flex-shrink: 0;
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        gap: 3px;
-        letter-spacing: -0.2px;
+        gap: 5px;
         line-height: 1;
         box-sizing: border-box;
         vertical-align: middle;
         text-align: center;
+        flex-shrink: 0;
     }
 
     .user-report-btn .btn-text {
         display: inline-flex !important;
         align-items: center;
-        font-size: 0.72rem !important;
+        font-size: 0.78rem !important;
         font-weight: 600 !important;
         line-height: 1;
-        letter-spacing: -0.2px;
     }
 
     .user-report-btn .report-icon {
-        font-size: 0.82rem;
-        margin: 0;
-        padding: 0;
+        font-size: 0.92rem;
         line-height: 1;
         display: inline-flex;
         align-items: center;
@@ -1734,43 +1793,32 @@ h1 span.city-name {
     }
 
     .user-news-btn {
-        padding: 0 8px;
-        height: 32px;
-        font-size: 0.72rem;
+        height: 34px;
+        padding: 0 10px;
+        font-size: 0.78rem;
+        font-weight: 700;
         border-radius: 8px;
-        flex-shrink: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 4px;
         line-height: 1;
         box-sizing: border-box;
+        flex-shrink: 0;
     }
 
     .user-news-btn .btn-text {
         display: inline-flex;
         align-items: center;
-        font-size: 0.72rem;
+        font-size: 0.78rem;
         line-height: 1;
     }
 
-    .header-actions {
-        order: 3;
-        width: auto;
-        display: flex;
-        flex-wrap: nowrap;
-        align-items: center;
-        gap: 6px;
-        margin-left: auto;
-        margin-right: 0;
-        flex-shrink: 0;
-    }
-
     .admin-reports-btn {
-        flex: 0 0 auto;
-        padding: 0 8px;
-        height: 32px;
-        font-size: 0.72rem;
+        height: 34px;
+        padding: 0 9px;
+        font-size: 0.76rem;
+        font-weight: 600;
         border-radius: 8px;
         background: #d97706;
         color: #ffffff;
@@ -1782,21 +1830,21 @@ h1 span.city-name {
         line-height: 1;
         box-sizing: border-box;
         box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+        flex-shrink: 0;
     }
 
     .admin-reports-btn .btn-text {
         display: inline-flex;
         align-items: center;
-        font-size: 0.72rem;
+        font-size: 0.76rem;
         line-height: 1;
-        letter-spacing: -0.2px;
     }
 
     .admin-news-btn {
-        flex: 0 0 auto;
-        padding: 0 8px;
-        height: 32px;
-        font-size: 0.72rem;
+        height: 34px;
+        padding: 0 9px;
+        font-size: 0.76rem;
+        font-weight: 600;
         border-radius: 8px;
         white-space: nowrap;
         display: inline-flex;
@@ -1805,20 +1853,21 @@ h1 span.city-name {
         gap: 4px;
         line-height: 1;
         box-sizing: border-box;
+        flex-shrink: 0;
     }
 
     .admin-news-btn .btn-text {
         display: inline-flex;
         align-items: center;
-        font-size: 0.72rem;
+        font-size: 0.76rem;
         line-height: 1;
     }
 
     .icon-btn,
     .admin-btn {
-        width: 32px;
-        min-width: 32px;
-        height: 32px;
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
         padding: 0 !important;
         border-radius: 8px;
         background: #0f172a;
@@ -1832,30 +1881,72 @@ h1 span.city-name {
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
     
-    .search-container {
-        width: 100%;
-        padding: 8px 10px;
-        border-radius: 12px;
-    }
-    
-    .admin-top-row input {
-        font-size: 0.84rem;
-        padding: 6px 10px;
+    /* Layout Riga 3 flessibile: raggruppa user e admin action */
+    .header-row-controls {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
     }
 
-    .admin-top-row button {
-        padding: 6px 12px;
-        font-size: 0.84rem;
+    .header-row-controls > .search-in-header {
+        grid-column: 1 / -1;
+    }
+
+    .header-row-controls-actions-subrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: 6px;
+    }
+
+    /* Barra Filtri Admin (Mobile) */
+    .search-container {
+        width: 100%;
+        padding: 6px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(14px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     
     .admin-filter-bar {
-        justify-content: center;
-        gap: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+        padding: 0;
+        border-top: none;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .admin-filter-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .filter-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #475569;
+        margin-right: 2px;
+        flex-shrink: 0;
     }
 
     .filter-pill {
         font-size: 0.72rem;
-        padding: 4px 8px;
+        font-weight: 600;
+        padding: 5px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+        flex: 1;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
     }
     
     .modal-content {
@@ -2362,11 +2453,6 @@ h1 span.city-name {
 
 /* Adattamento Mobile Nav Drawer & Urgent News */
 @media (max-width: 600px) {
-    .user-news-btn {
-        padding: 5px 8px;
-        font-size: 0.76rem;
-    }
-
     .urgent-news-content {
         width: 95%;
     }
@@ -2376,20 +2462,23 @@ h1 span.city-name {
     }
 }
 
-/* Smartphone compatto (sotto 440px): adatta i testi dei pulsanti secondari mantenendo la riga di ricerca a piena larghezza */
+/* Smartphone compatto (sotto 440px): ottimizzazione spaziature per schermi stretti */
 @media (max-width: 440px) {
+    h1 {
+        font-size: 0.82rem;
+    }
+
     .user-report-btn {
-        padding: 0 6px;
-        font-size: 0.72rem;
+        padding: 0 8px;
+        font-size: 0.75rem;
+    }
+
+    .user-report-btn .btn-text {
+        font-size: 0.75rem !important;
     }
 
     .admin-reports-btn .btn-text,
-    .admin-news-btn .btn-text,
-    .user-news-btn .btn-text {
+    .admin-news-btn .btn-text {
         display: none;
     }
 }
-
-
-
-
