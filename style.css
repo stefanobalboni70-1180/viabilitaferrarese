@@ -1681,96 +1681,27 @@ h1 span.city-name {
         border-radius: 999px;
     }
 
-    /* Container Controlli: si articola in Riga 2 (Ricerca) e Riga 3 (Toolbar Azioni) */
+    /* Container Controlli: Allineato su singola Riga 2 su Mobile (Header complessivo su 2 Righe) */
     .header-row-controls {
         display: flex !important;
-        flex-wrap: wrap !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         align-items: center !important;
         justify-content: space-between !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
-        gap: 6px 4px !important;
+        gap: 4px !important;
         margin: 0 !important;
         padding: 0 !important;
     }
 
-    /* Riga 2 (Mobile): Barra di Ricerca a Tutta Larghezza */
-    .search-in-header {
-        order: 1 !important;
-        width: 100% !important;
-        flex: 1 0 100% !important;
-        max-width: 100% !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-        margin: 0 !important;
-        box-sizing: border-box !important;
-    }
-
-    .search-in-header input {
-        flex: 1 !important;
-        min-width: 0 !important;
-        width: 100% !important;
-        height: 35px !important;
-        padding: 0 10px !important;
-        font-size: 0.84rem !important;
-        border-radius: 8px !important;
-        border: 1px solid rgba(0, 0, 0, 0.14) !important;
-        background: rgba(0, 0, 0, 0.05) !important;
-        color: #0f172a !important;
-        outline: none !important;
-        box-sizing: border-box !important;
-        transition: all 0.2s !important;
-    }
-
-    .search-in-header input:focus {
-        background: #ffffff !important;
-        border-color: var(--primary) !important;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
-    }
-
-    .search-in-header button {
-        height: 35px !important;
-        padding: 0 12px !important;
-        font-size: 0.80rem !important;
-        font-weight: 700 !important;
-        border-radius: 8px !important;
-        background: var(--primary) !important;
-        color: #ffffff !important;
-        border: none !important;
-        cursor: pointer !important;
-        flex-shrink: 0 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 4px !important;
-        box-sizing: border-box !important;
-        transition: background 0.2s, transform 0.1s !important;
-    }
-
-    .search-in-header button:active {
-        transform: scale(0.96) !important;
-    }
-
-    .search-in-header button .btn-text {
-        display: inline !important;
-        font-size: 0.80rem !important;
-    }
-
-    .search-in-header button .search-icon {
-        font-size: 0.85rem !important;
-        display: inline-block !important;
-    }
-
-    /* Riga 3 (Mobile): Toolbar Azioni Icone (Utente a Sinistra, Admin & Logout a Destra) */
+    /* Gruppo Utente: Pulsante Verde Segnalazione e Rosso News */
     .user-actions-group {
-        order: 2 !important;
         display: flex !important;
         align-items: center !important;
-        gap: 6px !important;
+        gap: 4px !important;
         flex-shrink: 0 !important;
-        justify-content: flex-start !important;
     }
 
     .user-report-btn {
@@ -1818,14 +1749,83 @@ h1 span.city-name {
         display: none !important;
     }
 
-    .header-actions {
-        order: 3 !important;
+    /* Barra di Ricerca al centro su Riga 2 (Flessibile) */
+    .search-in-header {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
         display: flex !important;
         align-items: center !important;
-        gap: 6px !important;
+        gap: 4px !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .search-in-header input {
+        flex: 1 1 auto !important;
+        min-width: 40px !important;
+        width: 100% !important;
+        height: 32px !important;
+        padding: 0 8px !important;
+        font-size: 0.80rem !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(0, 0, 0, 0.14) !important;
+        background: rgba(0, 0, 0, 0.05) !important;
+        color: #0f172a !important;
+        outline: none !important;
+        box-sizing: border-box !important;
+        transition: all 0.2s !important;
+    }
+
+    .search-in-header input:focus {
+        background: #ffffff !important;
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+    }
+
+    /* Pulsante Cerca Blu Ridotto a Sola Icona su Mobile */
+    .search-in-header button {
+        width: 32px !important;
+        min-width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: var(--primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3) !important;
+        transition: background 0.2s, transform 0.1s !important;
+    }
+
+    .search-in-header button:active {
+        transform: scale(0.96) !important;
+    }
+
+    .search-in-header button .btn-text {
+        display: none !important;
+    }
+
+    .search-in-header button .search-icon {
+        font-size: 0.90rem !important;
+        line-height: 1 !important;
+        display: inline-block !important;
+    }
+
+    /* Gruppo Azioni Admin (Ingranaggio, Notifiche, Esci) a Destra su Riga 2 */
+    .header-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
         justify-content: flex-end !important;
         flex-shrink: 0 !important;
-        margin-left: auto !important;
+        margin-left: 0 !important;
     }
 
     .icon-btn,
