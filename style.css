@@ -151,6 +151,20 @@ h1 span.city-name {
     flex-shrink: 0;
 }
 
+.header-search-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.header-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 .user-actions-group {
     display: flex;
     align-items: center;
@@ -1629,7 +1643,7 @@ h1 span.city-name {
         overflow: hidden !important;
     }
     
-    /* Riga 1: Brand, Titolo e Logo 118 Emilia Romagna */
+    /* Titolo in alto: Logo 118 Emilia Romagna + Testo + Badge Versione */
     .header-row-title {
         display: flex;
         align-items: center;
@@ -1681,43 +1695,45 @@ h1 span.city-name {
         border-radius: 999px;
     }
 
-    /* Container Controlli: Allineato su singola Riga 2 su Mobile (Header complessivo su 2 Righe) */
+    /* Controlli Mobile: Disposti su 2 Righe sotto il Titolo */
     .header-row-controls {
         display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        justify-content: space-between !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
-        gap: 4px !important;
+        gap: 6px !important;
         margin: 0 !important;
         padding: 0 !important;
     }
 
-    /* Gruppo Utente: Pulsante Verde Segnalazione e Rosso News */
-    .user-actions-group {
+    /* RIGA 1 sotto il titolo (Mobile): Icona Verde + Barra di Ricerca + Icona Blu */
+    .header-search-row {
         display: flex !important;
         align-items: center !important;
-        gap: 4px !important;
-        flex-shrink: 0 !important;
+        gap: 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
+    /* Pulsante Verde Segnalazione Rapida */
     .user-report-btn {
-        width: 32px !important;
-        min-width: 32px !important;
-        height: 32px !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 34px !important;
         padding: 0 !important;
         border-radius: 8px !important;
         background: #059669 !important;
         color: #ffffff !important;
+        border: none !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         box-sizing: border-box !important;
         flex-shrink: 0 !important;
         box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+        cursor: pointer !important;
         transition: all 0.2s !important;
     }
 
@@ -1726,30 +1742,14 @@ h1 span.city-name {
     }
 
     .user-report-btn .report-icon {
-        font-size: 1.05rem !important;
+        font-size: 1.15rem !important;
         line-height: 1 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
 
-    .user-news-btn {
-        height: 32px !important;
-        padding: 0 6px !important;
-        border-radius: 8px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 3px !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-    }
-
-    .user-news-btn .btn-text {
-        display: none !important;
-    }
-
-    /* Barra di Ricerca al centro su Riga 2 (Flessibile) */
+    /* Barra di Ricerca */
     .search-in-header {
         flex: 1 1 auto !important;
         min-width: 0 !important;
@@ -1757,18 +1757,18 @@ h1 span.city-name {
         max-width: none !important;
         display: flex !important;
         align-items: center !important;
-        gap: 4px !important;
+        gap: 6px !important;
         margin: 0 !important;
         box-sizing: border-box !important;
     }
 
     .search-in-header input {
         flex: 1 1 auto !important;
-        min-width: 40px !important;
+        min-width: 0 !important;
         width: 100% !important;
-        height: 32px !important;
-        padding: 0 8px !important;
-        font-size: 0.80rem !important;
+        height: 34px !important;
+        padding: 0 10px !important;
+        font-size: 0.84rem !important;
         border-radius: 8px !important;
         border: 1px solid rgba(0, 0, 0, 0.14) !important;
         background: rgba(0, 0, 0, 0.05) !important;
@@ -1786,9 +1786,9 @@ h1 span.city-name {
 
     /* Pulsante Cerca Blu Ridotto a Sola Icona su Mobile */
     .search-in-header button {
-        width: 32px !important;
-        min-width: 32px !important;
-        height: 32px !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 34px !important;
         padding: 0 !important;
         border-radius: 8px !important;
         background: var(--primary) !important;
@@ -1813,19 +1813,78 @@ h1 span.city-name {
     }
 
     .search-in-header button .search-icon {
-        font-size: 0.90rem !important;
+        font-size: 0.95rem !important;
         line-height: 1 !important;
         display: inline-block !important;
     }
 
-    /* Gruppo Azioni Admin (Ingranaggio, Notifiche, Esci) a Destra su Riga 2 */
-    .header-actions {
+    /* RIGA 2 sotto il titolo (Mobile): Solo Icone (News, Admin News, Notifiche, Login, Esci) */
+    .header-actions-row {
         display: flex !important;
         align-items: center !important;
-        gap: 4px !important;
-        justify-content: flex-end !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 2px 0 0 0 !important;
+    }
+
+    /* Regola per la versione mobile: SOLO ICONE (nessun testo) */
+    .header-actions-row button .btn-text {
+        display: none !important;
+    }
+
+    .user-news-btn {
+        height: 32px !important;
+        padding: 0 8px !important;
+        border-radius: 8px !important;
+        background: #dc2626 !important;
+        color: #ffffff !important;
+        border: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
         flex-shrink: 0 !important;
-        margin-left: 0 !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3) !important;
+    }
+
+    .admin-news-btn {
+        height: 32px !important;
+        padding: 0 8px !important;
+        border-radius: 8px !important;
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        border: none !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3) !important;
+    }
+
+    .admin-reports-btn {
+        height: 32px !important;
+        padding: 0 8px !important;
+        border-radius: 8px !important;
+        background: #d97706 !important;
+        color: #ffffff !important;
+        border: none !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3) !important;
+        flex-shrink: 0 !important;
+        cursor: pointer !important;
     }
 
     .icon-btn,
@@ -1844,49 +1903,24 @@ h1 span.city-name {
         justify-content: center !important;
         box-sizing: border-box !important;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+        user-select: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+
+    .icon-btn svg,
+    .admin-btn svg {
+        pointer-events: none !important;
     }
 
     #admin-logout-btn {
-        background: rgba(239, 68, 68, 0.18) !important;
-        border: 1px solid rgba(239, 68, 68, 0.5) !important;
+        background: rgba(239, 68, 68, 0.2) !important;
+        border: 1.5px solid #ef4444 !important;
         color: #ef4444 !important;
-    }
-
-    .admin-reports-btn {
-        height: 32px !important;
-        padding: 0 6px !important;
-        border-radius: 8px !important;
-        background: #d97706 !important;
-        color: #ffffff !important;
-        white-space: nowrap !important;
         display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 3px !important;
-        box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3) !important;
-        flex-shrink: 0 !important;
-    }
-
-    .admin-reports-btn .btn-text {
-        display: none !important;
-    }
-
-    .admin-news-btn {
-        height: 32px !important;
-        padding: 0 6px !important;
-        border-radius: 8px !important;
-        white-space: nowrap !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 3px !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-    }
-
-    .admin-news-btn .btn-text {
-        display: none !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
     }
 
     /* Barra Filtri Admin (Mobile) */

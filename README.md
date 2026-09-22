@@ -1,9 +1,11 @@
-# Viabilità Ferrara 118 - Versione 3.7.5
+# Viabilità Ferrara 118 - Versione 3.7.6
 
 Applicazione web progressiva (PWA) e dashboard interattiva per la gestione e consultazione della viabilità e criticità stradali per il servizio 118 della provincia di Ferrara.
 
-### Funzionalità Principali (v3.7.5):
-- **Pannello In-App Mobile Snello & Intuitivo:** pulsanti di azione ridotti a icone compatte perfettamente allineate (`📢` Segnalazioni verde, `🚨` News rosso, `📢` News admin, `🔔` Segnalazioni admin, `🚪` Esci admin rosso con contenimento garantito a bordo schermo).
+### Funzionalità Principali (v3.7.6):
+- **Layout Mobile Strutturato a 2 Righe sotto il Titolo:**
+  - **Riga 1:** Icona verde segnalazione `📢`, barra di ricerca espandibile e icona blu cerca `🔍`.
+  - **Riga 2:** Esclusivamente icone compatte per le altre azioni (News `🚨`, Gestione News `📢`, Notifiche `🔔`, Ingranaggio Admin `⚙️`, Logout rapido `🚪`).
 - **Tracciato Reale della Carreggiata (Zero Linee Rette & Anti-Detour):** ogni tratto stradale segue rigorosamente la sagoma fisica e le curve reali della carreggiata (tramite stitching topologico dei way OpenStreetMap e routing bidirezionale anti-detour), eliminando tassativamente qualsiasi linea retta e prevenendo giri strani o deviazioni anomale.
 - **Finestra Notizie Urgenti (Flash News 20s):** popup informativo visualizzato per 20 secondi all'avvio con barra di avanzamento per avvisi straordinari e criticità viabilistiche immediate.
 - **Pulsante di Consultazione Rapida `🚨 News`:** permette agli operatori di riaprire e consultare in qualsiasi momento tutte le comunicazioni urgenti attive.

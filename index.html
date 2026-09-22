@@ -6,14 +6,14 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Viabilità Ferrara v3.7.5 - Viabilità 118</title>
+    <title>Viabilità Ferrara v3.7.6 - Viabilità 118</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="manifest.json?v=3.7.5">
+    <link rel="manifest" href="manifest.json?v=3.7.6">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.7.5">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.7.6">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -30,45 +30,48 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.7.5">
+    <link rel="stylesheet" href="style.css?v=3.7.6">
 </head>
 <body>
     
     <div class="top-nav-wrapper">
         <header class="glass-header">
-            <!-- Riga 1: Titolo e Versione con Logo 118 Emilia-Romagna -->
+            <!-- Riga Titolo: Titolo e Versione con Logo 118 Emilia-Romagna -->
             <div class="header-row-title">
                 <div class="header-title-group">
                     <img src="logo_118.png" alt="118 Emilia Romagna" class="header-logo-118" />
-                    <h1>Situazione viabilità provincia di <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.7.5</span></h1>
+                    <h1>Situazione viabilità provincia di <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.7.6</span></h1>
                 </div>
             </div>
 
-            <!-- Riga 2 (Desktop) / Righe 2 e 3 (Mobile) -->
+            <!-- Controlli: Su Desktop su singola riga; Su Mobile divisi in Riga 1 (Ricerca e Segnalazione) e Riga 2 (Altre Icone) -->
             <div class="header-row-controls">
-                <div class="user-actions-group">
-                    <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">
+                <!-- Riga 1 sotto il titolo (Mobile): Icona Verde + Barra di Ricerca + Icona Blu -->
+                <div class="header-search-row">
+                    <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità" type="button">
                         <span class="report-icon">📢</span><span class="btn-text">Segnalazioni</span>
                     </button>
-                    <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">
+                    <div class="admin-top-row search-in-header">
+                        <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
+                        <button id="admin-search-btn" title="Cerca via" type="button"><span class="search-icon">🔍</span><span class="btn-text">Cerca</span></button>
+                    </div>
+                </div>
+
+                <!-- Riga 2 sotto il titolo (Mobile): Solo Icone (News, Admin News, Notifiche, Login, Esci) -->
+                <div class="header-actions-row">
+                    <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118" type="button">
                         <span>🚨</span><span class="btn-text">News</span> <span id="user-news-badge" class="badge">0</span>
                     </button>
-                </div>
-
-                <div class="admin-top-row search-in-header">
-                    <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
-                    <button id="admin-search-btn" title="Cerca via"><span class="search-icon">🔍</span><span class="btn-text">Cerca</span></button>
-                </div>
-
-                <div class="header-actions">
-                    <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti">📢 <span class="btn-text">News</span> <span id="admin-news-badge" class="badge">0/3</span></button>
-                    <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti">
-                        🔔 <span class="btn-text">Segnalazioni</span> <span id="reports-badge" class="badge">0</span>
+                    <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti" type="button">
+                        <span>📢</span> <span class="btn-text">News</span> <span id="admin-news-badge" class="badge">0/3</span>
                     </button>
-                    <button id="admin-login-btn" class="admin-btn icon-btn" title="Accesso Admin">
+                    <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti" type="button">
+                        <span>🔔</span> <span class="btn-text">Segnalazioni</span> <span id="reports-badge" class="badge">0</span>
+                    </button>
+                    <button id="admin-login-btn" class="admin-btn icon-btn" title="Accesso Admin" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     </button>
-                    <button id="admin-logout-btn" class="admin-btn hidden icon-btn" title="Esci (Admin)">
+                    <button id="admin-logout-btn" class="admin-btn hidden icon-btn" title="Esci (Admin)" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     </button>
                 </div>
