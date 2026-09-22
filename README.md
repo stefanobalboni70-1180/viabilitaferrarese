@@ -1,9 +1,9 @@
-# Viabilità Ferrara 118 - Versione 3.7.3
+# Viabilità Ferrara 118 - Versione 3.7.4
 
 Applicazione per la consultazione e gestione in tempo reale della viabilità, interruzioni stradali, mercati, sagre, segnalazioni e comunicazioni urgenti per i mezzi di soccorso 118 e i cittadini di Ferrara e Provincia.
 
-### Funzionalità Principali (v3.7.3):
-- **Pannello Mobile Rimodulato su 3 Righe:** layout mobile specificamente rimodulato con priorità alla barra di ricerca strada a larghezza intera (100%), garantendo massima comodità di digitazione e consultazione rapida da smartphone.
+### Funzionalità Principali (v3.7.4):
+- **Pannello In-App Mobile Snello & Intuitivo:** pulsanti di azione ridotti a icone compatte perfettamente allineate (`📢` Segnalazioni verde, `🚨` News rosso, `📢` News admin, `🔔` Segnalazioni admin, `🚪` Esci admin rosso con contenimento garantito a bordo schermo).
 - **Tracciato Reale della Carreggiata (Zero Linee Rette & Anti-Detour):** ogni tratto stradale segue rigorosamente la sagoma fisica e le curve reali della carreggiata (tramite stitching topologico dei way OpenStreetMap e routing bidirezionale anti-detour), eliminando tassativamente qualsiasi linea retta e prevenendo giri strani o deviazioni anomale.
 - **Finestra Notizie Urgenti (Flash News 20s):** popup informativo visualizzato per 20 secondi all'avvio con barra di avanzamento per avvisi straordinari e criticità viabilistiche immediate.
 - **Pulsante di Consultazione Rapida `🚨 News`:** permette agli operatori di riaprire e consultare in qualsiasi momento tutte le comunicazioni urgenti attive.
