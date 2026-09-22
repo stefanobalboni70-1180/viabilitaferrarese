@@ -1643,7 +1643,7 @@ h1 span.city-name {
         overflow: hidden !important;
     }
     
-    /* Titolo in alto: Logo 118 Emilia Romagna + Testo + Badge Versione */
+    /* Titolo in alto: Logo 118 Emilia Romagna + Testo + Badge Versione perfettamente allineati */
     .header-row-title {
         display: flex;
         align-items: center;
@@ -1659,7 +1659,8 @@ h1 span.city-name {
         justify-content: center;
         gap: 6px;
         width: 100%;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        white-space: nowrap;
     }
 
     .header-logo-118 {
@@ -1667,32 +1668,39 @@ h1 span.city-name {
         width: auto;
         object-fit: contain;
         flex-shrink: 0;
+        vertical-align: middle;
     }
 
     h1 {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         font-weight: 700;
         color: #0f172a;
         margin: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        flex-wrap: wrap;
+        gap: 5px;
+        flex-wrap: nowrap;
         text-align: center;
-        white-space: normal;
-        line-height: 1.25;
+        white-space: nowrap;
+        line-height: 1;
         letter-spacing: -0.2px;
     }
     
     .version-tag {
-        font-size: 0.62rem;
+        font-size: 0.65rem;
         font-weight: 700;
         color: var(--primary);
         background: rgba(59, 130, 246, 0.12);
         border: 1px solid rgba(59, 130, 246, 0.3);
-        padding: 1px 5px;
+        padding: 1px 6px;
         border-radius: 999px;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+        vertical-align: middle;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     /* Controlli Mobile: Disposti su 2 Righe sotto il Titolo */
@@ -2486,14 +2494,20 @@ h1 span.city-name {
     }
 }
 
-/* Smartphone compatto (sotto 440px): ottimizzazione e contenimento garantito */
+/* Smartphone compatto (sotto 440px): ottimizzazione e contenimento garantito su singola riga */
 @media (max-width: 440px) {
     h1 {
-        font-size: 0.78rem;
+        font-size: 0.74rem;
+        gap: 4px;
     }
 
     .header-logo-118 {
-        height: 19px;
+        height: 18px;
+    }
+
+    .version-tag {
+        font-size: 0.58rem;
+        padding: 0 4px;
     }
 
     .user-report-btn {
@@ -2510,6 +2524,22 @@ h1 span.city-name {
     .admin-reports-btn .btn-text,
     .admin-news-btn .btn-text {
         display: none !important;
+    }
+}
+
+@media (max-width: 360px) {
+    h1 {
+        font-size: 0.68rem;
+        gap: 3px;
+    }
+
+    .header-logo-118 {
+        height: 16px;
+    }
+
+    .version-tag {
+        font-size: 0.54rem;
+        padding: 0 3px;
     }
 }
 
