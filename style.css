@@ -1682,34 +1682,43 @@ h1 span.city-name {
         align-items: center;
         gap: 6px;
         flex-shrink: 0;
+        justify-content: flex-start;
     }
 
     .user-report-btn {
-        padding: 0 12px;
-        height: 34px;
-        font-size: 0.80rem;
+        padding: 0 10px;
+        height: 32px;
+        font-size: 0.74rem;
         font-weight: 600;
         border-radius: 8px;
         flex-shrink: 0;
         display: inline-flex !important;
         align-items: center;
-        gap: 5px;
+        justify-content: center;
+        gap: 4px;
+        letter-spacing: -0.2px;
+        line-height: 1;
     }
 
     .user-report-btn .btn-text {
         display: inline !important;
+        font-size: 0.74rem !important;
+        font-weight: 600 !important;
+        line-height: 1;
     }
 
     .user-report-btn .report-icon {
-        font-size: 1rem;
+        font-size: 0.88rem;
         margin: 0;
         line-height: 1;
+        display: inline-flex;
+        align-items: center;
     }
 
     .user-news-btn {
         padding: 0 8px;
-        height: 34px;
-        font-size: 0.76rem;
+        height: 32px;
+        font-size: 0.74rem;
         border-radius: 8px;
         flex-shrink: 0;
         display: inline-flex;
@@ -1719,6 +1728,7 @@ h1 span.city-name {
 
     .user-news-btn .btn-text {
         display: inline;
+        font-size: 0.74rem;
     }
 
     .header-actions {
@@ -1736,8 +1746,8 @@ h1 span.city-name {
     .admin-news-btn {
         flex: 0 0 auto;
         padding: 0 8px;
-        height: 34px;
-        font-size: 0.76rem;
+        height: 32px;
+        font-size: 0.74rem;
         border-radius: 8px;
         white-space: nowrap;
         display: inline-flex;
@@ -1748,12 +1758,13 @@ h1 span.city-name {
     .admin-reports-btn .btn-text,
     .admin-news-btn .btn-text {
         display: inline;
+        font-size: 0.74rem;
     }
 
     .icon-btn {
-        width: 34px;
-        min-width: 34px;
-        height: 34px;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
         border-radius: 8px;
         flex-shrink: 0;
     }
