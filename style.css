@@ -380,44 +380,55 @@ h1 span.city-name {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: white;
+    background: #ffffff;
     border-radius: 50%;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
     font-size: 1.2rem;
     border: 2px solid white;
     transition: transform 0.2s;
+    width: 36px;
+    height: 36px;
+    overflow: visible;
 }
 .custom-marker:hover {
-    transform: scale(1.1);
+    transform: scale(1.12);
 }
 
-.custom-marker.works { background-color: var(--color-works); }
+.custom-marker.works { 
+    background-color: #ffffff; 
+    border: 2px solid var(--color-works); 
+}
 .custom-marker.closed { 
     background-color: #ffffff; 
-    border: 2px solid #ef4444; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: 2px solid var(--color-closed); 
 }
-.custom-marker.closed svg {
-    width: 24px;
-    height: 24px;
+.custom-marker.bridge { 
+    background-color: #ffffff; 
+    border: 2px solid var(--color-bridge); 
 }
-.custom-marker.bridge { background-color: var(--color-bridge); }
-.custom-marker.accident { background-color: var(--color-accident); }
-.custom-marker.mercato { background-color: var(--color-market); }
-.custom-marker.semaforo { background-color: var(--color-traffic); }
+.custom-marker.accident { 
+    background-color: var(--color-accident); 
+    border: 2px solid #ffffff;
+    color: #ffffff;
+}
+.custom-marker.mercato { 
+    background-color: #ffffff; 
+    border: 2px solid var(--color-market); 
+}
+.custom-marker.semaforo { 
+    background-color: #ffffff; 
+    border: 2px solid var(--color-traffic); 
+}
 .custom-marker.sagra { 
     background-color: #ffffff; 
-    border: 2px solid #ec4899; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: 2px solid var(--color-sagra); 
 }
-.custom-marker.sagra img {
+
+.custom-marker svg {
     width: 24px;
     height: 24px;
-    object-fit: contain;
+    display: block;
+    margin: auto;
 }
 
 /* Popup Styling */
