@@ -6,15 +6,15 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Viabilità Ferrara v3.7.0 - Viabilità 118</title>
+    <title>Viabilità Ferrara v3.7.3 - Viabilità 118</title>
 
     <!-- PWA Manifest & Icona Home Screen -->
-    <link rel="manifest" href="manifest.json?v=3.7.2">
+    <link rel="manifest" href="manifest.json?v=3.7.3">
     <meta name="theme-color" content="#0f172a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.7.2">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.7.3">
     <link rel="apple-touch-icon" href="icon-512.jpg">
     <link rel="icon" type="image/jpeg" href="icon-512.jpg">
     
@@ -27,7 +27,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.7.2">
+    <link rel="stylesheet" href="style.css?v=3.7.3">
 </head>
 <body>
     
@@ -37,18 +37,20 @@
             <div class="header-row-title">
                 <div class="header-title-group">
                     <img src="logo_118.png" alt="118 Emilia Romagna" class="header-logo-118" />
-                    <h1>Situazione viabilità provincia di <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.7.0</span></h1>
+                    <h1>Situazione viabilità provincia di <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v3.7.3</span></h1>
                 </div>
             </div>
 
-            <!-- Riga 2: Pulsante verde a sinistra (Segnalazioni), poi Ricerca Via, poi Cerca a destra, poi Rotella Admin -->
+            <!-- Riga 2 (Desktop) / Righe 2 e 3 (Mobile) -->
             <div class="header-row-controls">
-                <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">
-                    <span class="report-icon">📢</span><span class="btn-text"> Segnalazioni</span>
-                </button>
-                <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">
-                    <span>🚨</span> <span class="btn-text">News</span> <span id="user-news-badge" class="badge">0</span>
-                </button>
+                <div class="user-actions-group">
+                    <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità">
+                        <span class="report-icon">📢</span><span class="btn-text"> Segnalazioni</span>
+                    </button>
+                    <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118">
+                        <span>🚨</span> <span class="btn-text">News</span> <span id="user-news-badge" class="badge">0</span>
+                    </button>
+                </div>
 
                 <div class="admin-top-row search-in-header">
                     <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
@@ -452,6 +454,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- Custom Script -->
-    <script src="script.js?v=3.7.2"></script>
+    <script src="script.js?v=3.7.3"></script>
 </body>
 </html>

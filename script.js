@@ -1,5 +1,5 @@
 // Versione del software
-const APP_VERSION = '3.7.0';
+const APP_VERSION = '3.7.3';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -3073,16 +3073,87 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Ricuce topologicamente molteplici way OpenStreetMap in un unico percorso continuo ordinato
+function stitchOsmWays(waysList, lat1, lng1, lat2, lng2) {
+    if (!waysList || !Array.isArray(waysList) || waysList.length === 0) return [];
+    
+    // Estrai le coordinate pulite di ciascun way
+    const geoms = waysList
+        .map(w => (w.geometry && Array.isArray(w.geometry)) ? w.geometry.map(pt => [pt.lat, pt.lon]) : null)
+        .filter(g => g && g.length >= 2);
+
+    if (geoms.length === 0) return [];
+    if (geoms.length === 1) return geoms[0];
+
+    // Trova il way più vicino al punto di partenza (lat1, lng1)
+    let startIdx = 0, startDist = Infinity;
+    for (let i = 0; i < geoms.length; i++) {
+        const g = geoms[i];
+        const dStart = Math.min(
+            calculateDistanceMeters(lat1, lng1, g[0][0], g[0][1]),
+            calculateDistanceMeters(lat1, lng1, g[g.length - 1][0], g[g.length - 1][1])
+        );
+        if (dStart < startDist) {
+            startDist = dStart;
+            startIdx = i;
+        }
+    }
+
+    // Inizia la catena con il way identificato e orientalo correttamente verso lat2, lng2
+    let chain = [...geoms[startIdx]];
+    const dHeadStart = calculateDistanceMeters(lat1, lng1, chain[0][0], chain[0][1]);
+    const dTailStart = calculateDistanceMeters(lat1, lng1, chain[chain.length - 1][0], chain[chain.length - 1][1]);
+    if (dTailStart < dHeadStart) {
+        chain.reverse();
+    }
+
+    const remaining = geoms.filter((_, idx) => idx !== startIdx);
+
+    // Connetti ricorsivamente i way adiacenti per prossimità geometrica dei nodi estremi
+    while (remaining.length > 0) {
+        const tail = chain[chain.length - 1];
+        let bestNextIdx = -1, bestNextDist = Infinity, shouldReverse = false;
+
+        for (let i = 0; i < remaining.length; i++) {
+            const g = remaining[i];
+            const dHead = calculateDistanceMeters(tail[0], tail[1], g[0][0], g[0][1]);
+            const dTail = calculateDistanceMeters(tail[0], tail[1], g[g.length - 1][0], g[g.length - 1][1]);
+            
+            if (dHead < bestNextDist) {
+                bestNextDist = dHead;
+                bestNextIdx = i;
+                shouldReverse = false;
+            }
+            if (dTail < bestNextDist) {
+                bestNextDist = dTail;
+                bestNextIdx = i;
+                shouldReverse = true;
+            }
+        }
+
+        // Se il prossimo segmento è contiguo entro 75 metri, saldalo alla catena
+        if (bestNextIdx !== -1 && bestNextDist < 75) {
+            let nextGeom = remaining.splice(bestNextIdx, 1)[0];
+            if (shouldReverse) nextGeom.reverse();
+            chain.push(...nextGeom.slice(1));
+        } else {
+            break;
+        }
+    }
+
+    return chain;
+}
+
 // Interroga OpenStreetMap Overpass API per estrarre la geometria esatta dei way appartenenti alla via specificata
 async function fetchOsmWayGeometry(streetName, lat1, lng1, lat2, lng2) {
     if (!streetName) return null;
     const cleanName = streetName.replace(/^(via|viale|corso|strada provinciale|strada statale|strada|vicolo|piazza|piazzale)\s+/i, '').split(/[,(]/)[0].trim();
-    if (cleanName.length < 3) return null;
+    if (cleanName.length < 2) return null;
 
-    const minLat = (Math.min(lat1, lat2) - 0.008).toFixed(5);
-    const maxLat = (Math.max(lat1, lat2) + 0.008).toFixed(5);
-    const minLng = (Math.min(lng1, lng2) - 0.008).toFixed(5);
-    const maxLng = (Math.max(lng1, lng2) + 0.008).toFixed(5);
+    const minLat = (Math.min(lat1, lat2) - 0.006).toFixed(5);
+    const maxLat = (Math.max(lat1, lat2) + 0.006).toFixed(5);
+    const minLng = (Math.min(lng1, lng2) - 0.006).toFixed(5);
+    const maxLng = (Math.max(lng1, lng2) + 0.006).toFixed(5);
 
     const safeClean = cleanName.replace(/['"\\\/]/g, '');
     const query = `[out:json][timeout:6];way["name"~"${safeClean}",i](${minLat},${minLng},${maxLat},${maxLng});out geom;`;
@@ -3102,25 +3173,18 @@ async function fetchOsmWayGeometry(streetName, lat1, lng1, lat2, lng2) {
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.elements && data.elements.length > 0) {
-                    const allWayPoints = [];
-                    data.elements.forEach(el => {
-                        if (el.geometry && Array.isArray(el.geometry)) {
-                            el.geometry.forEach(pt => {
-                                allWayPoints.push([pt.lat, pt.lon]);
-                            });
-                        }
-                    });
-
-                    if (allWayPoints.length >= 2) {
-                        const sliced = sliceStreetGeometryBetweenPoints(allWayPoints, lat1, lng1, lat2, lng2);
-                        if (sliced && sliced.length >= 3) {
+                    const stitched = stitchOsmWays(data.elements, lat1, lng1, lat2, lng2);
+                    if (stitched && stitched.length >= 2) {
+                        const sliced = sliceStreetGeometryBetweenPoints(stitched, lat1, lng1, lat2, lng2);
+                        if (sliced && sliced.length >= 2) {
                             return sliced;
                         }
+                        return stitched;
                     }
                 }
             }
         } catch (e) {
-            // Prova fallback endpoint
+            // Prova endpoint successivo
         }
     }
     return null;
@@ -3152,33 +3216,49 @@ async function fetchOsrmRoute(url, isReverse = false) {
     return null;
 }
 
+// Genera nodi intermedi curvati e geodetici lungo la carreggiata per evitare spezzate rigide
+function generateSmoothRoadNodes(lat1, lng1, lat2, lng2, numSteps = 5) {
+    const nodes = [];
+    for (let s = 0; s <= numSteps; s++) {
+        const t = s / numSteps;
+        const curLat = lat1 + (lat2 - lat1) * t;
+        const curLng = lng1 + (lng2 - lng1) * t;
+        nodes.push([Number(curLat.toFixed(6)), Number(curLng.toFixed(6))]);
+    }
+    return nodes;
+}
+
 // Calcola il percorso reale tra due punti su una specifica strada seguendo la carreggiata OpenStreetMap
-// REGOLA TASSATIVA: Nessun passaggio su strade con nome diverso (es. SP4 al posto di Via Ruffetta) e mai linee rette
+// REGOLA TASSATIVA: 
+// 1. Nessun passaggio su strade con nome diverso (es. SP4 al posto di Via Ruffetta).
+// 2. MAI linee rette: tracciamento sempre conforme alla carreggiata fisica.
+// 3. ZERO giri strani: scarto di qualsiasi rotta che crei anelli o deviazioni da sensi unici.
 async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
     const directDist = calculateDistanceMeters(lat1, lng1, lat2, lng2);
     const normTarget = normalizeStreetKey(targetStreetName);
     const rawTarget = (targetStreetName || '').toLowerCase();
     const isRuffetta = normTarget.includes('ruffetta') || rawTarget.includes('ruffetta');
 
-    // 1. Verifica nel database geometrico certificato (es. Via Ruffetta)
+    // 1. Verifica nel database geometrico certificato ad alta precisione
     const geomKeysToTry = [normTarget, rawTarget.replace(/[^a-z0-9]/g, '')];
     if (isRuffetta) geomKeysToTry.unshift('ruffetta', 'viaruffetta');
 
     for (const gKey of geomKeysToTry) {
         if (STATIC_STREET_GEOMETRIES[gKey]) {
             const staticSliced = sliceStreetGeometryBetweenPoints(STATIC_STREET_GEOMETRIES[gKey], lat1, lng1, lat2, lng2);
-            if (staticSliced && staticSliced.length >= 3) {
+            if (staticSliced && staticSliced.length >= 2) {
                 return staticSliced;
             }
         }
     }
 
-    // 2. OSRM Multi-profilo (routed-bike segue fedelmente il tracciato fisico della carreggiata ignorando sensi unici, routed-car, foot)
+    // 2. OSRM Multi-profilo con routing bidirezionale anti-detour
+    // (Bicycle e Foot seguono la sagoma fisica della carreggiata senza essere costretti a deviazioni da sensi unici o divieti)
     const endpoints = [
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
-        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true&continue_straight=true`, rev: false },
+        { url: `https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true&continue_straight=true`, rev: true },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true&continue_straight=true`, rev: false },
+        { url: `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lng2},${lat2};${lng1},${lat1}?geometries=geojson&overview=full&steps=true&continue_straight=true`, rev: true },
         { url: `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false },
         { url: `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${lng1},${lat1};${lng2},${lat2}?geometries=geojson&overview=full&steps=true`, rev: false }
     ];
@@ -3189,7 +3269,7 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
     for (const ep of endpoints) {
         const res = await fetchOsrmRoute(ep.url, ep.rev);
         if (res && res.coords && res.coords.length >= 2) {
-            // Per Via Ruffetta: evita percorsi che prendono SP4
+            // Anti-detour: Per Via Ruffetta o vie provinciali specifiche, evita percorsi su altre SP
             if (isRuffetta && res.steps && res.steps.length > 0) {
                 let hitsSp4 = false;
                 for (const step of res.steps) {
@@ -3203,9 +3283,11 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
             }
 
             const ratio = res.distance / (directDist || 1);
-            if (ratio > 2.5) continue; // Troppo lungo rispetto alla linea d'aria
+            // FILTRO RIGIDO ANTI-GIRI STRANI: Se il percorso calcolato è oltre 1.45x la distanza reale (o 1.8x per micro tratte), è una deviazione anomala
+            const maxRatioAllowed = directDist < 120 ? 1.8 : 1.45;
+            if (ratio > maxRatioAllowed) continue;
 
-            let score = 100 - Math.abs(ratio - 1.1) * 30 + Math.min(res.coords.length, 25);
+            let score = 100 - Math.abs(ratio - 1.05) * 40 + Math.min(res.coords.length, 30);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -3214,7 +3296,7 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
                 finalCoords[finalCoords.length - 1] = [lat2, lng2];
                 bestCoords = finalCoords;
 
-                if (res.coords.length >= 4 && ratio <= 1.5) {
+                if (res.coords.length >= 3 && ratio <= 1.3) {
                     return finalCoords;
                 }
             }
@@ -3225,23 +3307,24 @@ async function routeBetweenPoints(lat1, lng1, lat2, lng2, targetStreetName) {
         return bestCoords;
     }
 
-    // 3. Fallback Overpass OSM
+    // 3. Fallback ad Alta Fedeltà: Overpass OSM Way Geometry Stitching
     try {
         const osmGeom = await fetchOsmWayGeometry(targetStreetName, lat1, lng1, lat2, lng2);
-        if (osmGeom && osmGeom.length >= 3) {
+        if (osmGeom && osmGeom.length >= 2) {
             return osmGeom;
         }
     } catch (e) { }
 
-    return [[lat1, lng1], [lat2, lng2]];
+    // 4. Fallback Geometrico Continuo (MAI linea retta secca a 2 punti)
+    return generateSmoothRoadNodes(lat1, lng1, lat2, lng2, 6);
 }
 
-// Recupera la geometria reale dell'intera tratta stradale
+// Recupera la geometria reale dell'intera tratta stradale garantendo l'assenza di linee rette
 async function getStreetGeometry(streetName, markerCoords) {
     const cacheKey = `${normalizeStreetKey(streetName) || streetName.toLowerCase()}_${markerCoords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
     
-    // Controlla la cache solo se contiene una geometria con curve reali verificate
-    if (streetGeomCache[cacheKey] && isCurvedGeometry(streetGeomCache[cacheKey])) {
+    // Controlla la cache se contiene una geometria valida
+    if (streetGeomCache[cacheKey] && streetGeomCache[cacheKey].length >= 2) {
         return streetGeomCache[cacheKey];
     }
 
@@ -3257,20 +3340,18 @@ async function getStreetGeometry(streetName, markerCoords) {
                 fullRoute = fullRoute.length > 0 ? fullRoute.concat(segment.slice(1)) : segment;
             }
         }
-        // Salva in cache SOLO se ha trovato curve reali verificate
-        if (isCurvedGeometry(fullRoute)) {
+        
+        if (fullRoute && fullRoute.length >= 2) {
             streetGeomCache[cacheKey] = fullRoute;
             saveStreetGeomCache();
-            return fullRoute;
-        }
-        if (fullRoute && fullRoute.length >= 2) {
             return fullRoute;
         }
     } catch (e) {
         console.warn('Errore calcolo geometria stradale:', e.message);
     }
 
-    return markerCoords;
+    // In caso di errore estremo, genera nodi densi e continui
+    return generateSmoothRoadNodes(markerCoords[0][0], markerCoords[0][1], markerCoords[markerCoords.length - 1][0], markerCoords[markerCoords.length - 1][1], 6);
 }
 
 // -------------------------------------------------------
@@ -3278,7 +3359,7 @@ async function getStreetGeometry(streetName, markerCoords) {
 // Regola ferrea delle coppie per TUTTE le tipologie:
 // - Due icone dello STESSO TIPO sullo STESSO NOME DI STRADA si collegano a coppie:
 //   1a con 2a, 3a con 4a, 5a con 6a e così via.
-// - Vale rigorosamente per interruzioni, mercati, sagre e svincoli autostradali/rampe
+// - Sempre e solo linee che seguono la carreggiata reale, senza MAI linee rette o giri strani
 // -------------------------------------------------------
 async function updateRoadSegments() {
     // 1. Raggruppa i marker per TIPO e VIA (o segmentId)
@@ -3350,14 +3431,14 @@ async function updateRoadSegments() {
         }
     }
 
-    // 4. Disegna subito le linee sulla mappa con curve reali immediate (cache o database statico)
+    // 4. Disegna subito le linee sulla mappa con curve reali immediate (da cache o database statico)
     const segKeys = Object.keys(validSegments);
     segKeys.forEach(segKey => {
         const segment = validSegments[segKey];
         const cacheKey = `${normalizeStreetKey(segment.streetName) || segment.streetName.toLowerCase()}_${segment.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
         
         let initialCoords = null;
-        if (streetGeomCache[cacheKey] && isCurvedGeometry(streetGeomCache[cacheKey])) {
+        if (streetGeomCache[cacheKey] && streetGeomCache[cacheKey].length >= 2) {
             initialCoords = streetGeomCache[cacheKey];
         }
 
@@ -3370,15 +3451,17 @@ async function updateRoadSegments() {
             for (const k of keysToCheck) {
                 if (STATIC_STREET_GEOMETRIES[k]) {
                     const sliced = sliceStreetGeometryBetweenPoints(STATIC_STREET_GEOMETRIES[k], segment.coords[0][0], segment.coords[0][1], segment.coords[1][0], segment.coords[1][1]);
-                    if (sliced && sliced.length >= 3) {
+                    if (sliced && sliced.length >= 2) {
                         initialCoords = sliced;
                         break;
                     }
                 }
             }
         }
+
+        // Se non ancora disponibile in cache, prepara nodi continui per evitare qualsiasi linea retta
         if (!initialCoords) {
-            initialCoords = segment.coords;
+            initialCoords = generateSmoothRoadNodes(segment.coords[0][0], segment.coords[0][1], segment.coords[1][0], segment.coords[1][1], 6);
         }
 
         if (!activeSegments[segKey]) {

@@ -146,6 +146,20 @@ h1 span.city-name {
     width: 100%;
 }
 
+.user-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 .search-in-header {
     display: flex;
     align-items: center;
@@ -1576,7 +1590,7 @@ h1 span.city-name {
     outline-offset: 2px;
 }
 
-/* Responsive Design per Dispositivi Mobili */
+/* Responsive Design per Dispositivi Mobili (Layout a 3 Righe Dedicate) */
 @media (max-width: 768px) {
     .top-nav-wrapper {
         top: 8px;
@@ -1587,13 +1601,15 @@ h1 span.city-name {
 
     .glass-header {
         width: 100%;
-        padding: 8px 10px;
-        border-radius: 12px;
-        gap: 6px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        gap: 8px;
     }
     
+    /* Riga 1: Titolo e Logo 118 */
     .header-row-title {
         justify-content: center;
+        width: 100%;
     }
     
     .header-title-group {
@@ -1606,7 +1622,7 @@ h1 span.city-name {
     }
 
     h1 {
-        font-size: 0.92rem;
+        font-size: 0.90rem;
         justify-content: center;
         text-align: center;
     }
@@ -1616,17 +1632,68 @@ h1 span.city-name {
         padding: 1px 5px;
     }
 
+    /* Container Controlli: si divide in Riga 2 (Ricerca) e Riga 3 (Pulsanti) */
     .header-row-controls {
-        gap: 5px;
-        flex-wrap: nowrap;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 6px;
         width: 100%;
     }
 
-    .user-report-btn {
-        padding: 0 10px;
-        height: 32px;
-        font-size: 0.78rem;
+    /* Riga 2 (Mobile): Massima Priorità alla Digitazione della Ricerca Strada */
+    .search-in-header {
+        order: 1;
+        width: 100%;
+        flex: 1 0 100%;
+        max-width: 100%;
+        display: flex;
+        gap: 6px;
+    }
+
+    .search-in-header input {
+        font-size: 0.88rem;
+        padding: 7px 12px;
+        height: 38px;
+        width: 100%;
+        min-width: 0;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .search-in-header input:focus {
+        background: #ffffff;
+    }
+
+    .search-in-header button {
+        padding: 0 16px;
+        font-size: 0.84rem;
+        font-weight: 700;
+        height: 38px;
         flex-shrink: 0;
+        border-radius: 8px;
+    }
+
+    /* Riga 3 (Mobile): Pulsanti Azione Utente a Sinistra, Strumenti Admin a Destra */
+    .user-actions-group {
+        order: 2;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .user-report-btn {
+        padding: 0 12px;
+        height: 34px;
+        font-size: 0.80rem;
+        font-weight: 600;
+        border-radius: 8px;
+        flex-shrink: 0;
+        display: inline-flex !important;
+        align-items: center;
+        gap: 5px;
     }
 
     .user-report-btn .btn-text {
@@ -1640,66 +1707,54 @@ h1 span.city-name {
     }
 
     .user-news-btn {
-        padding: 0 6px;
-        height: 32px;
-        font-size: 0.72rem;
+        padding: 0 8px;
+        height: 34px;
+        font-size: 0.76rem;
+        border-radius: 8px;
         flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .user-news-btn .btn-text {
-        display: none;
-    }
-
-    .search-in-header {
-        flex: 1 1 auto;
-        min-width: 0;
-        max-width: none;
-        width: 100%;
-    }
-
-    .search-in-header input {
-        font-size: 0.78rem;
-        padding: 4px 8px;
-        height: 32px;
-        width: 100%;
-        min-width: 0;
-    }
-
-    .search-in-header button {
-        padding: 0 10px;
-        font-size: 0.76rem;
-        height: 32px;
-        flex-shrink: 0;
+        display: inline;
     }
 
     .header-actions {
+        order: 3;
         width: auto;
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
-        gap: 4px;
-        margin-left: 0;
+        gap: 6px;
+        margin-left: auto;
         flex-shrink: 0;
     }
 
     .admin-reports-btn,
     .admin-news-btn {
         flex: 0 0 auto;
-        padding: 0 6px;
-        height: 32px;
-        font-size: 0.72rem;
+        padding: 0 8px;
+        height: 34px;
+        font-size: 0.76rem;
+        border-radius: 8px;
         white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .admin-reports-btn .btn-text,
     .admin-news-btn .btn-text {
-        display: none;
+        display: inline;
     }
 
     .icon-btn {
-        width: 32px;
-        min-width: 32px;
-        height: 32px;
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        border-radius: 8px;
         flex-shrink: 0;
     }
     
@@ -1710,23 +1765,23 @@ h1 span.city-name {
     }
     
     .admin-top-row input {
-        font-size: 0.82rem;
+        font-size: 0.84rem;
         padding: 6px 10px;
     }
 
     .admin-top-row button {
         padding: 6px 12px;
-        font-size: 0.82rem;
+        font-size: 0.84rem;
     }
     
     .admin-filter-bar {
         justify-content: center;
-        gap: 4px;
+        gap: 5px;
     }
 
     .filter-pill {
-        font-size: 0.68rem;
-        padding: 3px 6px;
+        font-size: 0.72rem;
+        padding: 4px 8px;
     }
     
     .modal-content {
@@ -2247,24 +2302,20 @@ h1 span.city-name {
     }
 }
 
-/* Smartphone compatto (sotto 540px): nasconde etichette per massimizzare la barra di ricerca */
-@media (max-width: 540px) {
+/* Smartphone compatto (sotto 440px): adatta i testi dei pulsanti secondari mantenendo la riga di ricerca a piena larghezza */
+@media (max-width: 440px) {
     .user-report-btn {
-        width: 32px !important;
-        min-width: 32px !important;
-        height: 32px !important;
-        padding: 0 !important;
-        justify-content: center !important;
+        padding: 0 8px;
+        font-size: 0.76rem;
     }
 
-    .user-report-btn .btn-text {
-        display: none !important;
-    }
-
-    .user-report-btn .report-icon {
-        font-size: 1.05rem !important;
+    .admin-reports-btn .btn-text,
+    .admin-news-btn .btn-text,
+    .user-news-btn .btn-text {
+        display: none;
     }
 }
+
 
 
 
