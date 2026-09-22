@@ -1599,14 +1599,12 @@ h1 span.city-name {
     outline-offset: 2px;
 }
 
-/* Responsive Design per Dispositivi Mobili (Layout a 3 Righe Dedicate) */
-/* Responsive Design per Dispositivi Mobili (Layout a 3 Righe Dedicate & Perfettamente Allineate) */
-/* Responsive Design per Dispositivi Mobili (Layout compatto: Verde [Logo] -> Ricerca -> Blu [Logo] -> Ingranaggio) */
+/* Responsive Design per Dispositivi Mobili (Layout Snello, Chiaro e Sfruttabile a Colpo d'Occhio) */
 @media (max-width: 768px) {
     .top-nav-wrapper {
         top: 8px;
-        width: 96vw;
-        max-width: 96vw;
+        width: 95vw;
+        max-width: 95vw;
         gap: 6px;
     }
 
@@ -1615,9 +1613,9 @@ h1 span.city-name {
         flex-direction: column !important;
         align-items: stretch !important;
         width: 100% !important;
-        padding: 8px 10px !important;
+        padding: 10px 12px !important;
         border-radius: 14px !important;
-        gap: 6px !important;
+        gap: 8px !important;
         background: rgba(255, 255, 255, 0.96) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
@@ -1625,7 +1623,7 @@ h1 span.city-name {
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
     }
     
-    /* Riga 1: Titolo e Logo 118 Emilia Romagna */
+    /* Riga 1: Brand, Titolo e Logo 118 Emilia Romagna */
     .header-row-title {
         display: flex;
         align-items: center;
@@ -1645,21 +1643,21 @@ h1 span.city-name {
     }
 
     .header-logo-118 {
-        height: 22px;
+        height: 24px;
         width: auto;
         object-fit: contain;
         flex-shrink: 0;
     }
 
     h1 {
-        font-size: 0.86rem;
+        font-size: 0.88rem;
         font-weight: 700;
         color: #0f172a;
         margin: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: 5px;
         flex-wrap: wrap;
         text-align: center;
         white-space: normal;
@@ -1668,104 +1666,46 @@ h1 span.city-name {
     }
     
     .version-tag {
-        font-size: 0.62rem;
+        font-size: 0.65rem;
         font-weight: 700;
         color: var(--primary);
         background: rgba(59, 130, 246, 0.12);
         border: 1px solid rgba(59, 130, 246, 0.3);
-        padding: 1px 5px;
+        padding: 1px 6px;
         border-radius: 999px;
     }
 
-    /* Riga 2: Allineamento orizzontale compatto (Verde [Logo] -> Ricerca -> Blu [Logo] -> Ingranaggio) */
+    /* Container Controlli: si articola in Riga 2 (Ricerca) e Riga 3 (Toolbar Azioni) */
     .header-row-controls {
         display: flex !important;
-        flex-direction: row !important;
+        flex-wrap: wrap !important;
         align-items: center !important;
         justify-content: space-between !important;
         width: 100% !important;
-        gap: 6px !important;
+        gap: 8px 6px !important;
         margin: 0 !important;
         padding: 0 !important;
     }
 
-    /* 1. Parte Verde solo con logo */
-    .user-actions-group {
-        display: flex !important;
-        align-items: center !important;
-        gap: 5px !important;
-        flex-shrink: 0 !important;
-        order: 1 !important;
-    }
-
-    .user-report-btn {
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
-        padding: 0 !important;
-        border-radius: 8px !important;
-        background: #059669 !important;
-        color: #ffffff !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-        box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
-        transition: all 0.2s !important;
-    }
-
-    .user-report-btn .btn-text {
-        display: none !important;
-    }
-
-    .user-report-btn .report-icon {
-        font-size: 1.05rem !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    .user-news-btn {
-        height: 34px !important;
-        padding: 0 7px !important;
-        font-size: 0.76rem !important;
-        border-radius: 8px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 3px !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-    }
-
-    .user-news-btn .btn-text {
-        display: none !important;
-    }
-
-    /* 2. Ricerca Strada con 3. Pulsante Blu a fianco solo logo */
+    /* Riga 2 (Mobile): Barra di Ricerca a Tutta Larghezza */
     .search-in-header {
-        order: 2 !important;
-        flex: 1 1 auto !important;
-        min-width: 0 !important;
-        width: auto !important;
+        order: 1 !important;
+        width: 100% !important;
+        flex: 1 0 100% !important;
         max-width: 100% !important;
         display: flex !important;
         align-items: center !important;
-        gap: 5px !important;
+        gap: 6px !important;
         margin: 0 !important;
     }
 
     .search-in-header input {
-        flex: 1 1 auto !important;
+        flex: 1 !important;
         min-width: 0 !important;
         width: 100% !important;
-        height: 34px !important;
-        padding: 0 10px !important;
-        font-size: 0.82rem !important;
+        height: 36px !important;
+        padding: 0 12px !important;
+        font-size: 0.85rem !important;
         border-radius: 8px !important;
         border: 1px solid rgba(0, 0, 0, 0.14) !important;
         background: rgba(0, 0, 0, 0.05) !important;
@@ -1782,11 +1722,10 @@ h1 span.city-name {
     }
 
     .search-in-header button {
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
-        padding: 0 !important;
-        font-size: 0.95rem !important;
+        height: 36px !important;
+        padding: 0 14px !important;
+        font-size: 0.82rem !important;
+        font-weight: 700 !important;
         border-radius: 8px !important;
         background: var(--primary) !important;
         color: #ffffff !important;
@@ -1796,38 +1735,94 @@ h1 span.city-name {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
+        gap: 4px !important;
         box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3) !important;
         transition: background 0.2s, transform 0.1s !important;
     }
 
     .search-in-header button:active {
-        transform: scale(0.95) !important;
+        transform: scale(0.96) !important;
     }
 
     .search-in-header button .btn-text {
-        display: none !important;
+        display: inline !important;
+        font-size: 0.82rem !important;
     }
 
     .search-in-header button .search-icon {
+        font-size: 0.88rem !important;
+        display: inline-block !important;
+    }
+
+    /* Riga 3 (Mobile): Toolbar Azioni (Utente a Sinistra, Admin & Login a Destra) */
+    .user-actions-group {
+        order: 2 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        flex-shrink: 0 !important;
+        justify-content: flex-start !important;
+    }
+
+    .user-report-btn {
+        height: 34px !important;
+        padding: 0 12px !important;
+        font-size: 0.80rem !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        background: #059669 !important;
+        color: #ffffff !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 5px !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+        transition: all 0.2s !important;
+    }
+
+    .user-report-btn .btn-text {
+        display: inline !important;
+        font-size: 0.80rem !important;
+        font-weight: 600 !important;
+    }
+
+    .user-report-btn .report-icon {
         font-size: 0.95rem !important;
-        margin: 0 !important;
-        padding: 0 !important;
         line-height: 1 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
 
-    /* 4. Ingranaggio Admin / Logout a fianco a destra */
+    .user-news-btn {
+        height: 34px !important;
+        padding: 0 10px !important;
+        font-size: 0.80rem !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+    }
+
+    .user-news-btn .btn-text {
+        display: inline !important;
+        font-size: 0.80rem !important;
+    }
+
     .header-actions {
         order: 3 !important;
         display: flex !important;
         align-items: center !important;
-        gap: 5px !important;
+        gap: 6px !important;
         justify-content: flex-end !important;
         flex-shrink: 0 !important;
-        margin: 0 !important;
+        margin-left: auto !important;
     }
 
     .icon-btn,
@@ -1850,8 +1845,8 @@ h1 span.city-name {
 
     .admin-reports-btn {
         height: 34px !important;
-        padding: 0 7px !important;
-        font-size: 0.74rem !important;
+        padding: 0 10px !important;
+        font-size: 0.78rem !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
         background: #d97706 !important;
@@ -1860,33 +1855,35 @@ h1 span.city-name {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 3px !important;
+        gap: 4px !important;
         box-sizing: border-box !important;
         box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3) !important;
         flex-shrink: 0 !important;
     }
 
     .admin-reports-btn .btn-text {
-        display: none !important;
+        display: inline !important;
+        font-size: 0.78rem !important;
     }
 
     .admin-news-btn {
         height: 34px !important;
-        padding: 0 7px !important;
-        font-size: 0.74rem !important;
+        padding: 0 10px !important;
+        font-size: 0.78rem !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
         white-space: nowrap !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 3px !important;
+        gap: 4px !important;
         box-sizing: border-box !important;
         flex-shrink: 0 !important;
     }
 
     .admin-news-btn .btn-text {
-        display: none !important;
+        display: inline !important;
+        font-size: 0.78rem !important;
     }
 
     /* Barra Filtri Admin (Mobile) */
@@ -1917,7 +1914,7 @@ h1 span.city-name {
     }
 
     .filter-label {
-        font-size: 0.72rem;
+        font-size: 0.74rem;
         font-weight: 700;
         color: #475569;
         margin-right: 2px;
@@ -1925,7 +1922,7 @@ h1 span.city-name {
     }
 
     .filter-pill {
-        font-size: 0.72rem;
+        font-size: 0.74rem;
         font-weight: 600;
         padding: 5px 8px;
         border-radius: 999px;
@@ -2459,5 +2456,16 @@ h1 span.city-name {
 
     .header-logo-118 {
         height: 20px;
+    }
+
+    .user-report-btn {
+        padding: 0 8px !important;
+        font-size: 0.74rem !important;
+    }
+
+    .admin-reports-btn,
+    .admin-news-btn {
+        padding: 0 7px !important;
+        font-size: 0.74rem !important;
     }
 }
