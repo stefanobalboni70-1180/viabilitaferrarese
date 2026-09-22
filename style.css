@@ -53,7 +53,7 @@ body {
     pointer-events: none;
 }
 
-/* Glassmorphism Header */
+/* Glassmorphism Header (Desktop: Singola Riga Fluida) */
 .glass-header {
     position: static;
     transform: none;
@@ -63,17 +63,19 @@ body {
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 16px;
-    padding: 10px 20px;
+    padding: 8px 16px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     text-align: center;
     transition: all 0.3s ease;
     pointer-events: auto;
-    width: 100%;
-    max-width: 860px;
+    width: max-content;
+    max-width: 95vw;
     box-sizing: border-box;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
 }
 
 .glass-header:hover {
@@ -84,19 +86,20 @@ body {
 .header-row-title {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 100%;
+    justify-content: flex-start;
+    width: auto;
+    flex-shrink: 0;
 }
 
 .header-title-group {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
+    gap: 8px;
+    white-space: nowrap;
 }
 
 .header-logo-118 {
-    height: 30px;
+    height: 28px;
     width: auto;
     object-fit: contain;
     flex-shrink: 0;
@@ -110,14 +113,15 @@ body {
 }
 
 h1 {
-    font-size: 1.15rem;
+    font-size: 1.02rem;
     font-weight: 700;
     letter-spacing: -0.3px;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
     margin: 0;
+    white-space: nowrap;
 }
 
 h1 span.city-name {
@@ -125,25 +129,26 @@ h1 span.city-name {
 }
 
 .version-tag {
-    font-size: 0.70rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--primary);
     background: rgba(59, 130, 246, 0.1);
     border: 1px solid rgba(59, 130, 246, 0.25);
-    padding: 1px 7px;
+    padding: 1px 6px;
     border-radius: 999px;
     vertical-align: middle;
     letter-spacing: 0;
     display: inline-block;
 }
 
-/* Riga 2: Controlli e Ricerca */
+/* Riga Controlli: Integrata su singola riga su PC */
 .header-row-controls {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     gap: 10px;
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
 }
 
 .user-actions-group {
@@ -164,14 +169,14 @@ h1 span.city-name {
     display: flex;
     align-items: center;
     gap: 6px;
-    flex: 1 1 240px;
-    max-width: 380px;
+    width: 230px;
+    max-width: 250px;
 }
 
 .search-in-header input {
-    height: 34px;
-    padding: 6px 12px;
-    font-size: 0.85rem;
+    height: 32px;
+    padding: 5px 10px;
+    font-size: 0.82rem;
     background: rgba(0, 0, 0, 0.05);
     border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 8px;
@@ -189,9 +194,9 @@ h1 span.city-name {
 }
 
 .search-in-header button {
-    height: 34px;
-    padding: 0 14px;
-    font-size: 0.82rem;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 0.80rem;
     font-weight: 600;
     border-radius: 8px;
     background: var(--primary);
@@ -207,15 +212,19 @@ h1 span.city-name {
 }
 
 .icon-btn {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
     padding: 0 !important;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
     border-radius: 8px;
     cursor: pointer;
+    background: #0f172a;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.2s;
 }
 
 .subtitle {
@@ -1688,16 +1697,16 @@ h1 span.city-name {
     }
 
     .user-report-btn {
-        padding: 0 10px;
+        padding: 0 8px;
         height: 32px;
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         font-weight: 600;
         border-radius: 8px;
         flex-shrink: 0;
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: 3px;
         letter-spacing: -0.2px;
         line-height: 1;
         box-sizing: border-box;
@@ -1708,14 +1717,14 @@ h1 span.city-name {
     .user-report-btn .btn-text {
         display: inline-flex !important;
         align-items: center;
-        font-size: 0.74rem !important;
+        font-size: 0.72rem !important;
         font-weight: 600 !important;
         line-height: 1;
         letter-spacing: -0.2px;
     }
 
     .user-report-btn .report-icon {
-        font-size: 0.88rem;
+        font-size: 0.82rem;
         margin: 0;
         padding: 0;
         line-height: 1;
@@ -1727,7 +1736,7 @@ h1 span.city-name {
     .user-news-btn {
         padding: 0 8px;
         height: 32px;
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         border-radius: 8px;
         flex-shrink: 0;
         display: inline-flex;
@@ -1741,7 +1750,7 @@ h1 span.city-name {
     .user-news-btn .btn-text {
         display: inline-flex;
         align-items: center;
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         line-height: 1;
     }
 
@@ -1757,12 +1766,37 @@ h1 span.city-name {
         flex-shrink: 0;
     }
 
-    .admin-reports-btn,
+    .admin-reports-btn {
+        flex: 0 0 auto;
+        padding: 0 8px;
+        height: 32px;
+        font-size: 0.72rem;
+        border-radius: 8px;
+        background: #d97706;
+        color: #ffffff;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        line-height: 1;
+        box-sizing: border-box;
+        box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+    }
+
+    .admin-reports-btn .btn-text {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.72rem;
+        line-height: 1;
+        letter-spacing: -0.2px;
+    }
+
     .admin-news-btn {
         flex: 0 0 auto;
         padding: 0 8px;
         height: 32px;
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         border-radius: 8px;
         white-space: nowrap;
         display: inline-flex;
@@ -1773,24 +1807,29 @@ h1 span.city-name {
         box-sizing: border-box;
     }
 
-    .admin-reports-btn .btn-text,
     .admin-news-btn .btn-text {
         display: inline-flex;
         align-items: center;
-        font-size: 0.74rem;
+        font-size: 0.72rem;
         line-height: 1;
     }
 
-    .icon-btn {
+    .icon-btn,
+    .admin-btn {
         width: 32px;
         min-width: 32px;
         height: 32px;
+        padding: 0 !important;
         border-radius: 8px;
+        background: #0f172a;
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.15);
         flex-shrink: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         box-sizing: border-box;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
     
     .search-container {
@@ -2340,8 +2379,8 @@ h1 span.city-name {
 /* Smartphone compatto (sotto 440px): adatta i testi dei pulsanti secondari mantenendo la riga di ricerca a piena larghezza */
 @media (max-width: 440px) {
     .user-report-btn {
-        padding: 0 8px;
-        font-size: 0.76rem;
+        padding: 0 6px;
+        font-size: 0.72rem;
     }
 
     .admin-reports-btn .btn-text,
