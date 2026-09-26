@@ -1,11 +1,17 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.7.9';
+const APP_VERSION = '3.8.0';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
 
 // Icona Immagine per "Sagra / Manifestazione" (Bandiere)
 const ICON_SAGRA = '<img src="icon-sagra.png" class="sign-sagra-img" alt="Sagra / Manifestazione" style="width:22px; height:22px; object-fit:contain; vertical-align:middle; display:inline-block;" />';
+
+// Icona SVG per "Mercato settimanale" (Carrello nero su cerchio bianco)
+const ICON_MERCATO = '<svg class="sign-market-cart" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#10b981" stroke-width="2.8"/><path d="M8.5 9.5h2.2l2.1 7.2a1 1 0 0 0 .96.72h6.88a1 1 0 0 0 .96-.72l1.6-5.7H12.2" fill="none" stroke="#111827" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.3" cy="20.8" r="1.5" fill="#111827"/><circle cx="20.7" cy="20.8" r="1.5" fill="#111827"/></svg>';
+
+// Icona SVG per "Elisoccorso / Eliporto" (H rossa cerchiata di rosso)
+const ICON_ELISOCCORSO = '<svg class="sign-h-red" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#ef4444"><rect x="10.5" y="8.5" width="2.8" height="15" rx="0.6"/><rect x="18.7" y="8.5" width="2.8" height="15" rx="0.6"/><rect x="10.5" y="14.6" width="11" height="2.8" rx="0.4"/></g></svg>';
 
 // Funzione di sanificazione per prevenire attacchi XSS
 function escapeHtml(unsafe) {
@@ -1736,9 +1742,11 @@ const ICONS = {
     chiusa: { emoji: ICON_STRADA_CHIUSA, label: 'Strada chiusa' },
     ponte: { emoji: '🌉', label: 'Ponte interrotto' },
     incidente: { emoji: '⚠️', label: 'Incidente' },
-    mercato: { emoji: '🛒', label: 'Mercato settimanale' },
+    mercato: { emoji: ICON_MERCATO, label: 'Mercato settimanale' },
     semaforo: { emoji: '🚦', label: 'Senso unico alternato' },
-    sagra: { emoji: ICON_SAGRA, label: 'Sagra / Manifestazione' }
+    sagra: { emoji: ICON_SAGRA, label: 'Sagra / Manifestazione' },
+    eliporto: { emoji: ICON_ELISOCCORSO, label: 'Elisoccorso / Eliporto (H)' },
+    elisoccorso: { emoji: ICON_ELISOCCORSO, label: 'Elisoccorso / Eliporto (H)' }
 };
 
 // Stato dell'applicazione

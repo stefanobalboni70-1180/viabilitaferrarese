@@ -1,8 +1,11 @@
-# Viabilità Ferrara 118 - Versione 3.7.9
+# Viabilità Ferrara 118 - Versione 3.8.0
 
 Applicazione web progressiva (PWA) e dashboard interattiva per la gestione e consultazione della viabilità e criticità stradali per il servizio 118 della provincia di Ferrara.
 
-### Funzionalità Principali (v3.7.9):
+### Funzionalità Principali (v3.8.0):
+- **Nuove Icone Vettoriali Ufficiali:**
+  - **Elisoccorso / Eliporto (`H`):** nuova icona vettoriale con `H` rossa cerchiata di rosso ad alta visibilità.
+  - **Mercato Settimanale:** icona vettoriale con carrello della spesa nero su cerchio bianco con contorno verde.
 - **Layout Mobile Strutturato a 2 Righe sotto il Titolo:**
   - **Riga 1:** Icona verde segnalazione `📢`, barra di ricerca espandibile e icona blu cerca `🔍`.
   - **Riga 2:** Esclusivamente icone compatte per le altre azioni (News `🚨`, Gestione News `📢`, Notifiche `🔔`, Ingranaggio Admin `⚙️`, Logout rapido `🚪`).
