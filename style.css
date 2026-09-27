@@ -1684,8 +1684,7 @@ h1 {
     outline-offset: 2px;
 }
 
-/* Responsive Design per Dispositivi Mobili: Header Rigorosamente a 2 Righe */
-/* Responsive Design per Dispositivi Mobili: Header Rigorosamente a 2 Righe (Conforme a Screenshot) */
+/* Responsive Design per Dispositivi Mobili: Header Rigorosamente a 2 Righe per Utente e 3 Righe per Admin */
 @media (max-width: 768px) {
     .top-nav-wrapper {
         top: 6px;
@@ -1698,9 +1697,6 @@ h1 {
     }
 
     .glass-header {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
@@ -1714,9 +1710,163 @@ h1 {
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
         overflow: hidden !important;
     }
-    
-    /* Riga 1: Brand, Titolo e Logo 118 Emilia Romagna */
-    .header-row-title {
+
+    /* ========================================================
+       VERSIONE UTENTE MOBILE (2 Righe: Riga 1 Titolo + Icone, Riga 2 Ricerca a Tutta Larghezza)
+       ======================================================== */
+    body:not(.admin-logged-in) .glass-header {
+        display: grid !important;
+        grid-template-columns: 1fr auto auto !important;
+        align-items: center !important;
+        gap: 7px 6px !important;
+    }
+
+    body:not(.admin-logged-in) .header-row-title {
+        grid-column: 1 / 2 !important;
+        grid-row: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body:not(.admin-logged-in) .header-title-group {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 5px !important;
+        flex-wrap: wrap !important;
+        width: 100% !important;
+    }
+
+    body:not(.admin-logged-in) h1 {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        font-size: 0.80rem !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        margin: 0 !important;
+        line-height: 1.2 !important;
+        letter-spacing: -0.2px !important;
+        white-space: normal !important;
+    }
+
+    body:not(.admin-logged-in) .header-row-controls {
+        display: contents !important;
+    }
+
+    body:not(.admin-logged-in) .user-actions-group {
+        grid-column: 2 / 3 !important;
+        grid-row: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        justify-content: flex-end !important;
+        flex-shrink: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body:not(.admin-logged-in) .header-actions {
+        grid-column: 3 / 4 !important;
+        grid-row: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        justify-content: flex-end !important;
+        flex-shrink: 0 !important;
+        margin: 0 !important;
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header {
+        grid-column: 1 / -1 !important;
+        grid-row: 2 !important;
+        width: 100% !important;
+        flex: 1 0 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header input {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        height: 35px !important;
+        padding: 0 10px !important;
+        font-size: 0.84rem !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(0, 0, 0, 0.14) !important;
+        background: rgba(0, 0, 0, 0.05) !important;
+        color: #0f172a !important;
+        outline: none !important;
+        box-sizing: border-box !important;
+        transition: all 0.2s !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header input:focus {
+        background: #ffffff !important;
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header button {
+        width: 35px !important;
+        min-width: 35px !important;
+        height: 35px !important;
+        padding: 0 !important;
+        font-size: 0.80rem !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+        background: var(--primary) !important;
+        color: #ffffff !important;
+        border: none !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        box-sizing: border-box !important;
+        transition: background 0.2s, transform 0.1s !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header button:active {
+        transform: scale(0.96) !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header button .btn-text {
+        display: none !important;
+    }
+
+    body:not(.admin-logged-in) .search-in-header button .search-icon {
+        font-size: 0.95rem !important;
+        display: inline-block !important;
+        margin: 0 !important;
+    }
+
+    /* ========================================================
+       VERSIONE ADMIN MOBILE (Inalterata - 3 Righe: Titolo, Ricerca, Toolbar Admin)
+       ======================================================== */
+    body.admin-logged-in .glass-header {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 7px !important;
+    }
+
+    body.admin-logged-in .header-row-title {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -1725,7 +1875,7 @@ h1 {
         padding: 0 !important;
     }
     
-    .header-title-group {
+    body.admin-logged-in .header-title-group {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -1734,14 +1884,7 @@ h1 {
         flex-wrap: wrap !important;
     }
 
-    .header-logo-118 {
-        height: 22px !important;
-        width: auto !important;
-        object-fit: contain !important;
-        flex-shrink: 0 !important;
-    }
-
-    h1 {
+    body.admin-logged-in h1 {
         font-size: 0.85rem !important;
         font-weight: 700 !important;
         color: #0f172a !important;
@@ -1756,19 +1899,8 @@ h1 {
         line-height: 1.25 !important;
         letter-spacing: -0.2px !important;
     }
-    
-    .version-tag {
-        font-size: 0.62rem !important;
-        font-weight: 700 !important;
-        color: var(--primary) !important;
-        background: rgba(59, 130, 246, 0.12) !important;
-        border: 1px solid rgba(59, 130, 246, 0.3) !important;
-        padding: 1px 5px !important;
-        border-radius: 999px !important;
-    }
 
-    /* Container Controlli: si articola in Riga 2 (Ricerca) e Riga 3 (Toolbar Azioni) */
-    .header-row-controls {
+    body.admin-logged-in .header-row-controls {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: center !important;
@@ -1781,8 +1913,7 @@ h1 {
         padding: 0 !important;
     }
 
-    /* Riga 2 (Mobile): Barra di Ricerca a Tutta Larghezza */
-    .search-in-header {
+    body.admin-logged-in .search-in-header {
         order: 1 !important;
         width: 100% !important;
         flex: 1 0 100% !important;
@@ -1794,7 +1925,7 @@ h1 {
         box-sizing: border-box !important;
     }
 
-    .search-in-header input {
+    body.admin-logged-in .search-in-header input {
         flex: 1 !important;
         min-width: 0 !important;
         width: 100% !important;
@@ -1810,13 +1941,13 @@ h1 {
         transition: all 0.2s !important;
     }
 
-    .search-in-header input:focus {
+    body.admin-logged-in .search-in-header input:focus {
         background: #ffffff !important;
         border-color: var(--primary) !important;
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
     }
 
-    .search-in-header button {
+    body.admin-logged-in .search-in-header button {
         height: 35px !important;
         padding: 0 12px !important;
         font-size: 0.80rem !important;
@@ -1835,28 +1966,55 @@ h1 {
         transition: background 0.2s, transform 0.1s !important;
     }
 
-    .search-in-header button:active {
+    body.admin-logged-in .search-in-header button:active {
         transform: scale(0.96) !important;
     }
 
-    .search-in-header button .btn-text {
+    body.admin-logged-in .search-in-header button .btn-text {
         display: inline !important;
         font-size: 0.80rem !important;
     }
 
-    .search-in-header button .search-icon {
+    body.admin-logged-in .search-in-header button .search-icon {
         font-size: 0.85rem !important;
         display: inline-block !important;
     }
 
-    /* Riga 3 (Mobile): Toolbar Azioni Icone (Utente a Sinistra, Admin & Logout a Destra) */
-    .user-actions-group {
+    body.admin-logged-in .user-actions-group {
         order: 2 !important;
         display: flex !important;
         align-items: center !important;
         gap: 6px !important;
         flex-shrink: 0 !important;
         justify-content: flex-start !important;
+    }
+
+    body.admin-logged-in .header-actions {
+        order: 3 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        justify-content: flex-end !important;
+        flex-shrink: 0 !important;
+        margin-left: auto !important;
+    }
+
+    /* Elementi comuni Mobile (Pulsanti, Icone, Badge) */
+    .header-logo-118 {
+        height: 22px !important;
+        width: auto !important;
+        object-fit: contain !important;
+        flex-shrink: 0 !important;
+    }
+
+    .version-tag {
+        font-size: 0.62rem !important;
+        font-weight: 700 !important;
+        color: var(--primary) !important;
+        background: rgba(59, 130, 246, 0.12) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        padding: 1px 5px !important;
+        border-radius: 999px !important;
     }
 
     .user-report-btn {
@@ -1902,16 +2060,6 @@ h1 {
 
     .user-news-btn .btn-text {
         display: none !important;
-    }
-
-    .header-actions {
-        order: 3 !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-        justify-content: flex-end !important;
-        flex-shrink: 0 !important;
-        margin-left: auto !important;
     }
 
     .icon-btn,
@@ -2582,9 +2730,16 @@ h1 {
         padding: 0 4px;
     }
 
-    .user-report-btn {
+    body.admin-logged-in .user-report-btn {
         padding: 0 6px !important;
         font-size: 0.72rem !important;
+    }
+
+    body:not(.admin-logged-in) .user-report-btn {
+        padding: 0 !important;
+        width: 32px !important;
+        min-width: 32px !important;
+        height: 32px !important;
     }
 
     .admin-reports-btn,
