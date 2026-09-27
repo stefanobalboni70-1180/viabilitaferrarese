@@ -4833,7 +4833,8 @@ async function saveAdminNews() {
                 localStorage.setItem('ferrara_last_alerted_news_time', now.toString());
             } catch (e) { }
             triggerEmergencyNewsAlert();
-            showToast("Notizia urgente pubblicata con successo! Verrà mostrata a tutti gli utenti.", "success", 4000);
+            broadcastFcmPush('🚨 COMUNICAZIONE URGENTE 118', payload.text, typeof newNewsKey !== 'undefined' ? newNewsKey : now.toString());
+            showToast("Notizia urgente pubblicata con successo! Verrà inviata a tutti i dispositivi.", "success", 4000);
         }
 
         resetAdminNewsForm();
@@ -5106,10 +5107,147 @@ async function testDeviceNotification() {
     }, 3000);
 }
 
+let fcmServerKeyCache = '';
+
+function getFcmServerKey() {
+    if (fcmServerKeyCache) return fcmServerKeyCache;
+    let key = '';
+    try {
+        key = localStorage.getItem('ferrara_fcm_server_key') || '';
+    } catch (e) { }
+    fcmServerKeyCache = key;
+    return key;
+}
+
+async function loadFcmServerKeyFromDb() {
+    if (!isFirebaseOnline || !db) return;
+    try {
+        const snap = await db.ref('admin_settings/fcmServerKey').once('value');
+        const val = snap.val();
+        if (val && typeof val === 'string') {
+            fcmServerKeyCache = val;
+            try {
+                localStorage.setItem('ferrara_fcm_server_key', val);
+            } catch (e) { }
+            const input = document.getElementById('admin-fcm-key-input');
+            if (input && !input.value) {
+                input.value = val;
+            }
+            const statusEl = document.getElementById('fcm-key-status');
+            if (statusEl) statusEl.textContent = '✅ Chiave configurata';
+        }
+    } catch (e) { }
+}
+
+async function saveFcmServerKey() {
+    const input = document.getElementById('admin-fcm-key-input');
+    const statusEl = document.getElementById('fcm-key-status');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) {
+        showToast("Inserisci una chiave valida.", "warning", 3000);
+        return;
+    }
+    fcmServerKeyCache = val;
+    try {
+        localStorage.setItem('ferrara_fcm_server_key', val);
+    } catch (e) { }
+    if (isFirebaseOnline && db && isAdmin) {
+        try {
+            await db.ref('admin_settings/fcmServerKey').set(val);
+        } catch (e) {
+            console.warn("Errore salvataggio fcmServerKey su db:", e);
+        }
+    }
+    if (statusEl) statusEl.textContent = '✅ Chiave salvata!';
+    showToast("Chiave Server FCM salvata con successo!", "success", 3500);
+}
+
+async function broadcastFcmPush(title, body, newsId) {
+    if (!isFirebaseOnline || !db) return;
+    const serverKey = getFcmServerKey();
+    if (!serverKey) {
+        console.log('[Push] Nessuna FCM Server Key configurata dall\'admin.');
+        return;
+    }
+
+    try {
+        const snap = await db.ref('fcm_tokens').once('value');
+        const data = snap.val();
+        if (!data) {
+            console.log('[Push] Nessun token registrato in fcm_tokens');
+            return;
+        }
+
+        const tokens = Object.values(data)
+            .map(item => (typeof item === 'string' ? item : item.token))
+            .filter(t => typeof t === 'string' && t.length > 10);
+
+        if (tokens.length === 0) {
+            console.log('[Push] Nessun token valido trovato per il broadcast');
+            return;
+        }
+
+        console.log(`[Push] Invio broadcast push a ${tokens.length} dispositivi registrati...`);
+
+        // Suddividi in blocchi da 500 token (limite FCM)
+        const chunkSize = 500;
+        let successTotal = 0;
+        let failTotal = 0;
+
+        for (let i = 0; i < tokens.length; i += chunkSize) {
+            const chunk = tokens.slice(i, i + chunkSize);
+            const payload = {
+                registration_ids: chunk,
+                notification: {
+                    title: title || '🚨 COMUNICAZIONE URGENTE 118',
+                    body: body || 'Nuova allerta di viabilità provinciale registrata.',
+                    icon: 'icon-512.jpg',
+                    sound: 'default'
+                },
+                data: {
+                    title: title || '🚨 COMUNICAZIONE URGENTE 118',
+                    body: body || 'Nuova allerta di viabilità provinciale registrata.',
+                    url: './index.html?urgentNews=1',
+                    newsId: newsId || '',
+                    timestamp: Date.now().toString()
+                },
+                priority: 'high'
+            };
+
+            try {
+                const res = await fetch('https://fcm.googleapis.com/fcm/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'key=' + serverKey
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const resData = await res.json();
+                if (resData.success) successTotal += resData.success;
+                if (resData.failure) failTotal += resData.failure;
+            } catch (errChunk) {
+                console.warn('[Push] Errore invio blocco FCM:', errChunk);
+            }
+        }
+
+        console.log(`[Push] Esito invio FCM: ${successTotal} successi, ${failTotal} fallimenti su ${tokens.length} dispositivi.`);
+        if (successTotal > 0) {
+            showToast(`📢 Notifica inviata a ${successTotal} smartphone registrati!`, "success", 4500);
+        }
+    } catch (err) {
+        console.error('[Push] Errore invio broadcast FCM:', err);
+    }
+}
+
 function initPushModule() {
     const enableBtn = document.getElementById('enable-push-btn');
     const dismissBtn = document.getElementById('dismiss-push-btn');
     const testPushBtn = document.getElementById('admin-test-push-btn');
+    const saveFcmKeyBtn = document.getElementById('save-fcm-key-btn');
+    const fcmKeyInput = document.getElementById('admin-fcm-key-input');
+
     if (enableBtn) {
         enableBtn.addEventListener('click', requestPushPermission);
     }
@@ -5122,7 +5260,19 @@ function initPushModule() {
     if (testPushBtn) {
         testPushBtn.addEventListener('click', testDeviceNotification);
     }
+    if (saveFcmKeyBtn) {
+        saveFcmKeyBtn.addEventListener('click', saveFcmServerKey);
+    }
+    if (fcmKeyInput) {
+        const stored = getFcmServerKey();
+        if (stored) {
+            fcmKeyInput.value = stored;
+            const statusEl = document.getElementById('fcm-key-status');
+            if (statusEl) statusEl.textContent = '✅ Chiave configurata';
+        }
+    }
     initPushNotifications();
+    loadFcmServerKeyFromDb();
 }
 
 // Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone

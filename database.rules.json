@@ -29,6 +29,10 @@
       "$tokenId": {
         ".write": "newData.exists() && newData.hasChildren(['token', 'timestamp'])"
       }
+    },
+    "admin_settings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }
