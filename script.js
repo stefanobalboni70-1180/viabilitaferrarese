@@ -4024,6 +4024,98 @@ async function sendTelegramNotification(reportData) {
     }
 }
 
+// Invio notifica istantanea per Notizie Urgenti su Telegram (Canale / Gruppo / Chat)
+async function sendTelegramUrgentNews(newsPayload) {
+    if (!NOTIFICATIONS_CONFIG.telegram.enabled || !NOTIFICATIONS_CONFIG.telegram.botToken) {
+        return;
+    }
+
+    const chatId = localStorage.getItem('ferrara_telegram_chat_id') || NOTIFICATIONS_CONFIG.telegram.chatId;
+    if (!chatId) return;
+
+    try {
+        const text = escapeTelegramHtml(newsPayload.text || '');
+        const dateStr = new Date(newsPayload.createdAt || Date.now()).toLocaleString('it-IT');
+        let durationText = 'Fino a rimozione manuale';
+        if (newsPayload.expiresAt) {
+            durationText = `Fino al ${new Date(newsPayload.expiresAt).toLocaleString('it-IT')}`;
+        }
+
+        const message = `🚨 <b>COMUNICAZIONE URGENTE 118</b>\n` +
+            `📍 <b>Viabilità Provincia di Ferrara</b>\n\n` +
+            `⚠️ <b>AVVISO:</b>\n${text}\n\n` +
+            `⏱️ <b>Validità:</b> ${durationText}\n` +
+            `📅 <b>Data pubblicazione:</b> ${dateStr}\n\n` +
+            `🗺️ <a href="https://stefanobalboni70-1180.github.io/viabilitaferrarese/">Apri Mappa Viabilità 118</a>`;
+
+        const url = `https://api.telegram.org/bot${NOTIFICATIONS_CONFIG.telegram.botToken}/sendMessage`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML',
+                disable_web_page_preview: false
+            })
+        });
+
+        if (res.ok) {
+            console.log("📢 Notifica Telegram Urgent News inviata con successo!");
+            showToast("📢 Notifica urgente inoltrata su Telegram!", "success", 4000);
+        } else {
+            const errData = await res.json();
+            console.warn("⚠️ Risposta API Telegram Urgent News:", errData);
+        }
+    } catch (e) {
+        console.warn("⚠️ Errore invio Telegram Urgent News:", e.message);
+    }
+}
+
+async function testTelegramNews() {
+    const chatInput = document.getElementById('admin-telegram-chat-input');
+    const statusEl = document.getElementById('telegram-status-msg');
+    const chatId = (chatInput ? chatInput.value.trim() : '') || localStorage.getItem('ferrara_telegram_chat_id') || NOTIFICATIONS_CONFIG.telegram.chatId;
+
+    if (!chatId) {
+        showToast("Inserisci un Chat ID o nome canale Telegram.", "warning", 3500);
+        return;
+    }
+
+    if (statusEl) statusEl.textContent = "Invio in corso...";
+
+    try {
+        const testText = "Test di verifica ricezione allarmi urgenti 118 Viabilità Ferrara. Sistema attivo!";
+        const message = `🚨 <b>TEST NOTIFICA 118 VIABILITÀ FERRARA</b>\n\n` +
+            `✅ <b>Canale/Chat configurato correttamente!</b>\n` +
+            `📢 <i>${testText}</i>\n\n` +
+            `🕒 ${new Date().toLocaleString('it-IT')}`;
+
+        const url = `https://api.telegram.org/bot${NOTIFICATIONS_CONFIG.telegram.botToken}/sendMessage`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML'
+            })
+        });
+
+        if (res.ok) {
+            if (statusEl) statusEl.textContent = "✅ Notifica Telegram inviata!";
+            showToast("✅ Messaggio di prova inviato su Telegram!", "success", 4000);
+        } else {
+            const errData = await res.json();
+            if (statusEl) statusEl.textContent = `❌ Errore: ${errData.description || 'Non riuscito'}`;
+            showToast(`Errore Telegram: ${errData.description || res.statusText}`, "error", 5000);
+        }
+    } catch (e) {
+        if (statusEl) statusEl.textContent = `❌ Errore di rete`;
+        showToast("Errore di connessione a Telegram: " + e.message, "error", 4000);
+    }
+}
+
 // -------------------------------------------------------
 // GESTIONE NOTIFICHE AMMINISTRATORE
 // -------------------------------------------------------
@@ -4833,8 +4925,10 @@ async function saveAdminNews() {
                 localStorage.setItem('ferrara_last_alerted_news_time', now.toString());
             } catch (e) { }
             triggerEmergencyNewsAlert();
-            broadcastFcmPush('🚨 COMUNICAZIONE URGENTE 118', payload.text, typeof newNewsKey !== 'undefined' ? newNewsKey : now.toString());
-            showToast("Notizia urgente pubblicata con successo! Verrà inviata a tutti i dispositivi.", "success", 4000);
+            // Invia istantaneamente notifica su Telegram a canale/gruppo/operatori
+            sendTelegramUrgentNews(payload);
+            broadcastFcmPush('🚨 COMUNICAZIONE URGENTE 118', payload.text, now.toString());
+            showToast("Notizia urgente pubblicata! Inviata su Telegram e ai dispositivi.", "success", 4000);
         }
 
         resetAdminNewsForm();
@@ -4869,6 +4963,38 @@ function initUrgentNewsModule() {
     const cancelEditBtn = document.getElementById('admin-news-cancel-edit-btn');
     const urgentNewsModal = document.getElementById('urgent-news-modal');
     const adminNewsModal = document.getElementById('admin-news-modal');
+
+    // Configurazione Notifiche Telegram per Notizie Urgenti
+    const telegramChatInput = document.getElementById('admin-telegram-chat-input');
+    const saveTelegramBtn = document.getElementById('save-telegram-chat-btn');
+    const testTelegramBtn = document.getElementById('test-telegram-news-btn');
+    const telegramStatusEl = document.getElementById('telegram-status-msg');
+
+    if (telegramChatInput) {
+        telegramChatInput.value = localStorage.getItem('ferrara_telegram_chat_id') || (NOTIFICATIONS_CONFIG && NOTIFICATIONS_CONFIG.telegram ? NOTIFICATIONS_CONFIG.telegram.chatId : '') || '';
+    }
+
+    if (saveTelegramBtn) {
+        saveTelegramBtn.addEventListener('click', () => {
+            const val = telegramChatInput ? telegramChatInput.value.trim() : '';
+            if (!val) {
+                showToast("Inserisci un Chat ID o canale valido", "warning", 3000);
+                return;
+            }
+            localStorage.setItem('ferrara_telegram_chat_id', val);
+            if (telegramStatusEl) {
+                telegramStatusEl.textContent = "✅ Salvato!";
+                setTimeout(() => { telegramStatusEl.textContent = ''; }, 3000);
+            }
+            showToast("Destinatario Telegram salvato con successo!", "success", 3000);
+        });
+    }
+
+    if (testTelegramBtn) {
+        testTelegramBtn.addEventListener('click', () => {
+            testTelegramNews();
+        });
+    }
 
     if (userNewsBtn) {
         userNewsBtn.addEventListener('click', () => {
