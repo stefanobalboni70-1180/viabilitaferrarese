@@ -95,57 +95,43 @@ body {
 .header-title-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     white-space: nowrap;
 }
 
 .header-logo-118 {
-    height: 36px;
+    height: 26px;
     width: auto;
     object-fit: contain;
     flex-shrink: 0;
-    vertical-align: middle;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
 }
 
-.header-title-text {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    line-height: 1.25;
-}
-
-.header-title-main {
-    font-size: 0.98rem;
+h1 {
+    font-size: 1.05rem;
     font-weight: 700;
     color: #0f172a;
-    letter-spacing: -0.2px;
-}
-
-.header-title-sub {
+    letter-spacing: -0.3px;
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 1px;
-}
-
-.header-title-sub .city-name {
-    font-size: 1.08rem;
-    font-weight: 700;
-    color: #2563eb;
+    margin: 0;
+    line-height: 1.2;
 }
 
 .version-tag {
-    font-size: 0.70rem;
-    font-weight: 600;
-    color: #2563eb;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.25);
-    padding: 1px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 1px 6px;
     border-radius: 999px;
-    vertical-align: middle;
+    line-height: 1.2;
     display: inline-flex;
     align-items: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* Riga Controlli: Integrata su singola riga su PC */
@@ -153,93 +139,155 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 10px;
     width: auto;
     flex-shrink: 0;
 }
 
-.header-actions-row {
+.user-actions-group {
     display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.user-report-btn {
+    background: #059669;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0 14px;
+    height: 34px;
+    box-sizing: border-box;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.user-report-btn .btn-text {
+    display: inline !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    vertical-align: middle;
+}
+
+.user-report-btn .report-icon {
+    font-size: 1rem;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-report-btn:hover {
+    background: #047857;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
+    transform: translateY(-1px);
 }
 
 .search-in-header {
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 240px;
-    max-width: 260px;
+    margin: 0;
+    width: auto;
+    max-width: none;
 }
 
 .search-in-header input {
-    height: 38px;
-    padding: 0 12px;
-    font-size: 0.88rem;
+    width: 220px;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
     background: rgba(0, 0, 0, 0.04);
-    border: 1.5px solid rgba(0, 0, 0, 0.12);
-    border-radius: 12px;
     color: #0f172a;
-    width: 100%;
-    box-sizing: border-box;
     outline: none;
     transition: all 0.2s;
+    box-sizing: border-box;
 }
 
 .search-in-header input:focus {
-    border-color: var(--primary);
     background: #ffffff;
+    border-color: var(--primary);
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    width: 260px;
 }
 
 .search-in-header button {
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
-    padding: 0;
-    border-radius: 12px;
-    background: #2563eb;
-    color: white;
+    height: 34px;
+    padding: 0 12px;
+    font-size: 0.80rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: var(--primary);
+    color: #ffffff;
     border: none;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    gap: 4px;
+    box-sizing: border-box;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s;
 }
 
 .search-in-header button:hover {
     background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+}
+
+.search-in-header button .btn-text {
+    display: inline;
 }
 
 .search-in-header button .search-icon {
-    font-size: 1.05rem;
+    font-size: 0.85rem;
     line-height: 1;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
 .icon-btn {
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
-    padding: 0 !important;
-    display: inline-flex !important;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
+    border-radius: 8px;
     cursor: pointer;
-    background: rgba(0, 0, 0, 0.04);
-    color: #0f172a;
-    border: 1.5px solid rgba(0, 0, 0, 0.12);
+    background: #0f172a;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     transition: all 0.2s;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.icon-btn:hover {
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
 }
 
 .icon-btn svg {
-    width: 20px;
-    height: 20px;
-    color: #0f172a;
+    width: 18px;
+    height: 18px;
 }
 
 .subtitle {
@@ -1643,8 +1691,8 @@ body {
         top: 6px;
         left: 50%;
         transform: translateX(-50%);
-        width: calc(100vw - 12px);
-        max-width: calc(100vw - 12px);
+        width: calc(100vw - 16px);
+        max-width: calc(100vw - 16px);
         gap: 6px;
         box-sizing: border-box;
     }
@@ -1656,18 +1704,18 @@ body {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
-        padding: 9px 12px !important;
-        border-radius: 18px !important;
-        gap: 8px !important;
+        padding: 8px 10px !important;
+        border-radius: 14px !important;
+        gap: 7px !important;
         background: rgba(255, 255, 255, 0.96) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(0, 0, 0, 0.1) !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.14) !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
         overflow: hidden !important;
     }
     
-    /* RIGA 1: Logo 118 a sinistra + Titolo su 2 righe a destra */
+    /* Riga 1: Brand, Titolo e Logo 118 Emilia Romagna */
     .header-row-title {
         display: flex !important;
         align-items: center !important;
@@ -1681,114 +1729,64 @@ body {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 12px !important;
-        width: auto !important;
-        flex-wrap: nowrap !important;
-        white-space: nowrap !important;
+        gap: 6px !important;
+        width: 100% !important;
+        flex-wrap: wrap !important;
     }
 
     .header-logo-118 {
-        height: 38px !important;
+        height: 22px !important;
         width: auto !important;
         object-fit: contain !important;
         flex-shrink: 0 !important;
-        vertical-align: middle !important;
     }
 
-    .header-title-text {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        text-align: left !important;
-        line-height: 1.25 !important;
-    }
-
-    .header-title-main {
-        font-size: 0.96rem !important;
+    h1 {
+        font-size: 0.85rem !important;
         font-weight: 700 !important;
         color: #0f172a !important;
-        letter-spacing: -0.2px !important;
-    }
-
-    .header-title-sub {
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-        margin-top: 1px !important;
-    }
-
-    .header-title-sub .city-name {
-        font-size: 1.10rem !important;
-        font-weight: 700 !important;
-        color: #2563eb !important;
-    }
-
-    .version-tag {
-        font-size: 0.72rem !important;
-        font-weight: 600 !important;
-        color: #2563eb !important;
-        background: rgba(59, 130, 246, 0.1) !important;
-        border: 1px solid rgba(59, 130, 246, 0.25) !important;
-        padding: 1px 8px !important;
-        border-radius: 999px !important;
+        margin: 0 !important;
         display: inline-flex !important;
         align-items: center !important;
-        line-height: 1.2 !important;
+        justify-content: center !important;
+        gap: 4px !important;
+        flex-wrap: wrap !important;
+        text-align: center !important;
+        white-space: normal !important;
+        line-height: 1.25 !important;
+        letter-spacing: -0.2px !important;
+    }
+    
+    .version-tag {
+        font-size: 0.62rem !important;
+        font-weight: 700 !important;
+        color: var(--primary) !important;
+        background: rgba(59, 130, 246, 0.12) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        padding: 1px 5px !important;
+        border-radius: 999px !important;
     }
 
-    /* RIGA 2: Icone e Ricerca Strade su UN'UNICA RIGA ORIZZONTALE */
+    /* Container Controlli: si articola in Riga 2 (Ricerca) e Riga 3 (Toolbar Azioni) */
     .header-row-controls {
         display: flex !important;
-        flex-direction: row !important;
+        flex-wrap: wrap !important;
         align-items: center !important;
         justify-content: space-between !important;
-        gap: 6px !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
+        gap: 6px 4px !important;
         margin: 0 !important;
         padding: 0 !important;
-        flex-wrap: nowrap !important;
     }
 
-    /* Pulsante Verde Segnalazione Rapida (icona quadrata arrotondata 42px) */
-    .user-report-btn {
-        width: 42px !important;
-        min-width: 42px !important;
-        height: 42px !important;
-        padding: 0 !important;
-        border-radius: 12px !important;
-        background: #059669 !important;
-        color: #ffffff !important;
-        border: none !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-        box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
-        cursor: pointer !important;
-        transition: all 0.2s !important;
-    }
-
-    .user-report-btn .btn-text {
-        display: none !important;
-    }
-
-    .user-report-btn .report-icon {
-        font-size: 1.30rem !important;
-        line-height: 1 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    /* Barra di Ricerca: PARTE PIÙ GRANDE DI TUTTE (flex: 1) */
+    /* Riga 2 (Mobile): Barra di Ricerca a Tutta Larghezza */
     .search-in-header {
-        flex: 1 1 auto !important;
-        min-width: 0 !important;
-        width: auto !important;
-        max-width: none !important;
+        order: 1 !important;
+        width: 100% !important;
+        flex: 1 0 100% !important;
+        max-width: 100% !important;
         display: flex !important;
         align-items: center !important;
         gap: 6px !important;
@@ -1797,15 +1795,15 @@ body {
     }
 
     .search-in-header input {
-        flex: 1 1 auto !important;
+        flex: 1 !important;
         min-width: 0 !important;
         width: 100% !important;
-        height: 42px !important;
+        height: 35px !important;
         padding: 0 10px !important;
-        font-size: 0.88rem !important;
-        border-radius: 12px !important;
-        border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
-        background: rgba(0, 0, 0, 0.04) !important;
+        font-size: 0.84rem !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(0, 0, 0, 0.14) !important;
+        background: rgba(0, 0, 0, 0.05) !important;
         color: #0f172a !important;
         outline: none !important;
         box-sizing: border-box !important;
@@ -1818,14 +1816,13 @@ body {
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
     }
 
-    /* Pulsante Cerca Blu Ridotto a Sola Icona Compatta 42px */
     .search-in-header button {
-        width: 42px !important;
-        min-width: 42px !important;
-        height: 42px !important;
-        padding: 0 !important;
-        border-radius: 12px !important;
-        background: #2563eb !important;
+        height: 35px !important;
+        padding: 0 12px !important;
+        font-size: 0.80rem !important;
+        font-weight: 700 !important;
+        border-radius: 8px !important;
+        background: var(--primary) !important;
         color: #ffffff !important;
         border: none !important;
         cursor: pointer !important;
@@ -1833,8 +1830,8 @@ body {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
+        gap: 4px !important;
         box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3) !important;
         transition: background 0.2s, transform 0.1s !important;
     }
 
@@ -1843,119 +1840,139 @@ body {
     }
 
     .search-in-header button .btn-text {
-        display: none !important;
+        display: inline !important;
+        font-size: 0.80rem !important;
     }
 
     .search-in-header button .search-icon {
-        font-size: 1.10rem !important;
-        line-height: 1 !important;
+        font-size: 0.85rem !important;
         display: inline-block !important;
     }
 
-    /* Gruppo Icone di Azione (News, Notifiche, Login, Logout) sulla stessa Riga 2 */
-    .header-actions-row {
+    /* Riga 3 (Mobile): Toolbar Azioni Icone (Utente a Sinistra, Admin & Logout a Destra) */
+    .user-actions-group {
+        order: 2 !important;
         display: flex !important;
         align-items: center !important;
         gap: 6px !important;
         flex-shrink: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        justify-content: flex-start !important;
     }
 
-    .header-actions-row button .btn-text {
+    .user-report-btn {
+        width: 32px !important;
+        min-width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: #059669 !important;
+        color: #ffffff !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+        transition: all 0.2s !important;
+    }
+
+    .user-report-btn .btn-text {
         display: none !important;
     }
 
+    .user-report-btn .report-icon {
+        font-size: 1.05rem !important;
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
     .user-news-btn {
-        height: 42px !important;
-        padding: 0 8px !important;
-        border-radius: 12px !important;
-        background: #dc2626 !important;
-        color: #ffffff !important;
-        border: none !important;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
+        height: 32px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
         box-sizing: border-box !important;
         flex-shrink: 0 !important;
-        cursor: pointer !important;
-        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3) !important;
     }
 
-    .admin-news-btn {
-        height: 42px !important;
-        padding: 0 8px !important;
-        border-radius: 12px !important;
-        background: #0284c7 !important;
-        color: #ffffff !important;
-        border: none !important;
-        white-space: nowrap !important;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-        cursor: pointer !important;
-        box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3) !important;
+    .user-news-btn .btn-text {
+        display: none !important;
     }
 
-    .admin-reports-btn {
-        height: 42px !important;
-        padding: 0 8px !important;
-        border-radius: 12px !important;
-        background: #d97706 !important;
-        color: #ffffff !important;
-        border: none !important;
-        white-space: nowrap !important;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3) !important;
+    .header-actions {
+        order: 3 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        justify-content: flex-end !important;
         flex-shrink: 0 !important;
-        cursor: pointer !important;
+        margin-left: auto !important;
     }
 
     .icon-btn,
     .admin-btn {
-        width: 42px !important;
-        min-width: 42px !important;
-        height: 42px !important;
+        width: 32px !important;
+        min-width: 32px !important;
+        height: 32px !important;
         padding: 0 !important;
-        border-radius: 12px !important;
-        background: rgba(0, 0, 0, 0.04) !important;
-        color: #0f172a !important;
-        border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
+        border-radius: 8px !important;
+        background: #0f172a !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
         flex-shrink: 0 !important;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
         box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06) !important;
-        cursor: pointer !important;
-        pointer-events: auto !important;
-        user-select: none !important;
-        -webkit-tap-highlight-color: transparent !important;
-    }
-
-    .icon-btn svg,
-    .admin-btn svg {
-        width: 20px !important;
-        height: 20px !important;
-        color: #0f172a !important;
-        pointer-events: none !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
     }
 
     #admin-logout-btn {
-        background: rgba(239, 68, 68, 0.15) !important;
-        border: 1.5px solid #ef4444 !important;
+        background: rgba(239, 68, 68, 0.18) !important;
+        border: 1px solid rgba(239, 68, 68, 0.5) !important;
         color: #ef4444 !important;
-        display: inline-flex;
-        cursor: pointer !important;
-        pointer-events: auto !important;
+    }
+
+    .admin-reports-btn {
+        height: 32px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        background: #d97706 !important;
+        color: #ffffff !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3) !important;
+        flex-shrink: 0 !important;
+    }
+
+    .admin-reports-btn .btn-text {
+        display: none !important;
+    }
+
+    .admin-news-btn {
+        height: 32px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+    }
+
+    .admin-news-btn .btn-text {
+        display: none !important;
     }
 
     /* Barra Filtri Admin (Mobile) */

@@ -30,36 +30,37 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.8.7">
+    <link rel="stylesheet" href="style.css?v=3.8.8">
 </head>
 <body>
     
     <div class="top-nav-wrapper">
         <header class="glass-header">
-            <!-- Riga 1: Logo 118 affiancato al Titolo su 2 righe (Situazione viabilità provincia di / Ferrara + Badge v. 3.8.7) -->
+            <!-- Riga 1: Titolo e Versione con Logo 118 Emilia-Romagna -->
             <div class="header-row-title">
                 <div class="header-title-group">
                     <img src="logo_118.png" alt="118 Emilia Romagna" class="header-logo-118" />
-                    <div class="header-title-text">
-                        <div class="header-title-main">Situazione viabilità provincia di</div>
-                        <div class="header-title-sub"><span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v. 3.8.7</span></div>
-                    </div>
+                    <h1>Situazione viabilità provincia di <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v. 3.8.8</span></h1>
                 </div>
             </div>
 
-            <!-- Riga 2: Icone e Ricerca Strade (con la ricerca più grande e sola icona cerca) -->
+            <!-- Riga 2 (Desktop) / Righe 2 e 3 (Mobile) -->
             <div class="header-row-controls">
-                <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità" type="button">
-                    <span class="report-icon">📢</span>
-                </button>
-                <div class="admin-top-row search-in-header">
-                    <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
-                    <button id="admin-search-btn" title="Cerca via" type="button"><span class="search-icon">🔍</span></button>
-                </div>
-                <div class="header-actions-row">
+                <div class="user-actions-group">
+                    <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità" type="button">
+                        <span class="report-icon">📢</span><span class="btn-text">Segnalazioni</span>
+                    </button>
                     <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118" type="button">
                         <span>🚨</span><span class="btn-text">News</span> <span id="user-news-badge" class="badge">0</span>
                     </button>
+                </div>
+
+                <div class="admin-top-row search-in-header">
+                    <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
+                    <button id="admin-search-btn" title="Cerca via" type="button"><span class="search-icon">🔍</span><span class="btn-text">Cerca</span></button>
+                </div>
+
+                <div class="header-actions">
                     <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti" type="button">
                         <span>📢</span> <span class="btn-text">News</span> <span id="admin-news-badge" class="badge">0/3</span>
                     </button>
@@ -470,6 +471,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <!-- App Script -->
-    <script src="script.js?v=3.8.7"></script>
+    <script src="script.js?v=3.8.8"></script>
 </body>
 </html>
