@@ -5081,9 +5081,35 @@ function showSystemNotification(title, body) {
     }
 }
 
+async function testDeviceNotification() {
+    if (!('Notification' in window)) {
+        showToast("Le notifiche non sono supportate da questo dispositivo/browser.", "error", 4000);
+        return;
+    }
+
+    if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+            showToast("⚠️ Permesso notifiche non concesso. Abilitalo nelle impostazioni del browser/sito.", "warning", 5000);
+            return;
+        }
+    }
+
+    showToast("⏱️ Notifica di test programmata tra 3 secondi. Riduci l'app a icona o blocca lo schermo per testarla!", "info", 6000);
+
+    setTimeout(() => {
+        showSystemNotification(
+            '🚨 TEST ALLARME 118',
+            'Verifica ricezione allarme viabilità Ferrara completata con successo sul tuo dispositivo!'
+        );
+        playEmergencyAudioAlert();
+    }, 3000);
+}
+
 function initPushModule() {
     const enableBtn = document.getElementById('enable-push-btn');
     const dismissBtn = document.getElementById('dismiss-push-btn');
+    const testPushBtn = document.getElementById('admin-test-push-btn');
     if (enableBtn) {
         enableBtn.addEventListener('click', requestPushPermission);
     }
@@ -5092,6 +5118,9 @@ function initPushModule() {
             hidePushBanner();
             sessionStorage.setItem('ferrara_push_banner_dismissed', '1');
         });
+    }
+    if (testPushBtn) {
+        testPushBtn.addEventListener('click', testDeviceNotification);
     }
     initPushNotifications();
 }
