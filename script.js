@@ -4935,6 +4935,150 @@ function initUrgentNewsModule() {
     }
 }
 
+// =========================================================================
+// SISTEMA NOTIFICHE PUSH IN BACKGROUND (FCM & Service Worker 100% Gratuito)
+// =========================================================================
+let fcmMessaging = null;
+let currentPushToken = null;
+
+async function initPushNotifications() {
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+        console.log('[Push] Notifiche push non supportate da questo browser/dispositivo.');
+        return;
+    }
+
+    try {
+        // Registrazione Service Worker
+        const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        console.log('[Push] Service Worker registrato con successo:', swReg.scope);
+
+        if (typeof firebase !== 'undefined' && firebase.messaging && firebase.messaging.isSupported()) {
+            fcmMessaging = firebase.messaging();
+
+            // Ascolto messaggi in primo piano
+            fcmMessaging.onMessage((payload) => {
+                console.log('[Push] Messaggio ricevuto in primo piano:', payload);
+                if (document.hidden) {
+                    showSystemNotification(
+                        payload.notification?.title || '🚨 COMUNICAZIONE URGENTE 118',
+                        payload.notification?.body || 'Nuova allerta di viabilità provinciale a Ferrara'
+                    );
+                }
+            });
+
+            // Se il permesso è già concesso, sincronizza il token del dispositivo
+            if (Notification.permission === 'granted') {
+                await syncFcmToken();
+            } else if (Notification.permission === 'default') {
+                // Mostra il banner di invito dopo 2.5 secondi per non essere invasivi all'avvio
+                setTimeout(() => {
+                    showPushBanner();
+                }, 2500);
+            }
+        }
+    } catch (err) {
+        console.warn('[Push] Inizializzazione notifiche push:', err);
+    }
+}
+
+async function syncFcmToken() {
+    if (!fcmMessaging) return;
+    try {
+        const swReady = await navigator.serviceWorker.ready;
+        const token = await fcmMessaging.getToken({
+            serviceWorkerRegistration: swReady
+        });
+        if (token) {
+            currentPushToken = token;
+            console.log('[Push] Token FCM dispositivo attivo:', token);
+            if (isFirebaseOnline && db) {
+                const cleanKey = token.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+                await db.ref('fcm_tokens/' + cleanKey).set({
+                    token: token,
+                    timestamp: Date.now(),
+                    userAgent: navigator.userAgent
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[Push] Impossibile recuperare il token FCM:', e);
+    }
+}
+
+async function requestPushPermission() {
+    if (!('Notification' in window)) {
+        showToast("Le notifiche non sono supportate su questo browser.", "warning", 3500);
+        return;
+    }
+    try {
+        const permission = await Notification.requestPermission();
+        hidePushBanner();
+        if (permission === 'granted') {
+            showToast("🔔 Notifiche attivate! Riceverai gli allarmi 118 anche ad app chiusa.", "success", 4000);
+            await syncFcmToken();
+        } else {
+            showToast("Notifiche non abilitate. Potrai riattivarle dalle impostazioni del browser.", "info", 4000);
+        }
+    } catch (err) {
+        console.error('[Push] Errore richiesta permesso:', err);
+    }
+}
+
+function showPushBanner() {
+    const banner = document.getElementById('push-permission-banner');
+    if (!banner) return;
+    const dismissed = sessionStorage.getItem('ferrara_push_banner_dismissed');
+    if (dismissed || Notification.permission !== 'default') return;
+    banner.classList.remove('hidden');
+}
+
+function hidePushBanner() {
+    const banner = document.getElementById('push-permission-banner');
+    if (banner) banner.classList.add('hidden');
+}
+
+function showSystemNotification(title, body) {
+    if (Notification.permission !== 'granted') return;
+    try {
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(title, {
+                    body: body,
+                    icon: 'icon-512.jpg',
+                    badge: 'logo_118.png',
+                    tag: 'urgent-news-118',
+                    renotify: true,
+                    requireInteraction: true,
+                    vibrate: [300, 100, 300, 100, 300, 100, 400],
+                    data: { url: './index.html?urgentNews=1' }
+                });
+            });
+        } else {
+            new Notification(title, {
+                body: body,
+                icon: 'icon-512.jpg'
+            });
+        }
+    } catch (e) {
+        console.warn('[Push] Errore notifica di sistema:', e);
+    }
+}
+
+function initPushModule() {
+    const enableBtn = document.getElementById('enable-push-btn');
+    const dismissBtn = document.getElementById('dismiss-push-btn');
+    if (enableBtn) {
+        enableBtn.addEventListener('click', requestPushPermission);
+    }
+    if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+            hidePushBanner();
+            sessionStorage.setItem('ferrara_push_banner_dismissed', '1');
+        });
+    }
+    initPushNotifications();
+}
+
 // Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone
 setInterval(() => {
     refreshMarkers();
@@ -4944,4 +5088,5 @@ setInterval(() => {
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initUrgentNewsModule();
+    initPushModule();
 });

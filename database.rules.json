@@ -23,6 +23,12 @@
       "$reportId": {
         ".write": "!data.exists() && newData.exists() && newData.hasChildren(['lat', 'lng', 'type', 'timestamp'])"
       }
+    },
+    "fcm_tokens": {
+      ".read": "auth != null",
+      "$tokenId": {
+        ".write": "newData.exists() && newData.hasChildren(['token', 'timestamp'])"
+      }
     }
   }
 }

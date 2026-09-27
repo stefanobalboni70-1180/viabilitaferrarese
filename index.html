@@ -90,6 +90,21 @@
         </div>
     </div>
 
+    <!-- Banner Richiesta Notifiche Push Urgenti 118 -->
+    <div id="push-permission-banner" class="push-permission-banner hidden">
+        <div class="push-banner-content">
+            <span class="push-banner-icon">🔔</span>
+            <div class="push-banner-text-group">
+                <strong>Ricevi allarmi urgenti 118</strong>
+                <span>Attiva le notifiche per essere avvisato di blocchi stradali e urgenze anche ad app chiusa</span>
+            </div>
+            <div class="push-banner-actions">
+                <button id="enable-push-btn" class="push-btn-accept" type="button">Attiva</button>
+                <button id="dismiss-push-btn" class="push-btn-dismiss" type="button">Più tardi</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Banner selezione punto mappa per utente -->
     <div id="picker-banner" class="picker-banner hidden">
         <div class="picker-banner-content">
@@ -469,6 +484,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
     <!-- App Script -->
     <script src="script.js?v=3.8.9"></script>

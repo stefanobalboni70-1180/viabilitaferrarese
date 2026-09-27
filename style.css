@@ -931,6 +931,96 @@ h1 {
     width: max-content;
 }
 
+/* Banner Notifiche Push */
+.push-permission-banner {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2600;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 2px solid #ef4444;
+    border-radius: 16px;
+    padding: 12px 18px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6);
+    animation: banner-pop 0.3s ease-out;
+    max-width: 94vw;
+    width: 480px;
+    box-sizing: border-box;
+}
+
+.push-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.push-banner-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+}
+
+.push-banner-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.push-banner-text-group strong {
+    font-size: 0.92rem;
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+.push-banner-text-group span {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    line-height: 1.25;
+}
+
+.push-banner-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.push-btn-accept {
+    background: #ef4444;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.push-btn-accept:hover {
+    background: #dc2626;
+}
+
+.push-btn-dismiss {
+    background: transparent;
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.push-btn-dismiss:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
 @keyframes banner-pop {
     from { transform: translate(-50%, -10px); opacity: 0; }
     to { transform: translate(-50%, 0); opacity: 1; }
