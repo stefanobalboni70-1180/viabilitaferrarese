@@ -95,12 +95,12 @@ body {
 .header-title-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     white-space: nowrap;
 }
 
 .header-logo-118 {
-    height: 28px;
+    height: 36px;
     width: auto;
     object-fit: contain;
     flex-shrink: 0;
@@ -108,38 +108,44 @@ body {
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
 }
 
-.header-icon {
-    color: var(--primary);
-    flex-shrink: 0;
+.header-title-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.25;
 }
 
-h1 {
-    font-size: 1.02rem;
+.header-title-main {
+    font-size: 0.98rem;
     font-weight: 700;
-    letter-spacing: -0.3px;
+    color: #0f172a;
+    letter-spacing: -0.2px;
+}
+
+.header-title-sub {
     display: flex;
     align-items: center;
-    flex-wrap: nowrap;
     gap: 6px;
-    margin: 0;
-    white-space: nowrap;
+    margin-top: 1px;
 }
 
-h1 span.city-name {
-    color: var(--primary);
+.header-title-sub .city-name {
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: #2563eb;
 }
 
 .version-tag {
-    font-size: 0.68rem;
+    font-size: 0.70rem;
     font-weight: 600;
-    color: var(--primary);
+    color: #2563eb;
     background: rgba(59, 130, 246, 0.1);
     border: 1px solid rgba(59, 130, 246, 0.25);
-    padding: 1px 6px;
+    padding: 1px 8px;
     border-radius: 999px;
     vertical-align: middle;
-    letter-spacing: 0;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
 }
 
 /* Riga Controlli: Integrata su singola riga su PC */
@@ -147,36 +153,15 @@ h1 span.city-name {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
-    width: auto;
-    flex-shrink: 0;
-}
-
-.header-search-row {
-    display: flex;
-    align-items: center;
     gap: 8px;
+    width: auto;
     flex-shrink: 0;
 }
 
 .header-actions-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.user-actions-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
 }
 
@@ -184,17 +169,17 @@ h1 span.city-name {
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 230px;
-    max-width: 250px;
+    width: 240px;
+    max-width: 260px;
 }
 
 .search-in-header input {
-    height: 32px;
-    padding: 5px 10px;
-    font-size: 0.82rem;
-    background: rgba(0, 0, 0, 0.05);
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 8px;
+    height: 38px;
+    padding: 0 12px;
+    font-size: 0.88rem;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1.5px solid rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
     color: #0f172a;
     width: 100%;
     box-sizing: border-box;
@@ -209,42 +194,52 @@ h1 span.city-name {
 }
 
 .search-in-header button {
-    height: 32px;
-    padding: 0 12px;
-    font-size: 0.80rem;
-    font-weight: 600;
-    border-radius: 8px;
-    background: var(--primary);
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 12px;
+    background: #2563eb;
     color: white;
     border: none;
     cursor: pointer;
-    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: background 0.2s;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
 
 .search-in-header button:hover {
     background: var(--primary-hover);
 }
 
+.search-in-header button .search-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
 .icon-btn {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
     padding: 0 !important;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 12px;
     cursor: pointer;
-    background: #0f172a;
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.04);
+    color: #0f172a;
+    border: 1.5px solid rgba(0, 0, 0, 0.12);
     transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .icon-btn svg {
     width: 20px;
     height: 20px;
+    color: #0f172a;
 }
 
 .subtitle {
@@ -781,34 +776,31 @@ h1 span.city-name {
     background: #059669;
     color: #ffffff;
     border: none;
-    border-radius: 8px;
-    padding: 0 14px;
-    height: 34px;
+    border-radius: 12px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
     box-sizing: border-box;
-    font-size: 0.82rem;
-    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
     flex-shrink: 0;
-    white-space: nowrap;
 }
 
 .user-report-btn .btn-text {
-    display: inline !important;
-    color: #ffffff !important;
-    font-weight: 600 !important;
-    font-size: 0.82rem !important;
-    vertical-align: middle;
+    display: none !important;
 }
 
 .user-report-btn .report-icon {
-    font-size: 1rem;
-    display: inline-block;
-    vertical-align: middle;
+    font-size: 1.25rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .user-report-btn:hover {
@@ -1645,6 +1637,7 @@ h1 span.city-name {
 }
 
 /* Responsive Design per Dispositivi Mobili: Header Rigorosamente a 2 Righe */
+/* Responsive Design per Dispositivi Mobili: Header Rigorosamente a 2 Righe (Conforme a Screenshot) */
 @media (max-width: 768px) {
     .top-nav-wrapper {
         top: 6px;
@@ -1663,18 +1656,18 @@ h1 span.city-name {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
-        padding: 6px 8px !important;
-        border-radius: 14px !important;
-        gap: 6px !important;
+        padding: 9px 12px !important;
+        border-radius: 18px !important;
+        gap: 8px !important;
         background: rgba(255, 255, 255, 0.96) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.14) !important;
         overflow: hidden !important;
     }
     
-    /* RIGA 1: Titolo e Versione perfettamente allineati al centro */
+    /* RIGA 1: Logo 118 a sinistra + Titolo su 2 righe a destra */
     .header-row-title {
         display: flex !important;
         align-items: center !important;
@@ -1688,59 +1681,68 @@ h1 span.city-name {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 6px !important;
-        width: 100% !important;
+        gap: 12px !important;
+        width: auto !important;
         flex-wrap: nowrap !important;
         white-space: nowrap !important;
     }
 
     .header-logo-118 {
-        height: 22px !important;
+        height: 38px !important;
         width: auto !important;
         object-fit: contain !important;
         flex-shrink: 0 !important;
         vertical-align: middle !important;
     }
 
-    h1 {
-        font-size: 0.82rem !important;
-        font-weight: 700 !important;
-        color: #0f172a !important;
-        margin: 0 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 5px !important;
-        flex-wrap: nowrap !important;
-        text-align: center !important;
-        white-space: nowrap !important;
-        line-height: 1 !important;
-        letter-spacing: -0.2px !important;
-    }
-    
-    .version-tag {
-        font-size: 0.65rem !important;
-        font-weight: 700 !important;
-        color: var(--primary) !important;
-        background: rgba(59, 130, 246, 0.12) !important;
-        border: 1px solid rgba(59, 130, 246, 0.3) !important;
-        padding: 1px 6px !important;
-        border-radius: 999px !important;
-        line-height: 1.2 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        vertical-align: middle !important;
-        white-space: nowrap !important;
-        flex-shrink: 0 !important;
+    .header-title-text {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        line-height: 1.25 !important;
     }
 
-    /* RIGA 2: Icone e Ricerca Strade su UN'UNICA RIGA ORIZZONTALE (Ricerca dominante flex: 1) */
+    .header-title-main {
+        font-size: 0.96rem !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        letter-spacing: -0.2px !important;
+    }
+
+    .header-title-sub {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        margin-top: 1px !important;
+    }
+
+    .header-title-sub .city-name {
+        font-size: 1.10rem !important;
+        font-weight: 700 !important;
+        color: #2563eb !important;
+    }
+
+    .version-tag {
+        font-size: 0.72rem !important;
+        font-weight: 600 !important;
+        color: #2563eb !important;
+        background: rgba(59, 130, 246, 0.1) !important;
+        border: 1px solid rgba(59, 130, 246, 0.25) !important;
+        padding: 1px 8px !important;
+        border-radius: 999px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        line-height: 1.2 !important;
+    }
+
+    /* RIGA 2: Icone e Ricerca Strade su UN'UNICA RIGA ORIZZONTALE */
     .header-row-controls {
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important;
         justify-content: space-between !important;
-        gap: 5px !important;
+        gap: 6px !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
@@ -1749,13 +1751,13 @@ h1 span.city-name {
         flex-wrap: nowrap !important;
     }
 
-    /* Pulsante Verde Segnalazione Rapida (icona compatta 34px) */
+    /* Pulsante Verde Segnalazione Rapida (icona quadrata arrotondata 42px) */
     .user-report-btn {
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
         padding: 0 !important;
-        border-radius: 8px !important;
+        border-radius: 12px !important;
         background: #059669 !important;
         color: #ffffff !important;
         border: none !important;
@@ -1774,7 +1776,7 @@ h1 span.city-name {
     }
 
     .user-report-btn .report-icon {
-        font-size: 1.15rem !important;
+        font-size: 1.30rem !important;
         line-height: 1 !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -1789,7 +1791,7 @@ h1 span.city-name {
         max-width: none !important;
         display: flex !important;
         align-items: center !important;
-        gap: 4px !important;
+        gap: 6px !important;
         margin: 0 !important;
         box-sizing: border-box !important;
     }
@@ -1798,12 +1800,12 @@ h1 span.city-name {
         flex: 1 1 auto !important;
         min-width: 0 !important;
         width: 100% !important;
-        height: 34px !important;
-        padding: 0 8px !important;
-        font-size: 0.82rem !important;
-        border-radius: 8px !important;
-        border: 1px solid rgba(0, 0, 0, 0.14) !important;
-        background: rgba(0, 0, 0, 0.05) !important;
+        height: 42px !important;
+        padding: 0 10px !important;
+        font-size: 0.88rem !important;
+        border-radius: 12px !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
+        background: rgba(0, 0, 0, 0.04) !important;
         color: #0f172a !important;
         outline: none !important;
         box-sizing: border-box !important;
@@ -1816,14 +1818,14 @@ h1 span.city-name {
         box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
     }
 
-    /* Pulsante Cerca Blu Ridotto a Sola Icona Compatta 34px */
+    /* Pulsante Cerca Blu Ridotto a Sola Icona Compatta 42px */
     .search-in-header button {
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
         padding: 0 !important;
-        border-radius: 8px !important;
-        background: var(--primary) !important;
+        border-radius: 12px !important;
+        background: #2563eb !important;
         color: #ffffff !important;
         border: none !important;
         cursor: pointer !important;
@@ -1832,7 +1834,7 @@ h1 span.city-name {
         align-items: center !important;
         justify-content: center !important;
         box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3) !important;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3) !important;
         transition: background 0.2s, transform 0.1s !important;
     }
 
@@ -1845,7 +1847,7 @@ h1 span.city-name {
     }
 
     .search-in-header button .search-icon {
-        font-size: 0.95rem !important;
+        font-size: 1.10rem !important;
         line-height: 1 !important;
         display: inline-block !important;
     }
@@ -1854,7 +1856,7 @@ h1 span.city-name {
     .header-actions-row {
         display: flex !important;
         align-items: center !important;
-        gap: 4px !important;
+        gap: 6px !important;
         flex-shrink: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -1865,9 +1867,9 @@ h1 span.city-name {
     }
 
     .user-news-btn {
-        height: 34px !important;
+        height: 42px !important;
         padding: 0 8px !important;
-        border-radius: 8px !important;
+        border-radius: 12px !important;
         background: #dc2626 !important;
         color: #ffffff !important;
         border: none !important;
@@ -1882,9 +1884,9 @@ h1 span.city-name {
     }
 
     .admin-news-btn {
-        height: 34px !important;
+        height: 42px !important;
         padding: 0 8px !important;
-        border-radius: 8px !important;
+        border-radius: 12px !important;
         background: #0284c7 !important;
         color: #ffffff !important;
         border: none !important;
@@ -1900,9 +1902,9 @@ h1 span.city-name {
     }
 
     .admin-reports-btn {
-        height: 34px !important;
+        height: 42px !important;
         padding: 0 8px !important;
-        border-radius: 8px !important;
+        border-radius: 12px !important;
         background: #d97706 !important;
         color: #ffffff !important;
         border: none !important;
@@ -1919,20 +1921,20 @@ h1 span.city-name {
 
     .icon-btn,
     .admin-btn {
-        width: 34px !important;
-        min-width: 34px !important;
-        height: 34px !important;
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
         padding: 0 !important;
-        border-radius: 8px !important;
-        background: #0f172a !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 12px !important;
+        background: rgba(0, 0, 0, 0.04) !important;
+        color: #0f172a !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
         flex-shrink: 0 !important;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06) !important;
         cursor: pointer !important;
         pointer-events: auto !important;
         user-select: none !important;
@@ -1941,11 +1943,14 @@ h1 span.city-name {
 
     .icon-btn svg,
     .admin-btn svg {
+        width: 20px !important;
+        height: 20px !important;
+        color: #0f172a !important;
         pointer-events: none !important;
     }
 
     #admin-logout-btn {
-        background: rgba(239, 68, 68, 0.2) !important;
+        background: rgba(239, 68, 68, 0.15) !important;
         border: 1.5px solid #ef4444 !important;
         color: #ef4444 !important;
         display: inline-flex;
