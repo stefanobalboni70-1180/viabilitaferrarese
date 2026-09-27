@@ -4307,7 +4307,7 @@ function playEmergencyAudioAlert() {
     }
 }
 
-// Attiva l'alert sonoro e il lampeggio nero/rosso per esattamente 10 secondi
+// Attiva l'alert sonoro, il lampeggio nero/rosso e la notifica di sistema
 function triggerEmergencyNewsAlert() {
     // 1. Alert sonoro
     playEmergencyAudioAlert();
@@ -4323,6 +4323,13 @@ function triggerEmergencyNewsAlert() {
             overlay.classList.add('hidden');
             emergencyFlashTimeout = null;
         }, 10000); // 10 secondi
+    }
+
+    // 3. Notifica nativa di sistema (anche se l'app è in background, scheda minimizzata o schermo bloccato)
+    if (urgentNewsData && urgentNewsData.length > 0) {
+        const latestNews = urgentNewsData[0];
+        const newsText = latestNews.text || 'Nuova allerta di viabilità provinciale a Ferrara';
+        showSystemNotification('🚨 COMUNICAZIONE URGENTE 118', newsText);
     }
 }
 
@@ -4952,7 +4959,17 @@ async function initPushNotifications() {
         const swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         console.log('[Push] Service Worker registrato con successo:', swReg.scope);
 
-        if (typeof firebase !== 'undefined' && firebase.messaging && firebase.messaging.isSupported()) {
+        // Verifica supporto Firebase Messaging
+        let isFcmSupported = false;
+        if (typeof firebase !== 'undefined' && firebase.messaging) {
+            try {
+                isFcmSupported = await firebase.messaging.isSupported();
+            } catch (e) {
+                isFcmSupported = false;
+            }
+        }
+
+        if (isFcmSupported) {
             fcmMessaging = firebase.messaging();
 
             // Ascolto messaggi in primo piano
@@ -4965,16 +4982,16 @@ async function initPushNotifications() {
                     );
                 }
             });
+        }
 
-            // Se il permesso è già concesso, sincronizza il token del dispositivo
-            if (Notification.permission === 'granted') {
-                await syncFcmToken();
-            } else if (Notification.permission === 'default') {
-                // Mostra il banner di invito dopo 2.5 secondi per non essere invasivi all'avvio
-                setTimeout(() => {
-                    showPushBanner();
-                }, 2500);
-            }
+        // Se il permesso è già concesso, sincronizza il token del dispositivo
+        if (Notification.permission === 'granted') {
+            await syncFcmToken();
+        } else if (Notification.permission === 'default') {
+            // Mostra il banner di invito dopo 2.5 secondi per non essere invasivi all'avvio
+            setTimeout(() => {
+                showPushBanner();
+            }, 2500);
         }
     } catch (err) {
         console.warn('[Push] Inizializzazione notifiche push:', err);
@@ -5046,7 +5063,7 @@ function showSystemNotification(title, body) {
                     body: body,
                     icon: 'icon-512.jpg',
                     badge: 'logo_118.png',
-                    tag: 'urgent-news-118',
+                    tag: 'urgent-news-118-' + Date.now(),
                     renotify: true,
                     requireInteraction: true,
                     vibrate: [300, 100, 300, 100, 300, 100, 400],

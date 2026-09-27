@@ -12,34 +12,71 @@ const firebaseConfig = {
     appId: "1:470647422268:web:0d9286b851d14473007239"
 };
 
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
+try {
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
 
-// Gestione messaggi Push ricevuti in background (ad app chiusa o in background)
-messaging.onBackgroundMessage((payload) => {
-    console.log('[SW] Messaggio Push ricevuto in background:', payload);
-    const notificationTitle = payload.notification?.title || payload.data?.title || '🚨 COMUNICAZIONE URGENTE 118 - Ferrara';
-    const notificationText = payload.notification?.body || payload.data?.body || 'Nuova allerta di viabilità provinciale registrata.';
-    
-    const notificationOptions = {
-        body: notificationText,
-        icon: 'icon-512.jpg',
-        badge: 'logo_118.png',
-        tag: 'urgent-news-118',
-        renotify: true,
-        requireInteraction: true,
-        vibrate: [300, 100, 300, 100, 300, 100, 400],
-        data: {
-            url: payload.data?.url || './index.html?urgentNews=1',
-            timestamp: Date.now()
-        },
-        actions: [
-            { action: 'open', title: '🚨 Visualizza News' },
-            { action: 'close', title: 'Ignora' }
-        ]
-    };
+    // Gestione messaggi Push FCM ricevuti in background
+    messaging.onBackgroundMessage((payload) => {
+        console.log('[SW] Messaggio Push FCM ricevuto in background:', payload);
+        const notificationTitle = payload.notification?.title || payload.data?.title || '🚨 COMUNICAZIONE URGENTE 118';
+        const notificationText = payload.notification?.body || payload.data?.body || 'Nuova allerta di viabilità provinciale registrata.';
+        
+        const notificationOptions = {
+            body: notificationText,
+            icon: 'icon-512.jpg',
+            badge: 'logo_118.png',
+            tag: 'urgent-news-118',
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [300, 100, 300, 100, 300, 100, 400],
+            data: {
+                url: payload.data?.url || './index.html?urgentNews=1',
+                timestamp: Date.now()
+            },
+            actions: [
+                { action: 'open', title: '🚨 Visualizza News' },
+                { action: 'close', title: 'Ignora' }
+            ]
+        };
 
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+        return self.registration.showNotification(notificationTitle, notificationOptions);
+    });
+} catch (e) {
+    console.warn('[SW] Firebase messaging background init:', e);
+}
+
+// Gestione eventi Push generici (Web Push API)
+self.addEventListener('push', (event) => {
+    console.log('[SW] Evento Push generico ricevuto:', event);
+    if (!event.data) return;
+    try {
+        const payload = event.data.json();
+        const notificationTitle = payload.notification?.title || payload.title || '🚨 COMUNICAZIONE URGENTE 118';
+        const notificationOptions = {
+            body: payload.notification?.body || payload.body || 'Nuova allerta di viabilità a Ferrara',
+            icon: 'icon-512.jpg',
+            badge: 'logo_118.png',
+            tag: 'urgent-news-118',
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [300, 100, 300, 100, 300, 100, 400],
+            data: { url: payload.data?.url || './index.html?urgentNews=1' },
+            actions: [
+                { action: 'open', title: '🚨 Visualizza News' },
+                { action: 'close', title: 'Ignora' }
+            ]
+        };
+        event.waitUntil(self.registration.showNotification(notificationTitle, notificationOptions));
+    } catch (e) {
+        const text = event.data.text();
+        event.waitUntil(self.registration.showNotification('🚨 COMUNICAZIONE URGENTE 118', {
+            body: text || 'Nuova allerta di viabilità a Ferrara',
+            icon: 'icon-512.jpg',
+            badge: 'logo_118.png',
+            vibrate: [300, 100, 300, 100, 300]
+        }));
+    }
 });
 
 // Click sulla notifica ricevuta sullo schermo del dispositivo
