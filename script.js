@@ -4046,7 +4046,7 @@ async function sendTelegramUrgentNews(newsPayload) {
             `⚠️ <b>AVVISO:</b>\n${text}\n\n` +
             `⏱️ <b>Validità:</b> ${durationText}\n` +
             `📅 <b>Data pubblicazione:</b> ${dateStr}\n\n` +
-            `🗺️ <a href="https://stefanobalboni70-1180.github.io/viabilitaferrarese/">Apri Mappa Viabilità 118</a>`;
+            `🗺️ <a href="https://viabilita118fe.vercel.app/">Apri Mappa Viabilità 118</a>`;
 
         const url = `https://api.telegram.org/bot${NOTIFICATIONS_CONFIG.telegram.botToken}/sendMessage`;
         const res = await fetch(url, {
@@ -4089,7 +4089,8 @@ async function testTelegramNews() {
         const message = `🚨 <b>TEST NOTIFICA 118 VIABILITÀ FERRARA</b>\n\n` +
             `✅ <b>Canale/Chat configurato correttamente!</b>\n` +
             `📢 <i>${testText}</i>\n\n` +
-            `🕒 ${new Date().toLocaleString('it-IT')}`;
+            `🕒 ${new Date().toLocaleString('it-IT')}\n\n` +
+            `🗺️ <a href="https://viabilita118fe.vercel.app/">Apri Mappa Viabilità 118</a>`;
 
         const url = `https://api.telegram.org/bot${NOTIFICATIONS_CONFIG.telegram.botToken}/sendMessage`;
         const res = await fetch(url, {
