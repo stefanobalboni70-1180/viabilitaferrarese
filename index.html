@@ -432,15 +432,26 @@
                 </div>
 
                 <div class="admin-fcm-config-box" style="margin-top:12px; padding:10px 12px; background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.12); border-radius:8px;">
-                    <details style="cursor:pointer;">
-                        <summary style="font-size:0.80rem; font-weight:600; color:#94a3b8; outline:none; user-select:none;">⚙️ Configurazione Notifiche Push Gratuite (Server Key)</summary>
-                        <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
-                            <label for="admin-fcm-key-input" style="font-size:0.75rem; color:#cbd5e1;">Chiave Server Firebase (FCM Server Key):</label>
-                            <input type="password" id="admin-fcm-key-input" placeholder="Incolla qui la Chiave Server da Firebase Console..." style="width:100%; padding:6px 8px; font-size:0.78rem; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.4); color:#f8fafc; box-sizing:border-box;" />
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <button id="save-fcm-key-btn" type="button" class="secondary-btn" style="font-size:0.75rem; padding:4px 12px; background:#2563eb; color:#ffffff; border:none;">💾 Salva Chiave</button>
+                    <details open style="cursor:pointer;">
+                        <summary style="font-size:0.80rem; font-weight:600; color:#94a3b8; outline:none; user-select:none;">⚙️ Configurazione Notifiche Push Gratuite & Diagnostica</summary>
+                        <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
+                            <div>
+                                <label for="admin-fcm-vapid-input" style="font-size:0.75rem; color:#cbd5e1; display:block; margin-bottom:2px;">Coppia di chiavi Web Push (VAPID Key pubblica):</label>
+                                <input type="text" id="admin-fcm-vapid-input" placeholder="Es. BEl62v9K..." style="width:100%; padding:6px 8px; font-size:0.78rem; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.4); color:#f8fafc; box-sizing:border-box;" />
+                            </div>
+
+                            <div>
+                                <label for="admin-fcm-key-input" style="font-size:0.75rem; color:#cbd5e1; display:block; margin-bottom:2px;">Chiave Server Firebase (FCM Server Key):</label>
+                                <input type="password" id="admin-fcm-key-input" placeholder="Incolla qui la Chiave Server da Firebase Console..." style="width:100%; padding:6px 8px; font-size:0.78rem; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.4); color:#f8fafc; box-sizing:border-box;" />
+                            </div>
+
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <button id="save-fcm-key-btn" type="button" class="secondary-btn" style="font-size:0.75rem; padding:5px 12px; background:#2563eb; color:#ffffff; border:none;">💾 Salva Chiavi</button>
+                                <button id="run-push-diagnostic-btn" type="button" class="secondary-btn" style="font-size:0.75rem; padding:5px 12px; background:#0f172a; border:1px solid #10b981; color:#10b981;">🔍 Esegui Diagnostica Notifiche</button>
                                 <span id="fcm-key-status" style="font-size:0.72rem; color:#10b981;"></span>
                             </div>
+
+                            <div id="push-diagnostic-results" class="hidden" style="margin-top:6px; padding:8px 10px; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.15); border-radius:6px; font-family:monospace; font-size:0.74rem; color:#e2e8f0; line-height:1.4; white-space:pre-wrap;"></div>
                         </div>
                     </details>
                 </div>

@@ -5108,6 +5108,7 @@ async function testDeviceNotification() {
 }
 
 let fcmServerKeyCache = '';
+let fcmVapidKeyCache = '';
 
 function getFcmServerKey() {
     if (fcmServerKeyCache) return fcmServerKeyCache;
@@ -5119,48 +5120,175 @@ function getFcmServerKey() {
     return key;
 }
 
-async function loadFcmServerKeyFromDb() {
+function getFcmVapidKey() {
+    if (fcmVapidKeyCache) return fcmVapidKeyCache;
+    let key = '';
+    try {
+        key = localStorage.getItem('ferrara_fcm_vapid_key') || '';
+    } catch (e) { }
+    fcmVapidKeyCache = key;
+    return key;
+}
+
+async function loadFcmKeysFromDb() {
     if (!isFirebaseOnline || !db) return;
     try {
-        const snap = await db.ref('admin_settings/fcmServerKey').once('value');
+        const snap = await db.ref('admin_settings').once('value');
         const val = snap.val();
-        if (val && typeof val === 'string') {
-            fcmServerKeyCache = val;
-            try {
-                localStorage.setItem('ferrara_fcm_server_key', val);
-            } catch (e) { }
-            const input = document.getElementById('admin-fcm-key-input');
-            if (input && !input.value) {
-                input.value = val;
+        if (val) {
+            if (val.fcmServerKey) {
+                fcmServerKeyCache = val.fcmServerKey;
+                try { localStorage.setItem('ferrara_fcm_server_key', val.fcmServerKey); } catch (e) { }
+                const inputKey = document.getElementById('admin-fcm-key-input');
+                if (inputKey && !inputKey.value) inputKey.value = val.fcmServerKey;
+            }
+            if (val.fcmVapidKey) {
+                fcmVapidKeyCache = val.fcmVapidKey;
+                try { localStorage.setItem('ferrara_fcm_vapid_key', val.fcmVapidKey); } catch (e) { }
+                const inputVapid = document.getElementById('admin-fcm-vapid-input');
+                if (inputVapid && !inputVapid.value) inputVapid.value = val.fcmVapidKey;
             }
             const statusEl = document.getElementById('fcm-key-status');
-            if (statusEl) statusEl.textContent = '✅ Chiave configurata';
+            if (statusEl && (val.fcmServerKey || val.fcmVapidKey)) statusEl.textContent = '✅ Chiavi caricate';
         }
     } catch (e) { }
 }
 
-async function saveFcmServerKey() {
-    const input = document.getElementById('admin-fcm-key-input');
+async function saveFcmKeys() {
+    const inputKey = document.getElementById('admin-fcm-key-input');
+    const inputVapid = document.getElementById('admin-fcm-vapid-input');
     const statusEl = document.getElementById('fcm-key-status');
-    if (!input) return;
-    const val = input.value.trim();
-    if (!val) {
-        showToast("Inserisci una chiave valida.", "warning", 3000);
-        return;
-    }
-    fcmServerKeyCache = val;
+
+    const serverKeyVal = inputKey ? inputKey.value.trim() : '';
+    const vapidKeyVal = inputVapid ? inputVapid.value.trim() : '';
+
+    fcmServerKeyCache = serverKeyVal;
+    fcmVapidKeyCache = vapidKeyVal;
+
     try {
-        localStorage.setItem('ferrara_fcm_server_key', val);
+        localStorage.setItem('ferrara_fcm_server_key', serverKeyVal);
+        localStorage.setItem('ferrara_fcm_vapid_key', vapidKeyVal);
     } catch (e) { }
+
     if (isFirebaseOnline && db && isAdmin) {
         try {
-            await db.ref('admin_settings/fcmServerKey').set(val);
+            await db.ref('admin_settings/fcmServerKey').set(serverKeyVal);
+            await db.ref('admin_settings/fcmVapidKey').set(vapidKeyVal);
         } catch (e) {
-            console.warn("Errore salvataggio fcmServerKey su db:", e);
+            console.warn("Errore salvataggio chiavi su db:", e);
         }
     }
-    if (statusEl) statusEl.textContent = '✅ Chiave salvata!';
-    showToast("Chiave Server FCM salvata con successo!", "success", 3500);
+
+    if (statusEl) statusEl.textContent = '✅ Chiavi salvate!';
+    showToast("Chiavi salvate con successo! Riavvio sincronizzazione token...", "success", 4000);
+    syncFcmToken();
+}
+
+async function runPushDiagnostic() {
+    const resultsEl = document.getElementById('push-diagnostic-results');
+    if (!resultsEl) return;
+    resultsEl.classList.remove('hidden');
+    resultsEl.innerHTML = "⏳ Esecuzione diagnostica in corso...\n";
+
+    let logs = [];
+
+    // 1. Supporto Browser
+    const hasSW = 'serviceWorker' in navigator;
+    const hasNotification = 'Notification' in window;
+    logs.push(`1. Supporto Browser: ${hasSW && hasNotification ? '✅ Supportato' : '❌ Non supportato'}`);
+
+    // 2. Permesso Notifiche
+    const perm = hasNotification ? Notification.permission : 'non disponibile';
+    logs.push(`2. Permesso Notifiche: ${perm === 'granted' ? '✅ Concesso (granted)' : (perm === 'denied' ? '❌ Bloccato (denied)' : '⚠️ In attesa (default)')}`);
+
+    // 3. Service Worker
+    let swOk = false;
+    let swReg = null;
+    try {
+        swReg = await navigator.serviceWorker.getRegistration('./firebase-messaging-sw.js');
+        if (swReg) {
+            swOk = true;
+            logs.push(`3. Service Worker: ✅ Attivo (${swReg.scope})`);
+        } else {
+            swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+            logs.push(`3. Service Worker: ⚠️ Registrato adesso (${swReg.scope})`);
+            swOk = true;
+        }
+    } catch (errSW) {
+        logs.push(`3. Service Worker: ❌ Errore (${errSW.message})`);
+    }
+
+    // 4. Chiave VAPID
+    const vapidKey = getFcmVapidKey();
+    logs.push(`4. Chiave Web Push (VAPID): ${vapidKey ? `✅ Presente (${vapidKey.substring(0, 10)}...)` : '⚠️ Non inserita (opzionale o richiesta da FCM)'}`);
+
+    // 5. Generazione Token Dispositivo
+    let tokenOk = false;
+    if (hasNotification && perm === 'granted' && fcmMessaging && swReg) {
+        try {
+            const token = await fcmMessaging.getToken({
+                serviceWorkerRegistration: swReg,
+                vapidKey: vapidKey || undefined
+            });
+            if (token) {
+                tokenOk = true;
+                currentPushToken = token;
+                logs.push(`5. Token Dispositivo: ✅ Generato (${token.substring(0, 16)}...)`);
+            } else {
+                logs.push(`5. Token Dispositivo: ❌ Nessun token restituito`);
+            }
+        } catch (errToken) {
+            logs.push(`5. Token Dispositivo: ❌ Errore (${errToken.message})`);
+        }
+    } else {
+        logs.push(`5. Token Dispositivo: ⚠️ Impossibile generare (permesso non ancora concesso o fcm non inizializzato)`);
+    }
+
+    // 6. Database Token
+    if (isFirebaseOnline && db) {
+        try {
+            const snap = await db.ref('fcm_tokens').once('value');
+            const val = snap.val();
+            const count = val ? Object.keys(val).length : 0;
+            logs.push(`6. Dispositivi Registrati nel Database: ✅ ${count} smartphone/computer`);
+        } catch (errDb) {
+            logs.push(`6. Dispositivi Registrati nel Database: ❌ Errore lettura (${errDb.message})`);
+        }
+    } else {
+        logs.push(`6. Database: ⚠️ Offline`);
+    }
+
+    // 7. Chiave Server FCM
+    const serverKey = getFcmServerKey();
+    logs.push(`7. Chiave Server FCM per Invio: ${serverKey ? `✅ Presente (${serverKey.substring(0, 8)}...)` : '⚠️ Mancante (incollala da Firebase Console)'}`);
+
+    resultsEl.innerHTML = logs.join('\n');
+}
+
+async function syncFcmToken() {
+    if (!fcmMessaging) return;
+    try {
+        const swReady = await navigator.serviceWorker.ready;
+        const vapidKey = getFcmVapidKey();
+        const token = await fcmMessaging.getToken({
+            serviceWorkerRegistration: swReady,
+            vapidKey: vapidKey || undefined
+        });
+        if (token) {
+            currentPushToken = token;
+            console.log('[Push] Token FCM dispositivo attivo:', token);
+            if (isFirebaseOnline && db) {
+                const cleanKey = token.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+                await db.ref('fcm_tokens/' + cleanKey).set({
+                    token: token,
+                    timestamp: Date.now(),
+                    userAgent: navigator.userAgent
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[Push] Impossibile recuperare il token FCM:', e);
+    }
 }
 
 async function broadcastFcmPush(title, body, newsId) {
@@ -5246,7 +5374,9 @@ function initPushModule() {
     const dismissBtn = document.getElementById('dismiss-push-btn');
     const testPushBtn = document.getElementById('admin-test-push-btn');
     const saveFcmKeyBtn = document.getElementById('save-fcm-key-btn');
+    const diagnosticBtn = document.getElementById('run-push-diagnostic-btn');
     const fcmKeyInput = document.getElementById('admin-fcm-key-input');
+    const fcmVapidInput = document.getElementById('admin-fcm-vapid-input');
 
     if (enableBtn) {
         enableBtn.addEventListener('click', requestPushPermission);
@@ -5261,18 +5391,21 @@ function initPushModule() {
         testPushBtn.addEventListener('click', testDeviceNotification);
     }
     if (saveFcmKeyBtn) {
-        saveFcmKeyBtn.addEventListener('click', saveFcmServerKey);
+        saveFcmKeyBtn.addEventListener('click', saveFcmKeys);
+    }
+    if (diagnosticBtn) {
+        diagnosticBtn.addEventListener('click', runPushDiagnostic);
     }
     if (fcmKeyInput) {
         const stored = getFcmServerKey();
-        if (stored) {
-            fcmKeyInput.value = stored;
-            const statusEl = document.getElementById('fcm-key-status');
-            if (statusEl) statusEl.textContent = '✅ Chiave configurata';
-        }
+        if (stored) fcmKeyInput.value = stored;
+    }
+    if (fcmVapidInput) {
+        const storedVapid = getFcmVapidKey();
+        if (storedVapid) fcmVapidInput.value = storedVapid;
     }
     initPushNotifications();
-    loadFcmServerKeyFromDb();
+    loadFcmKeysFromDb();
 }
 
 // Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone
