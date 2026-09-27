@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.8.6';
+const APP_VERSION = '3.8.7';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -4251,9 +4251,79 @@ window.rejectReport = function (reportId) {
 // =======================================================
 // MODULO NOTIZIE / COMUNICAZIONI URGENTI 118 (FLASH NEWS 20s)
 // - Popup automatico di 20 secondi all'avvio per tutti gli utenti
+// - Allarme sonoro e lampeggio nero/rosso per 10s all'inserimento
 // - Gestione amministratore con durata, modifica e cancellazione (max 3 news)
 // - Sincronizzazione in tempo reale su Firebase Realtime Database
 // =======================================================
+
+let emergencyFlashTimeout = null;
+
+// Riproduce un allarme sonoro bitonale di emergenza (118 emergency alert)
+function playEmergencyAudioAlert() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
+
+        const now = ctx.currentTime;
+        // Allarme bitonale ripetuto ad alto impatto
+        const tones = [
+            { f: 920, t: 0.00, d: 0.22 },
+            { f: 680, t: 0.25, d: 0.22 },
+            { f: 920, t: 0.50, d: 0.22 },
+            { f: 680, t: 0.75, d: 0.22 },
+            { f: 920, t: 1.00, d: 0.22 },
+            { f: 680, t: 1.25, d: 0.22 },
+            { f: 960, t: 1.55, d: 0.40 }
+        ];
+
+        tones.forEach(tone => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(tone.f, now + tone.t);
+
+            gain.gain.setValueAtTime(0, now + tone.t);
+            gain.gain.linearRampToValueAtTime(0.35, now + tone.t + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + tone.t + tone.d);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now + tone.t);
+            osc.stop(now + tone.t + tone.d);
+        });
+
+        // Vibrazione su dispositivi mobili supportati
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([400, 200, 400, 200, 600]);
+        }
+    } catch (e) {
+        console.warn("Impossibile riprodurre alert sonoro emergenza:", e);
+    }
+}
+
+// Attiva l'alert sonoro e il lampeggio nero/rosso per esattamente 10 secondi
+function triggerEmergencyNewsAlert() {
+    // 1. Alert sonoro
+    playEmergencyAudioAlert();
+
+    // 2. Lampeggio nero e rosso per 10 secondi una volta sola
+    const overlay = document.getElementById('emergency-flashing-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        if (emergencyFlashTimeout) {
+            clearTimeout(emergencyFlashTimeout);
+        }
+        emergencyFlashTimeout = setTimeout(() => {
+            overlay.classList.add('hidden');
+            emergencyFlashTimeout = null;
+        }, 10000); // 10 secondi
+    }
+}
 
 function initUrgentNewsListener() {
     if (!isFirebaseOnline || !urgentNewsRef) return;
@@ -4309,6 +4379,23 @@ function processUrgentNews() {
 
     updateUserNewsButton();
     updateAdminNewsBadge();
+
+    // Controllo se c'è una notizia attiva recente non ancora allertata su questo dispositivo
+    if (urgentNewsData.length > 0) {
+        let lastAlertedTime = 0;
+        try {
+            lastAlertedTime = parseInt(localStorage.getItem('ferrara_last_alerted_news_time') || '0', 10);
+        } catch (e) { }
+
+        const newestNewsTime = Math.max(...urgentNewsData.map(n => n.createdAt || n.updatedAt || 0));
+
+        if (newestNewsTime > lastAlertedTime) {
+            try {
+                localStorage.setItem('ferrara_last_alerted_news_time', newestNewsTime.toString());
+            } catch (e) { }
+            triggerEmergencyNewsAlert();
+        }
+    }
 
     // Se l'amministratore ha aperto il pannello, aggiorna la lista
     const adminNewsModal = document.getElementById('admin-news-modal');
@@ -4734,6 +4821,10 @@ async function saveAdminNews() {
                 localStorage.setItem('ferrara_urgent_news_cache', JSON.stringify(allUrgentNewsRaw));
                 processUrgentNews();
             }
+            try {
+                localStorage.setItem('ferrara_last_alerted_news_time', now.toString());
+            } catch (e) { }
+            triggerEmergencyNewsAlert();
             showToast("Notizia urgente pubblicata con successo! Verrà mostrata a tutti gli utenti.", "success", 4000);
         }
 
