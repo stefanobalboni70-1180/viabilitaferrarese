@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.8.1';
+const APP_VERSION = '3.8.2';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2618,12 +2618,15 @@ if (adminSaveMarkerBtn) {
 function createCustomIcon(type, status = 'active') {
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const statusClass = (isAdmin && status !== 'active') ? status : '';
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
+    const size = isDesktop ? 44 : 36;
+    const anchor = size / 2;
     return L.divIcon({
         className: 'custom-icon-wrapper',
         html: `<div class="custom-marker ${type} ${statusClass}">${config.emoji}</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -18]
+        iconSize: [size, size],
+        iconAnchor: [anchor, anchor],
+        popupAnchor: [0, -anchor]
     });
 }
 
