@@ -425,73 +425,73 @@ h1 {
     font-weight: 500;
 }
 
-/* Custom Marker CSS (Desktop / PC di default: 44px) */
+/* Custom Marker CSS (Dimensioni v3.7: 36px) */
 .custom-marker {
     display: flex;
     justify-content: center;
     align-items: center;
     background: white;
     border-radius: 50%;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
-    font-size: 1.45rem;
-    border: 2.5px solid white;
-    width: 44px;
-    height: 44px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    font-size: 1.2rem;
+    border: 2px solid white;
+    width: 36px;
+    height: 36px;
     box-sizing: border-box;
     transition: transform 0.2s;
 }
 .custom-marker:hover {
-    transform: scale(1.12);
+    transform: scale(1.1);
 }
 
 .custom-marker.works { background-color: var(--color-works); }
 .custom-marker.closed { 
     background-color: #ffffff; 
-    border: 2.5px solid #ef4444; 
+    border: 2px solid #ef4444; 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .custom-marker.closed svg {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
 }
 .custom-marker.bridge { background-color: var(--color-bridge); }
 .custom-marker.accident { background-color: var(--color-accident); }
 .custom-marker.mercato { 
     background-color: #ffffff; 
-    border: 2.5px solid #10b981; 
+    border: 2px solid #10b981; 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .custom-marker.mercato svg {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
 }
 .custom-marker.semaforo { background-color: var(--color-traffic); }
 .custom-marker.sagra { 
     background-color: #ffffff; 
-    border: 2.5px solid #ec4899; 
+    border: 2px solid #ec4899; 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .custom-marker.sagra img {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     object-fit: contain;
 }
 .custom-marker.eliporto, .custom-marker.elisoccorso { 
     background-color: #ffffff; 
-    border: 2.5px solid #0ea5e9; 
+    border: 2px solid #0ea5e9; 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .custom-marker.eliporto svg, .custom-marker.elisoccorso svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
 }
 
 /* Popup Styling */
