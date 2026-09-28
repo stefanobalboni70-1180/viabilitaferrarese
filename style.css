@@ -15,7 +15,7 @@
     --color-market: #10b981; /* Green */
     --color-traffic: #06b6d4; /* Cyan */
     --color-sagra: #ec4899; /* Pink */
-    --color-eliporto: #ef4444; /* Red */
+    --color-eliporto: #0ea5e9; /* Azzurro */
 }
 
 * {
@@ -418,7 +418,7 @@ h1 {
 .icon-wrapper.market { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); }
 .icon-wrapper.traffic { background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); }
 .icon-wrapper.sagra { background: rgba(236, 72, 153, 0.15); border: 1px solid rgba(236, 72, 153, 0.3); }
-.icon-wrapper.eliporto, .icon-wrapper.elisoccorso { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); }
+.icon-wrapper.eliporto, .icon-wrapper.elisoccorso { background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.35); }
 
 .option-card span {
     font-size: 0.85rem;
@@ -484,14 +484,14 @@ h1 {
 }
 .custom-marker.eliporto, .custom-marker.elisoccorso { 
     background-color: #ffffff; 
-    border: 2.5px solid #ef4444; 
+    border: 2.5px solid #0ea5e9; 
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .custom-marker.eliporto svg, .custom-marker.elisoccorso svg {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
 }
 
 /* Popup Styling */
@@ -2322,11 +2322,20 @@ h1 {
     }
     
     .custom-marker.closed svg,
-    .custom-marker.mercato svg,
-    .custom-marker.eliporto svg,
-    .custom-marker.elisoccorso svg {
+    .custom-marker.mercato svg {
         width: 24px !important;
         height: 24px !important;
+    }
+
+    .custom-marker.eliporto,
+    .custom-marker.elisoccorso {
+        border-color: #0ea5e9 !important;
+    }
+
+    .custom-marker.eliporto svg,
+    .custom-marker.elisoccorso svg {
+        width: 18px !important;
+        height: 18px !important;
     }
     
     .custom-marker.sagra img {
