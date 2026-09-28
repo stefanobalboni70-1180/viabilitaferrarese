@@ -1,11 +1,11 @@
 @echo off
 title Pubblicazione Aggiornamenti Viabilita 118 Ferrara
 echo ======================================================
-echo Pubblicazione versione 3.9.4 (Pulsante Elisoccorso e Header v3.9.4) su Vercel...
+echo Pubblicazione versione 3.9.3 (Ripristino versione 3.9.3) su Vercel / GitHub...
 echo ======================================================
 cd /d "c:\Users\acer\Desktop\viabilita 118"
 git add .
-git commit -m "Aggiungi pulsante toggle elisoccorso, sposta versione sotto Ferrara e aggiorna a v3.9.4"
+git commit -m "Ripristino versione 3.9.3"
 git push origin main
 echo ======================================================
 echo PUBBLICAZIONE COMPLETATA CON SUCCESSO!
