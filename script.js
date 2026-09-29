@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.3';
+const APP_VERSION = '3.9.4';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -1732,6 +1732,299 @@ const DEFAULT_WEEKLY_MARKETS = [
     }
 ];
 
+// --- EVENTI PROGRAMMATI SPECIALI & MANIFESTAZIONI (118) ---
+const DEFAULT_SCHEDULED_EVENTS = [
+    // GIRO DELL'EMILIA 2026 - Sabato 3 Ottobre 2026 (10:15 - 13:15)
+    // Partenza da Largo Castello (Ferrara), Circuito cittadino di 11,3 km e uscita verso Bologna su SS64 Porrettana
+    // 1. Largo Castello / Viale Cavour (Partenza circuito)
+    {
+        id: 'giro_emilia_2026_cavour_1',
+        lat: 44.83750,
+        lng: 11.61900,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Largo Castello / Viale Cavour, Ferrara',
+        segmentId: 'giro_emilia_cavour',
+        note: "Giro dell'Emilia 2026 - Partenza da Largo Castello lungo Viale Cavour",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_cavour_2',
+        lat: 44.83900,
+        lng: 11.60450,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Largo Castello / Viale Cavour, Ferrara',
+        segmentId: 'giro_emilia_cavour',
+        note: "Giro dell'Emilia 2026 - Viale Cavour / Incrocio Viale IV Novembre",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 2. Viale IV Novembre (da Viale Cavour dritto verso Ponte della Pace, senza passare dalla Stazione)
+    {
+        id: 'giro_emilia_2026_ivnovembre_1',
+        lat: 44.83900,
+        lng: 11.60450,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Viale IV Novembre, Ferrara',
+        segmentId: 'giro_emilia_ivnovembre',
+        note: "Giro dell'Emilia 2026 - Svolta da Viale Cavour in Viale IV Novembre",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ivnovembre_2',
+        lat: 44.83000,
+        lng: 11.60270,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Viale IV Novembre, Ferrara',
+        segmentId: 'giro_emilia_ivnovembre',
+        note: "Giro dell'Emilia 2026 - Viale IV Novembre verso Ponte della Pace",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 3. Ponte della Pace e Via Mulinetto verso Via Ferraresi
+    {
+        id: 'giro_emilia_2026_mulinetto_1',
+        lat: 44.83000,
+        lng: 11.60270,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Ponte della Pace / Via Mulinetto, Ferrara',
+        segmentId: 'giro_emilia_mulinetto',
+        note: "Giro dell'Emilia 2026 - Attraversamento Ponte della Pace",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_mulinetto_2',
+        lat: 44.81800,
+        lng: 11.59400,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Ponte della Pace / Via Mulinetto, Ferrara',
+        segmentId: 'giro_emilia_mulinetto',
+        note: "Giro dell'Emilia 2026 - Via Mulinetto verso raccordo Via Ferraresi",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 4. Via Ferraresi (Cavalcavia)
+    {
+        id: 'giro_emilia_2026_ferraresi_1',
+        lat: 44.81800,
+        lng: 11.59400,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Ferraresi, Ferrara',
+        segmentId: 'giro_emilia_ferraresi',
+        note: "Giro dell'Emilia 2026 - Asse di scorrimento Via Ferraresi",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ferraresi_2',
+        lat: 44.80500,
+        lng: 11.60000,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Ferraresi, Ferrara',
+        segmentId: 'giro_emilia_ferraresi',
+        note: "Giro dell'Emilia 2026 - Rotatoria Via Ferraresi / Via Beethoven",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 5. Via Beethoven / Via Richard Wagner
+    {
+        id: 'giro_emilia_2026_wagner_1',
+        lat: 44.80500,
+        lng: 11.60000,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Beethoven / Via Richard Wagner, Ferrara',
+        segmentId: 'giro_emilia_wagner',
+        note: "Giro dell'Emilia 2026 - Asse Via Beethoven / Via Richard Wagner",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_wagner_2',
+        lat: 44.80350,
+        lng: 11.63600,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Beethoven / Via Richard Wagner, Ferrara',
+        segmentId: 'giro_emilia_wagner',
+        note: "Giro dell'Emilia 2026 - Via Richard Wagner / Incrocio Via Ravenna",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 6. Via Ravenna / Piazzale San Giorgio / Ponte San Giorgio
+    {
+        id: 'giro_emilia_2026_ravenna_1',
+        lat: 44.80350,
+        lng: 11.63600,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Ravenna / Ponte San Giorgio, Ferrara',
+        segmentId: 'giro_emilia_ravenna',
+        note: "Giro dell'Emilia 2026 - Via Ravenna e Piazzale San Giorgio",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ravenna_2',
+        lat: 44.82400,
+        lng: 11.63350,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Ravenna / Ponte San Giorgio, Ferrara',
+        segmentId: 'giro_emilia_ravenna',
+        note: "Giro dell'Emilia 2026 - Ponte San Giorgio / Via San Maurelio",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 7. Via San Maurelio / Viale Alfonso I d'Este / Piazzale Medaglie d'Oro
+    {
+        id: 'giro_emilia_2026_alfonso_1',
+        lat: 44.82400,
+        lng: 11.63350,
+        type: 'sagra',
+        color: '#ec4899',
+        street: "Viale Alfonso I d'Este / Piazzale Medaglie d'Oro, Ferrara",
+        segmentId: 'giro_emilia_alfonso',
+        note: "Giro dell'Emilia 2026 - Via San Maurelio e Viale Alfonso I d'Este",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_alfonso_2',
+        lat: 44.83300,
+        lng: 11.63350,
+        type: 'sagra',
+        color: '#ec4899',
+        street: "Viale Alfonso I d'Este / Piazzale Medaglie d'Oro, Ferrara",
+        segmentId: 'giro_emilia_alfonso',
+        note: "Giro dell'Emilia 2026 - Piazzale Medaglie d'Oro (Prospettiva)",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 8. Corso della Giovecca (Ritorno a Largo Castello)
+    {
+        id: 'giro_emilia_2026_giovecca_1',
+        lat: 44.83300,
+        lng: 11.63350,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Corso della Giovecca, Ferrara',
+        segmentId: 'giro_emilia_giovecca',
+        note: "Giro dell'Emilia 2026 - Corso della Giovecca (Prospettiva -> Castello)",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_giovecca_2',
+        lat: 44.83750,
+        lng: 11.61900,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Corso della Giovecca, Ferrara',
+        segmentId: 'giro_emilia_giovecca',
+        note: "Giro dell'Emilia 2026 - Chiusura anello a Largo Castello",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 9. Via Bologna (Tratto Urbano Ferrara -> Chiesuol del Fosso)
+    {
+        id: 'giro_emilia_2026_bologna_1',
+        lat: 44.80500,
+        lng: 11.60000,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Bologna (Ferrara -> Chiesuol del Fosso)',
+        segmentId: 'giro_emilia_bologna_urbano',
+        note: "Giro dell'Emilia 2026 - Uscita da Ferrara su Via Bologna",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_bologna_2',
+        lat: 44.78300,
+        lng: 11.59500,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Bologna (Ferrara -> Chiesuol del Fosso)',
+        segmentId: 'giro_emilia_bologna_urbano',
+        note: "Giro dell'Emilia 2026 - Via Bologna / Chiesuol del Fosso",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 10. SS64 Porrettana (Chiesuol del Fosso -> San Martino)
+    {
+        id: 'giro_emilia_2026_ss64_1',
+        lat: 44.78300,
+        lng: 11.59500,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'SS64 Porrettana (Chiesuol del Fosso -> San Martino)',
+        segmentId: 'giro_emilia_ss64_sanmartino',
+        note: "Giro dell'Emilia 2026 - SS64 Porrettana direzione Sud (Uccellino)",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ss64_2',
+        lat: 44.74800,
+        lng: 11.60050,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'SS64 Porrettana (Chiesuol del Fosso -> San Martino)',
+        segmentId: 'giro_emilia_ss64_sanmartino',
+        note: "Giro dell'Emilia 2026 - SS64 Porrettana / San Martino",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 11. SS64 Porrettana (San Martino -> Montalbano)
+    {
+        id: 'giro_emilia_2026_ss64_3',
+        lat: 44.74800,
+        lng: 11.60050,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'SS64 Porrettana (San Martino -> Montalbano)',
+        segmentId: 'giro_emilia_ss64_montalbano',
+        note: "Giro dell'Emilia 2026 - SS64 Porrettana verso Montalbano",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ss64_4',
+        lat: 44.71700,
+        lng: 11.59800,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'SS64 Porrettana (San Martino -> Montalbano)',
+        segmentId: 'giro_emilia_ss64_montalbano',
+        note: "Giro dell'Emilia 2026 - SS64 Porrettana / Montalbano",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+
+    // 12. SS64 Porrettana (Montalbano -> Gallo / Confine Bologna)
+    {
+        id: 'giro_emilia_2026_ss64_5',
+        lat: 44.71700,
+        lng: 11.59800,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'SS64 Porrettana (Montalbano -> Gallo / Confine BO)',
+        segmentId: 'giro_emilia_ss64_gallo',
+        note: "Giro dell'Emilia 2026 - SS64 Porrettana verso Gallo Ferrarese",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ss64_6',
+        lat: 44.68500,
+        lng: 11.55800,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'SS64 Porrettana (Montalbano -> Gallo / Confine BO)',
+        segmentId: 'giro_emilia_ss64_gallo',
+        note: "Giro dell'Emilia 2026 - Confine Provinciale Ferrara / Bologna verso Malalbergo",
+        schedule: { mode: 'window', start: '2026-10-03T10:15:00', end: '2026-10-03T13:15:00' }
+    }
+];
+
 // Coordinate di Ferrara
 const FERRARA_COORDS = [44.8381, 11.6198];
 const MAP_ZOOM = 11;
@@ -2616,12 +2909,13 @@ if (adminSaveMarkerBtn) {
 }
 
 // Crea l'icona custom per Leaflet con supporto visivo a stati temporali in Admin
-function createCustomIcon(type, status = 'active') {
+function createCustomIcon(type, status = 'active', customColor = null) {
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const statusClass = (isAdmin && status !== 'active') ? status : '';
+    const colorStyle = customColor ? `border-color:${customColor};` : '';
     return L.divIcon({
         className: 'custom-icon-wrapper',
-        html: `<div class="custom-marker ${type} ${statusClass}">${config.emoji}</div>`,
+        html: `<div class="custom-marker ${type} ${statusClass}" ${colorStyle ? `style="${colorStyle}"` : ''}>${config.emoji}</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
         popupAnchor: [0, -18]
@@ -2629,7 +2923,7 @@ function createCustomIcon(type, status = 'active') {
 }
 
 // Aggiungi un marker alla mappa
-function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null, segmentId = null) {
+function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = null, street = null, schedule = null, segmentId = null, color = null) {
     const markerId = id || Date.now().toString();
     const config = ICONS[type] || { emoji: '📍', label: 'Segnalazione' };
     const ts = parseInt(markerId);
@@ -2640,6 +2934,7 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         lat,
         lng,
         type,
+        color: color || (type === 'sagra' ? '#ec4899' : null),
         note: note || null,
         fbKey: fbKey || null,
         street: street || null,
@@ -2652,7 +2947,7 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
 
     if (visible) {
         const marker = L.marker([lat, lng], {
-            icon: createCustomIcon(type, status)
+            icon: createCustomIcon(type, status, markerObj.color)
         }).addTo(map);
 
         const safeLabel = escapeHtml(config.label);
@@ -2748,6 +3043,7 @@ function saveMarkerToFirebase(markerObj) {
         lat: markerObj.lat,
         lng: markerObj.lng,
         type: markerObj.type,
+        color: markerObj.color || null,
         timestamp: parseInt(markerObj.id) || Date.now(),
         note: markerObj.note || null,
         street: markerObj.street || null,
@@ -3386,7 +3682,7 @@ async function updateRoadSegments() {
 
     markersData.forEach(m => {
         if (!isMarkerVisible(m)) return;
-        if (getMarkerScheduleStatus(m) !== 'active') return;
+        if (!isAdmin && getMarkerScheduleStatus(m) !== 'active') return;
 
         // Le icone eliporto ed elisoccorso rappresentano siti puntuali e NON devono mai collegarsi tra di loro
         const mType = m.type || 'interruzione';
@@ -3437,9 +3733,11 @@ async function updateRoadSegments() {
             const m2 = group.markers[i + 1];
             const pairIdx = Math.floor(i / 2);
             const segKey = `${groupKey}_pair_${pairIdx}`;
+            const segColor = m1.color || m2.color || (group.type === 'sagra' ? '#ec4899' : '#dc2626');
             validSegments[segKey] = {
                 type: group.type,
                 streetName: group.streetName,
+                color: segColor,
                 coords: [[m1.lat, m1.lng], [m2.lat, m2.lng]]
             };
         }
@@ -3458,6 +3756,8 @@ async function updateRoadSegments() {
     segKeys.forEach(segKey => {
         const segment = validSegments[segKey];
         const cacheKey = `${normalizeStreetKey(segment.streetName) || segment.streetName.toLowerCase()}_${segment.coords.map(c => `${c[0].toFixed(4)},${c[1].toFixed(4)}`).join('_')}`;
+        const segColor = segment.color || (segment.type === 'sagra' ? '#ec4899' : '#dc2626');
+        const tooltipIcon = (segColor === '#ec4899' || segment.type === 'sagra') ? '🌸' : '🔴';
         
         let initialCoords = null;
         if (streetGeomCache[cacheKey] && streetGeomCache[cacheKey].length >= 2) {
@@ -3488,14 +3788,14 @@ async function updateRoadSegments() {
 
         if (!activeSegments[segKey]) {
             const polyline = L.polyline(initialCoords, {
-                color: '#dc2626',
-                weight: 5,
-                opacity: 1,
+                color: segColor,
+                weight: 6,
+                opacity: 0.95,
                 lineJoin: 'round',
                 lineCap: 'round'
             }).addTo(map);
 
-            polyline.bindTooltip(`🔴 ${escapeHtml(segment.streetName)}`, {
+            polyline.bindTooltip(`${tooltipIcon} ${escapeHtml(segment.streetName)}`, {
                 permanent: false,
                 direction: 'center',
                 className: 'road-segment-tooltip'
@@ -3504,15 +3804,18 @@ async function updateRoadSegments() {
             activeSegments[segKey] = polyline;
         } else {
             activeSegments[segKey].setLatLngs(initialCoords);
+            activeSegments[segKey].setStyle({ color: segColor });
         }
     });
 
     // 5. Passo asincrono parallelo: affina il tracciato con le curve reali della carreggiata
     await Promise.all(segKeys.map(async (segKey) => {
         const segment = validSegments[segKey];
+        const segColor = segment.color || (segment.type === 'sagra' ? '#ec4899' : '#dc2626');
         const routeCoords = await getStreetGeometry(segment.streetName, segment.coords);
         if (routeCoords && routeCoords.length >= 2 && activeSegments[segKey]) {
             activeSegments[segKey].setLatLngs(routeCoords);
+            activeSegments[segKey].setStyle({ color: segColor });
         }
     }));
 }
@@ -3562,6 +3865,7 @@ function loadMarkers() {
                         lat: m.lat,
                         lng: m.lng,
                         type: m.type,
+                        color: m.color || (m.type === 'sagra' ? '#ec4899' : null),
                         note: m.note || null,
                         fbKey: fbKey,
                         street: m.street || null,
@@ -3569,7 +3873,7 @@ function loadMarkers() {
                         segmentId: m.segmentId || null
                     };
                     markersData.push(markerObj);
-                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null, m.segmentId || null);
+                    addMarker(m.lat, m.lng, m.type, localId, false, m.note || null, fbKey, m.street || null, m.schedule || null, m.segmentId || null, markerObj.color);
                 });
             }
 
@@ -3579,13 +3883,24 @@ function loadMarkers() {
                     const isDeleted = isPermanentlyDeletedMarker(dm, dm.id, null);
                     if (!loadedIds.has(dm.id) && !isDeleted) {
                         markersData.push(dm);
-                        addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
+                        addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId, dm.color || null);
+                    }
+                });
+            }
+
+            // Includi eventi speciali programmati (Giro dell'Emilia 2026, ecc.) se non già presenti e non eliminati
+            if (typeof DEFAULT_SCHEDULED_EVENTS !== 'undefined' && Array.isArray(DEFAULT_SCHEDULED_EVENTS)) {
+                DEFAULT_SCHEDULED_EVENTS.forEach(de => {
+                    const isDeleted = isPermanentlyDeletedMarker(de, de.id, null);
+                    if (!loadedIds.has(de.id) && !isDeleted) {
+                        markersData.push(de);
+                        addMarker(de.lat, de.lng, de.type, de.id, false, de.note, null, de.street, de.schedule, de.segmentId, de.color || '#ec4899');
                     }
                 });
             }
 
             saveToLocalStorage();
-            console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale (inclusi mercati provinciali)`);
+            console.log(`📍 ${markersData.length} marker caricati/aggiornati in tempo reale (inclusi mercati ed eventi programmati)`);
 
             updateFilterCounts();
             updateRoadSegments();
@@ -3613,7 +3928,7 @@ function loadFromLocalStorage() {
                 if (isDeleted) return;
                 loadedIds.add(m.id);
                 markersData.push(m);
-                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
+                addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null, m.color || null);
             });
             console.log(`📍 Caricati ${markersData.length} marker da localStorage (offline)`);
         } catch (e) {
@@ -3628,7 +3943,18 @@ function loadFromLocalStorage() {
             const isDeleted = isPermanentlyDeletedMarker(dm, dm.id, null);
             if (!loadedIds.has(dm.id) && !isDeleted) {
                 markersData.push(dm);
-                addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId);
+                addMarker(dm.lat, dm.lng, dm.type, dm.id, false, dm.note, null, dm.street, dm.schedule, dm.segmentId, dm.color || null);
+            }
+        });
+    }
+
+    // Includi eventi speciali programmati (Giro dell'Emilia 2026, ecc.) se non già presenti e non eliminati
+    if (typeof DEFAULT_SCHEDULED_EVENTS !== 'undefined' && Array.isArray(DEFAULT_SCHEDULED_EVENTS)) {
+        DEFAULT_SCHEDULED_EVENTS.forEach(de => {
+            const isDeleted = isPermanentlyDeletedMarker(de, de.id, null);
+            if (!loadedIds.has(de.id) && !isDeleted) {
+                markersData.push(de);
+                addMarker(de.lat, de.lng, de.type, de.id, false, de.note, null, de.street, de.schedule, de.segmentId, de.color || '#ec4899');
             }
         });
     }
@@ -3647,7 +3973,7 @@ function refreshMarkers() {
     markersData.forEach(m => {
         const isDeleted = isPermanentlyDeletedMarker(m, m.id, m.fbKey);
         if (!isDeleted) {
-            addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null);
+            addMarker(m.lat, m.lng, m.type, m.id, false, m.note, m.fbKey || null, m.street || null, m.schedule || null, m.segmentId || null, m.color || null);
         }
     });
 
