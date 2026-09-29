@@ -1,5 +1,5 @@
 ﻿// Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.10';
+const APP_VERSION = '3.9.11';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -87,21 +87,11 @@ function isPermanentlyDeletedMarker(m, localId = null, fbKey = null) {
         return true;
     }
 
-    // 2. Blacklist ID/segmenti dei mercati rimossi (Baluardi, Lunedì, Travaglio/Kennedy di default) ed eventi speciali rimossi (Giro dell'Emilia)
+        // 2. Blacklist ID/segmenti dei mercati rimossi (Baluardi, LunedÃ¬, Travaglio/Kennedy di default)
     if (idStr.startsWith('mkt_fe_lun') || idStr.startsWith('mkt_fe_baluardi') || idStr.startsWith('mkt_baluardi') ||
         idStr.startsWith('mkt_fe_ven') ||
         segStr.includes('mercato_fe_lun') || segStr.includes('baluardi_pallone') || segStr.includes('mercato_baluardi') ||
-        segStr.includes('chiozziole') || segStr.includes('giuoco_del_pallone') || segStr.includes('mercato_fe_ven') ||
-        idStr.startsWith('giro_emilia') || segStr.startsWith('giro_emilia')) {
-        deletedMarkerIds.add(idStr);
-        if (keyStr) deletedMarkerIds.add(keyStr);
-        return true;
-    }
-
-    // 3. Riconoscimento semantico e geografico rigoroso dei mercati/eventi rimossi
-    const street = (m.street || '').toLowerCase();
-    const note = (m.note || '').toLowerCase();
-    if (note.includes("giro dell'emilia") || note.includes("giro emilia")) {
+        segStr.includes('chiozziole') || segStr.includes('giuoco_del_pallone') || segStr.includes('mercato_fe_ven')) {
         deletedMarkerIds.add(idStr);
         if (keyStr) deletedMarkerIds.add(keyStr);
         return true;
@@ -1741,7 +1731,201 @@ const DEFAULT_WEEKLY_MARKETS = [
 ];
 
 // --- EVENTI PROGRAMMATI SPECIALI & MANIFESTAZIONI (118) ---
-const DEFAULT_SCHEDULED_EVENTS = [];
+const DEFAULT_SCHEDULED_EVENTS = [
+    // GIRO DELL'EMILIA 2026 - Sabato 3 Ottobre 2026 (09:00 - 14:00)
+    // Circuito cittadino chiuso di Ferrara (11,3 km)
+    // 1. Largo Castello / Viale Cavour
+    {
+        id: 'giro_emilia_2026_cavour_1',
+        lat: 44.83750,
+        lng: 11.61900,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Largo Castello / Viale Cavour, Ferrara',
+        segmentId: 'giro_emilia_cavour',
+        note: "Giro dell'Emilia 2026 - Partenza da Largo Castello lungo Viale Cavour",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_cavour_2',
+        lat: 44.83900,
+        lng: 11.60450,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Largo Castello / Viale Cavour, Ferrara',
+        segmentId: 'giro_emilia_cavour',
+        note: "Giro dell'Emilia 2026 - Viale Cavour / Incrocio Viale IV Novembre",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 2. Viale IV Novembre
+    {
+        id: 'giro_emilia_2026_ivnovembre_1',
+        lat: 44.83900,
+        lng: 11.60450,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Viale IV Novembre, Ferrara',
+        segmentId: 'giro_emilia_ivnovembre',
+        note: "Giro dell'Emilia 2026 - Svolta da Viale Cavour in Viale IV Novembre",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ivnovembre_2',
+        lat: 44.83000,
+        lng: 11.60270,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Viale IV Novembre, Ferrara',
+        segmentId: 'giro_emilia_ivnovembre',
+        note: "Giro dell'Emilia 2026 - Viale IV Novembre verso Ponte della Pace",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 3. Ponte della Pace / Via Mulinetto
+    {
+        id: 'giro_emilia_2026_mulinetto_1',
+        lat: 44.83000,
+        lng: 11.60270,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Ponte della Pace / Via Mulinetto, Ferrara',
+        segmentId: 'giro_emilia_mulinetto',
+        note: "Giro dell'Emilia 2026 - Attraversamento Ponte della Pace",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_mulinetto_2',
+        lat: 44.81800,
+        lng: 11.59400,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Ponte della Pace / Via Mulinetto, Ferrara',
+        segmentId: 'giro_emilia_mulinetto',
+        note: "Giro dell'Emilia 2026 - Via Mulinetto verso raccordo Via Ferraresi",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 4. Via Aldo Ferraresi (Cavalcavia) e raccordo Via Ludwig Van Beethoven
+    {
+        id: 'giro_emilia_2026_ferraresi_1',
+        lat: 44.81800,
+        lng: 11.59400,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Aldo Ferraresi / Via Beethoven, Ferrara',
+        segmentId: 'giro_emilia_ferraresi',
+        note: "Giro dell'Emilia 2026 - Asse di scorrimento Via Ferraresi (Cavalcavia)",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ferraresi_2',
+        lat: 44.81640,
+        lng: 11.60940,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Aldo Ferraresi / Via Beethoven, Ferrara',
+        segmentId: 'giro_emilia_ferraresi',
+        note: "Giro dell'Emilia 2026 - Via Ludwig Van Beethoven verso Via Richard Wagner",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 5. Tutta Via Richard Wagner (da Via Beethoven alla rotatoria con Via Ravenna)
+    {
+        id: 'giro_emilia_2026_wagner_1',
+        lat: 44.81640,
+        lng: 11.60940,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Richard Wagner, Ferrara',
+        segmentId: 'giro_emilia_wagner',
+        note: "Giro dell'Emilia 2026 - Tutta Via Richard Wagner (da Via Beethoven)",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_wagner_2',
+        lat: 44.81447,
+        lng: 11.63078,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Richard Wagner, Ferrara',
+        segmentId: 'giro_emilia_wagner',
+        note: "Giro dell'Emilia 2026 - Rotonda Via Richard Wagner / Via Ravenna",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 6. Via Ravenna / Piazzale San Giorgio / Ponte San Giorgio (Solo Nord verso Ferrara centro)
+    {
+        id: 'giro_emilia_2026_ravenna_1',
+        lat: 44.81447,
+        lng: 11.63078,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Ravenna / Piazzale San Giorgio, Ferrara',
+        segmentId: 'giro_emilia_ravenna',
+        note: "Giro dell'Emilia 2026 - Rotonda Via Wagner / Svolta a Nord su Via Ravenna",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_ravenna_2',
+        lat: 44.82404,
+        lng: 11.63368,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Via Ravenna / Piazzale San Giorgio, Ferrara',
+        segmentId: 'giro_emilia_ravenna',
+        note: "Giro dell'Emilia 2026 - Ponte San Giorgio / Piazzale San Giorgio",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 7. Viale Alfonso I d'Este / Piazzale Medaglie d'Oro
+    {
+        id: 'giro_emilia_2026_alfonso_1',
+        lat: 44.82404,
+        lng: 11.63368,
+        type: 'sagra',
+        color: '#ec4899',
+        street: "Viale Alfonso I d'Este / Piazzale Medaglie d'Oro, Ferrara",
+        segmentId: 'giro_emilia_alfonso',
+        note: "Giro dell'Emilia 2026 - Viale Alfonso I d'Este da Piazzale San Giorgio",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_alfonso_2',
+        lat: 44.83300,
+        lng: 11.63350,
+        type: 'sagra',
+        color: '#ec4899',
+        street: "Viale Alfonso I d'Este / Piazzale Medaglie d'Oro, Ferrara",
+        segmentId: 'giro_emilia_alfonso',
+        note: "Giro dell'Emilia 2026 - Piazzale Medaglie d'Oro (Prospettiva)",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+
+    // 8. Corso della Giovecca (Ritorno e chiusura anello a Largo Castello)
+    {
+        id: 'giro_emilia_2026_giovecca_1',
+        lat: 44.83300,
+        lng: 11.63350,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Corso della Giovecca, Ferrara',
+        segmentId: 'giro_emilia_giovecca',
+        note: "Giro dell'Emilia 2026 - Corso della Giovecca (Prospettiva -> Castello)",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    },
+    {
+        id: 'giro_emilia_2026_giovecca_2',
+        lat: 44.83750,
+        lng: 11.61900,
+        type: 'sagra',
+        color: '#ec4899',
+        street: 'Corso della Giovecca, Ferrara',
+        segmentId: 'giro_emilia_giovecca',
+        note: "Giro dell'Emilia 2026 - Chiusura circuito anello a Largo Castello",
+        schedule: { mode: 'window', start: '2026-10-03T09:00:00', end: '2026-10-03T14:00:00' }
+    }
+];
 
 // Coordinate di Ferrara
 const FERRARA_COORDS = [44.8381, 11.6198];
