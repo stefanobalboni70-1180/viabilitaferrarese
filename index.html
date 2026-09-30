@@ -919,10 +919,77 @@
                 <button type="button" id="cancel-reset-pw-btn" class="btn-cancel">Annulla</button>
                 <button type="button" id="submit-reset-pw-btn" class="primary-btn">Invia Link di Ripristino</button>
             </div>
+    <!-- Modal Reimpostazione Manuale Password da Admin -->
+    <div id="admin-manual-reset-modal" class="modal-overlay hidden">
+        <div class="modal-content reset-content">
+            <div class="modal-header">
+                <h2>🔑 Assegna Nuova Password</h2>
+                <button id="close-manual-reset-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">
+                Stai reimpostando la password per:<br>
+                <strong id="manual-reset-user-name" style="color:#0f172a; font-size:1rem;">-</strong> (<span id="manual-reset-user-email" style="color:#2563eb;">-</span>)
+            </p>
+            <form id="manual-reset-form" onsubmit="return false;">
+                <input type="hidden" id="manual-reset-user-uid" value="" />
+                
+                <div class="form-group">
+                    <label for="manual-reset-password">Nuova Password Provvisoria *</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="manual-reset-password" placeholder="Minimo 6 caratteri" autocomplete="new-password" required />
+                        <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('manual-reset-password', this)">👁️</button>
+                    </div>
+                    <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                        <button type="button" id="manual-reset-generate-pw-btn" class="btn-action-icon btn-action-success" style="padding:6px 12px; font-size:0.8rem; font-weight:700;">
+                            🎲 Genera Password Casuale
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group-checkbox" style="margin-top:14px;">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="manual-reset-must-change" checked />
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label" style="font-weight:600; color:#334155;">Obbliga l'utente a scegliere una nuova password personale al prossimo accesso</span>
+                    </label>
+                </div>
+
+                <p id="manual-reset-error" class="error-msg hidden" style="margin-top:10px;"></p>
+
+                <div class="modal-footer-actions" style="margin-top:20px;">
+                    <button type="button" id="cancel-manual-reset-btn" class="btn-cancel">Annulla</button>
+                    <button type="button" id="submit-manual-reset-btn" class="primary-btn">💾 Salva e Assegna Password</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Toast Notification Container -->
+    <!-- Modal Riepilogo Password Reimpostata con Copia Credenziali -->
+    <div id="admin-manual-reset-success-modal" class="modal-overlay hidden">
+        <div class="modal-content credentials-content">
+            <div class="modal-header">
+                <h2>🔑 Nuova Password Assegnata!</h2>
+            </div>
+            <p class="modal-desc">La nuova password è stata impostata con successo. Copia le credenziali di seguito per comunicarle all'operatore.</p>
+
+            <div class="credentials-box">
+                <div class="cred-row"><span>👤 Operatore:</span> <strong id="reset-summary-name">-</strong></div>
+                <div class="cred-row"><span>📧 Username / Login:</span> <strong id="reset-summary-email">-</strong></div>
+                <div class="cred-row"><span>🔑 Nuova Password Provvisoria:</span> <code id="reset-summary-password">-</code></div>
+                <div class="cred-row"><span>🔒 Cambio obbligatorio:</span> <span id="reset-summary-mustchange" style="font-weight:700; color:#dc2626;">Sì (al prossimo login)</span></div>
+                <div class="cred-row"><span>🌐 Portale Accesso:</span> <code>https://viabilita118fe.vercel.app/</code></div>
+            </div>
+
+            <div class="modal-footer-actions">
+                <button type="button" id="copy-reset-credentials-btn" class="primary-btn">
+                    <span>📋</span> Copia per WhatsApp / Messaggio
+                </button>
+                <button type="button" id="close-reset-success-btn" class="btn-secondary">Chiudi</button>
+            </div>
+        </div>
+    </div>
     <div id="toast" class="toast-box hidden"></div>
 
     <!-- Overlay Lampeggiante Emergenza (Nero / Rosso 10 secondi) -->

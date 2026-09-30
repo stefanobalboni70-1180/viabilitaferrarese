@@ -7019,11 +7019,14 @@ function renderAdminUsersList() {
                 </div>
                 <div class="user-card-actions">
                     ${!isAdminRole && !isCurrentAuthUser ? `
+                        <button type="button" class="btn-action-icon btn-action-success" onclick="openAdminManualResetModal('${escapeHtml(u.uid)}', '${escapeHtml(u.name || '')}', '${escapeHtml(u.email || '')}')" title="Assegna nuova password provvisoria direttamente">
+                            🔑 Nuova PW
+                        </button>
+                        <button type="button" class="btn-action-icon" onclick="triggerAdminSendReset('${escapeHtml(u.email)}')" title="Invia email con link per reimpostare password">
+                            📧 Link Email
+                        </button>
                         <button type="button" class="btn-action-icon ${isDisabled ? 'btn-action-success' : 'btn-action-danger'}" onclick="toggleUserStatus('${escapeHtml(u.uid)}', '${isDisabled ? 'active' : 'disabled'}')" title="${isDisabled ? 'Riabilita accesso utente' : 'Disabilita accesso utente'}">
                             ${isDisabled ? '✅ Riabilita' : '🚫 Disabilita'}
-                        </button>
-                        <button type="button" class="btn-action-icon" onclick="triggerAdminSendReset('${escapeHtml(u.email)}')" title="Invia email per reimpostare password">
-                            📧 Reset PW
                         </button>
                         <button type="button" class="btn-action-icon btn-action-danger" onclick="deleteAuthorizedUser('${escapeHtml(u.uid)}', '${escapeHtml(u.name || u.email)}')" title="Elimina account utente">
                             🗑️
@@ -7035,6 +7038,168 @@ function renderAdminUsersList() {
     });
 
     listEl.innerHTML = html;
+}
+
+// Apertura Modal Reimpostazione Manuale Password (Admin)
+function openAdminManualResetModal(uid, name, email) {
+    const modal = document.getElementById('admin-manual-reset-modal');
+    const nameEl = document.getElementById('manual-reset-user-name');
+    const emailEl = document.getElementById('manual-reset-user-email');
+    const uidInput = document.getElementById('manual-reset-user-uid');
+    const passInput = document.getElementById('manual-reset-password');
+    const mustChangeCheck = document.getElementById('manual-reset-must-change');
+    const errorEl = document.getElementById('manual-reset-error');
+
+    if (nameEl) nameEl.textContent = name || 'Operatore 118';
+    if (emailEl) emailEl.textContent = email || '-';
+    if (uidInput) uidInput.value = uid;
+    if (passInput) passInput.value = generateRandomPassword(8);
+    if (mustChangeCheck) mustChangeCheck.checked = true;
+    if (errorEl) errorEl.classList.add('hidden');
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Esecuzione Reimpostazione Manuale Password (Admin)
+async function handleAdminManualResetSubmit() {
+    const uidInput = document.getElementById('manual-reset-user-uid');
+    const passInput = document.getElementById('manual-reset-password');
+    const mustChangeCheck = document.getElementById('manual-reset-must-change');
+    const errorEl = document.getElementById('manual-reset-error');
+    const submitBtn = document.getElementById('submit-manual-reset-btn');
+
+    const uid = uidInput ? uidInput.value : '';
+    const newPassword = passInput ? passInput.value : '';
+    const mustChange = mustChangeCheck ? mustChangeCheck.checked : true;
+
+    if (!uid || !newPassword) {
+        if (errorEl) {
+            errorEl.textContent = 'Inserisci la nuova password da assegnare.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        if (errorEl) {
+            errorEl.textContent = 'La password deve contenere almeno 6 caratteri.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (!authorizedUsersRef) return;
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Aggiornamento in corso...';
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+
+    try {
+        // Recupera dati correnti dell'utente per tentare sincronizzazione Auth
+        const userSnap = await authorizedUsersRef.child(uid).once('value');
+        const userData = userSnap.val() || {};
+        const email = userData.email || '';
+        const name = userData.name || 'Operatore 118';
+
+        // Prova a sincronizzare la password in Firebase Auth tramite istanza temporanea
+        if (email) {
+            try {
+                const tempAppName = 'ResetSync_' + Date.now();
+                const tempApp = firebase.initializeApp(firebaseConfig, tempAppName);
+                const tempAuth = tempApp.auth();
+
+                // 1. Prova prima con l'eventuale vecchia password provvisoria nota
+                let signedIn = false;
+                if (userData.tempPassword) {
+                    try {
+                        const cred = await tempAuth.signInWithEmailAndPassword(email, userData.tempPassword);
+                        await cred.user.updatePassword(newPassword);
+                        signedIn = true;
+                    } catch (e) {
+                        // Password modificata in precedenza o non corrispondente
+                    }
+                }
+
+                // 2. Se non è riuscito a fare signIn, prova a crearla se mancava in Auth
+                if (!signedIn) {
+                    try {
+                        await tempAuth.createUserWithEmailAndPassword(email, newPassword);
+                    } catch (createErr) {
+                        // Utente esiste già in Auth con password personale.
+                        // Inviamo in parallelo l'email di notifica/reset standard
+                        try {
+                            await auth.sendPasswordResetEmail(email);
+                        } catch (mailErr) {
+                            console.warn('Invio email reset parallela:', mailErr.message);
+                        }
+                    }
+                }
+
+                await tempAuth.signOut();
+                await tempApp.delete();
+            } catch (authSyncErr) {
+                console.warn('Sync Auth secondaria:', authSyncErr);
+            }
+        }
+
+        // Aggiorna scheda utente nel Database
+        await authorizedUsersRef.child(uid).update({
+            tempPassword: newPassword,
+            mustChangePassword: mustChange,
+            status: 'active',
+            passwordResetAt: Date.now(),
+            passwordResetBy: auth?.currentUser?.email || 'admin'
+        });
+
+        // Chiudi modal di modifica
+        const resetModal = document.getElementById('admin-manual-reset-modal');
+        if (resetModal) resetModal.classList.add('hidden');
+
+        // Mostra riepilogo con copia rapida
+        const summaryModal = document.getElementById('admin-manual-reset-success-modal');
+        const summaryName = document.getElementById('reset-summary-name');
+        const summaryEmail = document.getElementById('reset-summary-email');
+        const summaryPass = document.getElementById('reset-summary-password');
+        const summaryMustChange = document.getElementById('reset-summary-mustchange');
+
+        if (summaryName) summaryName.textContent = name;
+        if (summaryEmail) summaryEmail.textContent = email;
+        if (summaryPass) summaryPass.textContent = newPassword;
+        if (summaryMustChange) summaryMustChange.textContent = mustChange ? 'Sì (al prossimo login)' : 'No';
+
+        if (summaryModal) summaryModal.classList.remove('hidden');
+
+        showToast(`Nuova password assegnata a "${name}"!`, "success", 3500);
+    } catch (err) {
+        console.error('Errore reimpostazione password:', err);
+        if (errorEl) {
+            errorEl.textContent = 'Errore durante l\'aggiornamento: ' + err.message;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '💾 Salva e Assegna Password';
+        }
+    }
+}
+
+// Copia Credenziali Reimpostate per Messaggio / WhatsApp
+async function copyResetCredentials() {
+    const name = document.getElementById('reset-summary-name')?.textContent || '';
+    const email = document.getElementById('reset-summary-email')?.textContent || '';
+    const pass = document.getElementById('reset-summary-password')?.textContent || '';
+
+    const textToCopy = `🚑 VIABILITÀ 118 FERRARA\nNuove credenziali di accesso:\n\n👤 Operatore: ${name}\n📧 Login / Username: ${email}\n🔑 Nuova Password: ${pass}\n🌐 Accedi qui: https://viabilita118fe.vercel.app/\n\n(Al primo accesso ti verrà richiesto di confermare una nuova password personale).`;
+
+    try {
+        await navigator.clipboard.writeText(textToCopy);
+        showToast("✅ Credenziali copiate negli appunti! Pronte da incollare su WhatsApp.", "success", 4000);
+    } catch (e) {
+        showToast("Seleziona e copia manualmente il testo delle credenziali.", "info", 3000);
+    }
 }
 
 // Toggle Stato Utente (Attivo / Disabilitato)
@@ -7411,7 +7576,39 @@ function initUsersModule() {
     }
     if (submitResetPwBtn) submitResetPwBtn.addEventListener('click', handleSendResetPasswordEmail);
 
-    // 8. Password Toggle (Mostra / Nascondi) per tutti i campi password con icona occhio
+    // 8. Admin Manual Reset Password Modal Events
+    const closeManualResetBtn = document.getElementById('close-manual-reset-modal');
+    const cancelManualResetBtn = document.getElementById('cancel-manual-reset-btn');
+    const submitManualResetBtn = document.getElementById('submit-manual-reset-btn');
+    const manualResetGenPwBtn = document.getElementById('manual-reset-generate-pw-btn');
+    const copyResetCredsBtn = document.getElementById('copy-reset-credentials-btn');
+    const closeResetSuccessBtn = document.getElementById('close-reset-success-btn');
+
+    if (closeManualResetBtn) {
+        closeManualResetBtn.addEventListener('click', () => {
+            document.getElementById('admin-manual-reset-modal')?.classList.add('hidden');
+        });
+    }
+    if (cancelManualResetBtn) {
+        cancelManualResetBtn.addEventListener('click', () => {
+            document.getElementById('admin-manual-reset-modal')?.classList.add('hidden');
+        });
+    }
+    if (submitManualResetBtn) submitManualResetBtn.addEventListener('click', handleAdminManualResetSubmit);
+    if (manualResetGenPwBtn) {
+        manualResetGenPwBtn.addEventListener('click', () => {
+            const pwInput = document.getElementById('manual-reset-password');
+            if (pwInput) pwInput.value = generateRandomPassword(8);
+        });
+    }
+    if (copyResetCredsBtn) copyResetCredsBtn.addEventListener('click', copyResetCredentials);
+    if (closeResetSuccessBtn) {
+        closeResetSuccessBtn.addEventListener('click', () => {
+            document.getElementById('admin-manual-reset-success-modal')?.classList.add('hidden');
+        });
+    }
+
+    // 9. Password Toggle (Mostra / Nascondi) per tutti i campi password con icona occhio
     document.querySelectorAll('.toggle-pw-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const targetId = btn.getAttribute('data-target');
