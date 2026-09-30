@@ -41,47 +41,48 @@ body {
 /* Top Navigation Flow Container (Header + Admin Bar) */
 .top-nav-wrapper {
     position: absolute;
-    top: 14px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    width: max-content;
-    max-width: 95vw;
+    gap: 6px;
+    width: auto;
+    max-width: 98vw;
     pointer-events: none;
 }
 
-/* Glassmorphism Header (Desktop: Singola Riga Fluida) */
+/* Glassmorphism Header (Desktop & Admin Fluid Layout) */
 .glass-header {
     position: static;
     transform: none;
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(255, 255, 255, 0.96);
     color: #0f172a;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 16px;
-    padding: 8px 16px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 14px;
+    padding: 6px 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
     text-align: center;
     transition: all 0.3s ease;
     pointer-events: auto;
-    width: max-content;
-    max-width: 95vw;
+    width: auto;
+    max-width: 98vw;
     box-sizing: border-box;
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .glass-header:hover {
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    background: rgba(255, 255, 255, 0.98);
 }
 
 .header-row-title {
@@ -99,15 +100,8 @@ body {
     white-space: nowrap;
 }
 
-.header-logo-118 {
-    height: 26px;
-    width: auto;
-    object-fit: contain;
-    flex-shrink: 0;
-}
-
 h1 {
-    font-size: 1.05rem;
+    font-size: 0.96rem;
     font-weight: 700;
     color: #0f172a;
     letter-spacing: -0.3px;
@@ -119,12 +113,12 @@ h1 {
 }
 
 .version-tag {
-    font-size: 0.72rem;
+    font-size: 0.70rem;
     font-weight: 700;
     color: var(--primary);
     background: rgba(59, 130, 246, 0.12);
     border: 1px solid rgba(59, 130, 246, 0.3);
-    padding: 1px 6px;
+    padding: 1px 5px;
     border-radius: 999px;
     line-height: 1.2;
     display: inline-flex;
@@ -134,20 +128,21 @@ h1 {
     flex-shrink: 0;
 }
 
-/* Riga Controlli: Integrata su singola riga su PC */
+/* Riga Controlli: Integrata su singola riga su PC con flex fluido */
 .header-row-controls {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
     width: auto;
     flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 .user-actions-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
 }
 
@@ -155,18 +150,18 @@ h1 {
     background: #059669;
     color: #ffffff;
     border: none;
-    border-radius: 8px;
-    padding: 0 14px;
-    height: 34px;
+    border-radius: 7px;
+    padding: 0 11px;
+    height: 32px;
     box-sizing: border-box;
-    font-size: 0.82rem;
+    font-size: 0.80rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+    box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     flex-shrink: 0;
     white-space: nowrap;
 }
@@ -175,42 +170,42 @@ h1 {
     display: inline !important;
     color: #ffffff !important;
     font-weight: 600 !important;
-    font-size: 0.82rem !important;
+    font-size: 0.80rem !important;
     vertical-align: middle;
 }
 
 .user-report-btn .report-icon {
-    font-size: 1rem;
+    font-size: 0.90rem;
     display: inline-block;
     vertical-align: middle;
 }
 
 .user-report-btn:hover {
     background: #047857;
-    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
+    box-shadow: 0 4px 10px rgba(5, 150, 105, 0.4);
     transform: translateY(-1px);
 }
 
 .search-in-header {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     margin: 0;
     width: auto;
     max-width: none;
 }
 
 .search-in-header input {
-    width: 220px;
-    height: 34px;
-    padding: 0 10px;
-    font-size: 0.82rem;
-    border-radius: 8px;
+    width: 170px;
+    height: 32px;
+    padding: 0 9px;
+    font-size: 0.80rem;
+    border-radius: 7px;
     border: 1px solid rgba(0, 0, 0, 0.15);
     background: rgba(0, 0, 0, 0.04);
     color: #0f172a;
     outline: none;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     box-sizing: border-box;
 }
 
@@ -218,15 +213,15 @@ h1 {
     background: #ffffff;
     border-color: var(--primary);
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    width: 260px;
+    width: 210px;
 }
 
 .search-in-header button {
-    height: 34px;
-    padding: 0 12px;
-    font-size: 0.80rem;
+    height: 32px;
+    padding: 0 10px;
+    font-size: 0.78rem;
     font-weight: 600;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--primary);
     color: #ffffff;
     border: none;
@@ -235,8 +230,9 @@ h1 {
     align-items: center;
     gap: 4px;
     box-sizing: border-box;
-    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .search-in-header button:hover {
@@ -250,33 +246,31 @@ h1 {
 }
 
 .search-in-header button .search-icon {
-    font-size: 0.85rem;
+    font-size: 0.80rem;
     line-height: 1;
 }
 
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-left: auto;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .icon-btn {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-    padding: 0;
+    height: 32px;
+    padding: 0 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 7px;
     cursor: pointer;
     background: #0f172a;
     color: #ffffff;
     border: 1px solid rgba(255, 255, 255, 0.15);
     transition: all 0.2s;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
 }
 
 .icon-btn:hover {
@@ -286,8 +280,22 @@ h1 {
 }
 
 .icon-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
+}
+
+#admin-logout-btn {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+    border: 1px solid #fca5a5 !important;
+    padding: 0 9px !important;
+    font-weight: 700 !important;
+}
+
+#admin-logout-btn:hover {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #dc2626 !important;
 }
 
 .subtitle {
