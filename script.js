@@ -7245,6 +7245,15 @@ async function deleteAuthorizedUser(uid, name) {
     }
 }
 
+// Esponi funzioni a livello globale (window) per interazioni onclick da HTML
+window.openAdminManualResetModal = openAdminManualResetModal;
+window.handleAdminManualResetSubmit = handleAdminManualResetSubmit;
+window.copyResetCredentials = copyResetCredentials;
+window.toggleUserStatus = toggleUserStatus;
+window.triggerAdminSendReset = triggerAdminSendReset;
+window.deleteAuthorizedUser = deleteAuthorizedUser;
+window.openCreateUserModal = openCreateUserModal;
+
 // Apertura Modal Creazione Utente
 function openCreateUserModal() {
     const modal = document.getElementById('create-user-modal');
