@@ -3332,6 +3332,12 @@ h1 {
     color: #ffffff;
 }
 
+.custom-event-route-polyline.admin-preview {
+    stroke-dasharray: 8, 8 !important;
+    opacity: 0.65 !important;
+    cursor: pointer;
+}
+
 /* Leaflet Custom Route Tooltip & Popup */
 .custom-route-tooltip {
     background: rgba(15, 23, 42, 0.92);

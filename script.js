@@ -5758,15 +5758,22 @@ function isCustomRouteVisible(route, now = new Date()) {
 }
 
 function updateAdminRoutesBadge() {
+    const totalCount = customRoutesData.length;
     const activeCount = customRoutesData.filter(r => isCustomRouteVisible(r)).length;
     if (adminRoutesBadge) {
-        adminRoutesBadge.textContent = activeCount;
+        if (totalCount === 0) {
+            adminRoutesBadge.textContent = '0';
+        } else if (activeCount === totalCount) {
+            adminRoutesBadge.textContent = String(activeCount);
+        } else {
+            adminRoutesBadge.textContent = `${activeCount}/${totalCount}`;
+        }
     }
     if (adminRoutesCount) {
-        adminRoutesCount.textContent = `${activeCount} attivi`;
+        adminRoutesCount.textContent = `${activeCount} attivi (${totalCount} in memoria)`;
     }
     if (adminRoutesTotalCount) {
-        adminRoutesTotalCount.textContent = customRoutesData.length;
+        adminRoutesTotalCount.textContent = totalCount;
     }
 }
 
@@ -5777,29 +5784,39 @@ function renderCustomRoutesOnMap() {
     const currentVisibleIds = new Set();
 
     customRoutesData.forEach((route) => {
-        const visible = isCustomRouteVisible(route, now);
-        if (visible) {
+        const isCurrentlyActive = isCustomRouteVisible(route, now);
+        // L'amministratore vede tutti i percorsi (attivi, futuri e nascosti), il pubblico solo quelli attualmente attivi
+        const shouldShowOnMap = isCurrentlyActive || (isAdmin && route.points && route.points.length >= 2);
+
+        if (shouldShowOnMap) {
             currentVisibleIds.add(route.id);
             const color = route.color || '#8b5cf6';
             const weight = Number(route.weight) || 6;
-            const dashArray = getDashArray(route.dashStyle);
             const typeConfig = ROUTE_TYPES_CONFIG[route.type] || ROUTE_TYPES_CONFIG['corteo'];
+
+            // Se è attivo ha opacità piena, se è futuro/nascosto ma visibile all'admin è tratteggiato e semitrasparente
+            const isPreviewOnly = !isCurrentlyActive && isAdmin;
+            const opacity = isPreviewOnly ? 0.55 : 0.92;
+            const dashArray = isPreviewOnly ? '8, 8' : getDashArray(route.dashStyle);
 
             const polylineOptions = {
                 color: color,
                 weight: weight,
-                opacity: 0.92,
+                opacity: opacity,
                 lineJoin: 'round',
                 lineCap: 'round',
                 dashArray: dashArray,
-                className: 'custom-event-route-polyline'
+                className: isPreviewOnly ? 'custom-event-route-polyline admin-preview' : 'custom-event-route-polyline'
             };
+
+            const statusSuffix = isPreviewOnly ? (route.active === false ? ' [⚪ Nascosto]' : ' [⏳ Programmato]') : '';
+            const tooltipText = `${typeConfig.icon} ${escapeHtml(route.name)}${statusSuffix}`;
 
             if (!activeCustomRouteLayers[route.id]) {
                 const polyline = L.polyline(route.points, polylineOptions).addTo(map);
 
                 // Tooltip
-                polyline.bindTooltip(`${typeConfig.icon} ${escapeHtml(route.name)}`, {
+                polyline.bindTooltip(tooltipText, {
                     permanent: false,
                     direction: 'center',
                     className: 'custom-route-tooltip'
@@ -5816,7 +5833,7 @@ function renderCustomRoutesOnMap() {
                 const existingLayer = activeCustomRouteLayers[route.id];
                 existingLayer.setLatLngs(route.points);
                 existingLayer.setStyle(polylineOptions);
-                existingLayer.setTooltipContent(`${typeConfig.icon} ${escapeHtml(route.name)}`);
+                existingLayer.setTooltipContent(tooltipText);
                 existingLayer.setPopupContent(createRoutePopupContent(route));
             }
         }
@@ -6300,14 +6317,15 @@ window.deleteCustomRoute = async function (id) {
     try {
         if (isFirebaseOnline && customRoutesRef) {
             await customRoutesRef.child(id).remove();
-        } else {
-            customRoutesData = customRoutesData.filter(r => r.id !== id);
-            localStorage.setItem('ferrara_viabilita_custom_routes', JSON.stringify(customRoutesData));
-            renderCustomRoutesOnMap();
-            renderAdminRoutesList();
-            updateAdminRoutesBadge();
         }
-        showToast("Percorso eliminato con successo.", "info", 2500);
+        customRoutesData = customRoutesData.filter(r => r.id !== id);
+        try {
+            localStorage.setItem('ferrara_viabilita_custom_routes', JSON.stringify(customRoutesData));
+        } catch (e) { }
+        renderCustomRoutesOnMap();
+        renderAdminRoutesList();
+        updateAdminRoutesBadge();
+        showToast(`Percorso "${route.name}" eliminato con successo.`, "info", 3000);
     } catch (err) {
         console.error("Errore cancellazione percorso:", err);
         showToast("Errore durante l'eliminazione: " + err.message, "error", 3500);
@@ -6326,9 +6344,12 @@ window.zoomToCustomRoute = function (id) {
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
     }
 
-    if (activeCustomRouteLayers[id]) {
-        activeCustomRouteLayers[id].openPopup();
-    }
+    renderCustomRoutesOnMap();
+    setTimeout(() => {
+        if (activeCustomRouteLayers[id]) {
+            activeCustomRouteLayers[id].openPopup();
+        }
+    }, 350);
 };
 
 function initCustomRoutesModule() {
