@@ -3776,6 +3776,41 @@ h1 {
 }
 
 /* Admin Users Management Modal */
+.admin-users-content {
+    width: 95% !important;
+    max-width: 980px !important;
+    max-height: 88vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 26px 30px !important;
+    box-sizing: border-box !important;
+}
+
+@media (min-width: 1024px) {
+    .admin-users-content {
+        max-width: 1050px !important;
+        width: 90% !important;
+        padding: 30px 36px !important;
+    }
+    .admin-users-list {
+        max-height: 58vh !important;
+        gap: 12px !important;
+    }
+    .user-card-item {
+        padding: 14px 18px !important;
+    }
+    .user-name-title {
+        font-size: 1rem !important;
+    }
+    .user-email-subtitle {
+        font-size: 0.88rem !important;
+    }
+    .btn-action-icon {
+        padding: 7px 13px !important;
+        font-size: 0.84rem !important;
+    }
+}
+
 .admin-users-toolbar {
     display: flex;
     flex-wrap: wrap;
