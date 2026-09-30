@@ -41,48 +41,47 @@ body {
 /* Top Navigation Flow Container (Header + Admin Bar) */
 .top-nav-wrapper {
     position: absolute;
-    top: 10px;
+    top: 14px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    width: auto;
-    max-width: 98vw;
+    gap: 8px;
+    width: max-content;
+    max-width: 95vw;
     pointer-events: none;
 }
 
-/* Glassmorphism Header (Desktop & Admin Fluid Layout) */
+/* Glassmorphism Header (Desktop: Singola Riga Fluida v3.8.0) */
 .glass-header {
     position: static;
     transform: none;
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(255, 255, 255, 0.94);
     color: #0f172a;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 14px;
-    padding: 6px 14px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    padding: 8px 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     text-align: center;
     transition: all 0.3s ease;
     pointer-events: auto;
-    width: auto;
-    max-width: 98vw;
+    width: max-content;
+    max-width: 95vw;
     box-sizing: border-box;
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
+    gap: 14px;
 }
 
 .glass-header:hover {
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
-    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.97);
 }
 
 .header-row-title {
@@ -101,48 +100,55 @@ body {
 }
 
 h1 {
-    font-size: 0.96rem;
+    font-size: 1.02rem;
     font-weight: 700;
-    color: #0f172a;
     letter-spacing: -0.3px;
     display: flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 6px;
     margin: 0;
-    line-height: 1.2;
+    white-space: nowrap;
+}
+
+h1 span.city-name {
+    color: var(--primary);
 }
 
 .version-tag {
-    font-size: 0.70rem;
-    font-weight: 700;
+    font-size: 0.68rem;
+    font-weight: 600;
     color: var(--primary);
-    background: rgba(59, 130, 246, 0.12);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    padding: 1px 5px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    padding: 1px 6px;
     border-radius: 999px;
-    line-height: 1.2;
-    display: inline-flex;
-    align-items: center;
     vertical-align: middle;
-    white-space: nowrap;
-    flex-shrink: 0;
+    letter-spacing: 0;
+    display: inline-block;
 }
 
-/* Riga Controlli: Integrata su singola riga su PC con flex fluido */
+/* Riga Controlli: Integrata su singola riga su PC */
 .header-row-controls {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 10px;
     width: auto;
     flex-shrink: 0;
-    flex-wrap: wrap;
 }
 
-.user-actions-group {
+.header-search-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.header-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
 }
 
@@ -150,18 +156,18 @@ h1 {
     background: #059669;
     color: #ffffff;
     border: none;
-    border-radius: 7px;
-    padding: 0 11px;
-    height: 32px;
+    border-radius: 8px;
+    padding: 0 14px;
+    height: 34px;
     box-sizing: border-box;
-    font-size: 0.80rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     flex-shrink: 0;
     white-space: nowrap;
 }
@@ -170,107 +176,82 @@ h1 {
     display: inline !important;
     color: #ffffff !important;
     font-weight: 600 !important;
-    font-size: 0.80rem !important;
+    font-size: 0.82rem !important;
     vertical-align: middle;
 }
 
 .user-report-btn .report-icon {
-    font-size: 0.90rem;
+    font-size: 1rem;
     display: inline-block;
     vertical-align: middle;
 }
 
 .user-report-btn:hover {
     background: #047857;
-    box-shadow: 0 4px 10px rgba(5, 150, 105, 0.4);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
     transform: translateY(-1px);
 }
 
 .search-in-header {
     display: flex;
     align-items: center;
-    gap: 5px;
-    margin: 0;
-    width: auto;
-    max-width: none;
+    gap: 6px;
+    width: 230px;
+    max-width: 250px;
 }
 
 .search-in-header input {
-    width: 170px;
     height: 32px;
-    padding: 0 9px;
-    font-size: 0.80rem;
-    border-radius: 7px;
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    background: rgba(0, 0, 0, 0.04);
+    padding: 5px 10px;
+    font-size: 0.82rem;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
     color: #0f172a;
-    outline: none;
-    transition: all 0.2s ease;
+    width: 100%;
     box-sizing: border-box;
+    outline: none;
+    transition: all 0.2s;
 }
 
 .search-in-header input:focus {
-    background: #ffffff;
     border-color: var(--primary);
+    background: #ffffff;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    width: 210px;
 }
 
 .search-in-header button {
     height: 32px;
-    padding: 0 10px;
-    font-size: 0.78rem;
+    padding: 0 12px;
+    font-size: 0.80rem;
     font-weight: 600;
-    border-radius: 7px;
+    border-radius: 8px;
     background: var(--primary);
-    color: #ffffff;
+    color: white;
     border: none;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    box-sizing: border-box;
-    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
-    transition: all 0.2s;
     white-space: nowrap;
+    transition: background 0.2s;
 }
 
 .search-in-header button:hover {
     background: var(--primary-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
-}
-
-.search-in-header button .btn-text {
-    display: inline;
-}
-
-.search-in-header button .search-icon {
-    font-size: 0.80rem;
-    line-height: 1;
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
 }
 
 .icon-btn {
+    width: 32px;
+    min-width: 32px;
     height: 32px;
-    padding: 0 8px;
-    display: inline-flex;
+    padding: 0 !important;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    border-radius: 7px;
+    border-radius: 8px;
     cursor: pointer;
     background: #0f172a;
     color: #ffffff;
     border: 1px solid rgba(255, 255, 255, 0.15);
     transition: all 0.2s;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
 }
 
 .icon-btn:hover {
@@ -280,22 +261,8 @@ h1 {
 }
 
 .icon-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-#admin-logout-btn {
-    background: #fee2e2 !important;
-    color: #b91c1c !important;
-    border: 1px solid #fca5a5 !important;
-    padding: 0 9px !important;
-    font-weight: 700 !important;
-}
-
-#admin-logout-btn:hover {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-    border-color: #dc2626 !important;
+    width: 18px;
+    height: 18px;
 }
 
 .subtitle {

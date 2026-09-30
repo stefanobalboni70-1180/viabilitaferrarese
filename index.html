@@ -39,27 +39,28 @@
             <!-- Riga 1: Titolo e Versione -->
             <div class="header-row-title">
                 <div class="header-title-group">
-                    <h1>Situazione viabilità provincia <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v. 3.9.16</span></h1>
+                    <h1>Situazione viabilità provincia di <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v. 3.9.16</span></h1>
                 </div>
             </div>
 
-            <!-- Riga 2 (Desktop) / Righe 2 e 3 (Mobile) -->
+            <!-- Controlli: Su Desktop su singola riga ordinata; Su Mobile divisi in Riga 1 e Riga 2 -->
             <div class="header-row-controls">
-                <div class="user-actions-group">
+                <!-- Sezione Ricerca e Segnalazione Utente -->
+                <div class="header-search-row">
                     <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità" type="button">
                         <span class="report-icon">📢</span><span class="btn-text">Segnalazioni</span>
                     </button>
+                    <div class="admin-top-row search-in-header">
+                        <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
+                        <button id="admin-search-btn" title="Cerca via" type="button"><span class="search-icon">🔍</span><span class="btn-text">Cerca</span></button>
+                    </div>
+                </div>
+
+                <!-- Sezione Azioni e Strumenti Admin / Utente -->
+                <div class="header-actions-row">
                     <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118" type="button">
                         <span>🚨</span><span class="btn-text">News</span> <span id="user-news-badge" class="badge">0</span>
                     </button>
-                </div>
-
-                <div class="admin-top-row search-in-header">
-                    <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
-                    <button id="admin-search-btn" title="Cerca via" type="button"><span class="search-icon">🔍</span><span class="btn-text">Cerca</span></button>
-                </div>
-
-                <div class="header-actions">
                     <button id="admin-routes-btn" class="admin-routes-btn hidden" title="Gestione Percorsi ed Eventi Speciali" type="button">
                         <span>🚩</span> <span class="btn-text">Percorsi</span> <span id="admin-routes-badge" class="badge">0</span>
                     </button>
