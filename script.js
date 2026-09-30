@@ -196,7 +196,7 @@ function initFirebase() {
             deletedMarkersRef = db.ref("deleted_markers");
             urgentNewsRef = db.ref("urgent_news");
             customRoutesRef = db.ref("custom_routes");
-            authorizedUsersRef = db.ref("authorized_users");
+            authorizedUsersRef = db.ref("admin_settings/authorized_users");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
 
@@ -6815,24 +6815,118 @@ async function handleSendResetPasswordEmail() {
 
 // --- GESTIONE UTENTI ADMIN (PANNELLO AMMINISTRAZIONE) ---
 
+const DEFAULT_INITIAL_AUTHORIZED_USERS = [
+    {
+        uid: 'user_admin_principal',
+        name: 'Amministratore 118',
+        email: 'admin@viabilitaferrara.it',
+        role: 'admin',
+        status: 'active',
+        mustChangePassword: false,
+        createdAt: 1727720000000,
+        createdBy: 'system'
+    },
+    {
+        uid: 'user_elisa_biolcati',
+        name: 'Elisa Biolcati',
+        email: 'elisa.biolcati@118fe.it',
+        role: 'operator',
+        status: 'active',
+        mustChangePassword: true,
+        createdAt: Date.now(),
+        createdBy: 'admin'
+    }
+];
+
+function loadAuthorizedUsersFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('ferrara_authorized_users_cache');
+        if (saved) {
+            allAuthorizedUsers = JSON.parse(saved);
+        } else {
+            allAuthorizedUsers = [...DEFAULT_INITIAL_AUTHORIZED_USERS];
+            saveAuthorizedUsersToLocalStorage();
+        }
+    } catch (e) {
+        allAuthorizedUsers = [...DEFAULT_INITIAL_AUTHORIZED_USERS];
+    }
+}
+
+function saveAuthorizedUsersToLocalStorage() {
+    try {
+        localStorage.setItem('ferrara_authorized_users_cache', JSON.stringify(allAuthorizedUsers));
+    } catch (e) {
+        console.warn('Errore salvataggio cache utenti:', e);
+    }
+}
+
 let adminUsersListenerActive = false;
 
+// Sincronizzazione automatica utenti predefiniti (es. Elisa Biolcati e Admin)
+async function ensureDefaultAuthorizedUsers() {
+    if (!authorizedUsersRef) return;
+    try {
+        const snap = await authorizedUsersRef.once('value');
+        const val = snap.val() || {};
+        const entries = Object.values(val);
+
+        // Inserimento Elisa Biolcati se non presente
+        const hasElisa = entries.some(u => (u.email && u.email.toLowerCase().includes('elisa')) || (u.name && u.name.toLowerCase().includes('elisa')));
+        if (!hasElisa) {
+            const elisaKey = 'user_elisa_biolcati';
+            const elisaObj = {
+                uid: elisaKey,
+                name: 'Elisa Biolcati',
+                email: 'elisa.biolcati@118fe.it',
+                role: 'operator',
+                status: 'active',
+                mustChangePassword: true,
+                createdAt: Date.now(),
+                createdBy: 'admin'
+            };
+            await authorizedUsersRef.child(elisaKey).set(elisaObj);
+            console.log('✅ Account Elisa Biolcati inserito nel database');
+        }
+
+        // Inserimento Amministratore se non presente
+        const hasAdmin = entries.some(u => (u.email && u.email.toLowerCase().includes('admin')) || u.role === 'admin');
+        if (!hasAdmin) {
+            const adminKey = 'user_admin_principal';
+            await authorizedUsersRef.child(adminKey).set(DEFAULT_INITIAL_AUTHORIZED_USERS[0]);
+        }
+    } catch (e) {
+        console.warn('Sync utenti iniziali:', e);
+    }
+}
+
 function initAdminUsersListener() {
+    if (!allAuthorizedUsers || allAuthorizedUsers.length === 0) {
+        loadAuthorizedUsersFromLocalStorage();
+    }
+    updateAdminUsersBadge();
+    renderAdminUsersList();
+    ensureDefaultAuthorizedUsers();
+
     if (!authorizedUsersRef || adminUsersListenerActive) return;
     adminUsersListenerActive = true;
 
     authorizedUsersRef.on('value', (snapshot) => {
         const val = snapshot.val();
-        allAuthorizedUsers = [];
-        if (val) {
+        if (val && Object.keys(val).length > 0) {
+            allAuthorizedUsers = [];
             Object.keys(val).forEach(uid => {
                 allAuthorizedUsers.push({
                     uid: uid,
                     ...val[uid]
                 });
             });
-            // Ordina per data di creazione più recente
             allAuthorizedUsers.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            saveAuthorizedUsersToLocalStorage();
+        } else {
+            // Se Firebase è vuoto, sincronizza i default su Firebase
+            DEFAULT_INITIAL_AUTHORIZED_USERS.forEach(u => {
+                authorizedUsersRef.child(u.uid).set(u);
+            });
         }
         updateAdminUsersBadge();
         renderAdminUsersList();
@@ -6844,8 +6938,6 @@ function stopAdminUsersListener() {
         authorizedUsersRef.off('value');
         adminUsersListenerActive = false;
     }
-    allAuthorizedUsers = [];
-    updateAdminUsersBadge();
 }
 
 function updateAdminUsersBadge() {
@@ -6859,9 +6951,19 @@ function updateAdminUsersBadge() {
 function renderAdminUsersList() {
     const listEl = document.getElementById('admin-users-list');
     const searchInput = document.getElementById('admin-users-search-input');
+    const clearBtn = document.getElementById('clear-users-search-btn');
     if (!listEl) return;
 
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    if (!allAuthorizedUsers || allAuthorizedUsers.length === 0) {
+        loadAuthorizedUsersFromLocalStorage();
+    }
+
+    const rawQuery = searchInput ? searchInput.value.trim() : '';
+    const query = rawQuery.toLowerCase();
+
+    if (clearBtn) {
+        clearBtn.classList.toggle('hidden', rawQuery.length === 0);
+    }
 
     const filtered = allAuthorizedUsers.filter(u => {
         if (!query) return true;
@@ -6872,7 +6974,25 @@ function renderAdminUsersList() {
     });
 
     if (filtered.length === 0) {
-        listEl.innerHTML = `<div class="users-empty-state">${query ? 'Nessun utente trovato corrispondente alla ricerca.' : 'Nessun account operatore registrato.'}</div>`;
+        if (rawQuery) {
+            listEl.innerHTML = `
+                <div class="users-empty-state" style="text-align:center; padding:20px 10px;">
+                    <p style="font-size:0.95rem; color:#64748b; margin-bottom:10px;">Nessun utente trovato per "<strong>${escapeHtml(rawQuery)}</strong>".</p>
+                    <button type="button" class="btn-action-icon btn-action-success" onclick="document.getElementById('admin-users-search-input').value=''; renderAdminUsersList();" style="padding:8px 14px; font-weight:700;">
+                        🔄 Mostra tutti gli utenti (${allAuthorizedUsers.length})
+                    </button>
+                </div>
+            `;
+        } else {
+            listEl.innerHTML = `
+                <div class="users-empty-state" style="text-align:center; padding:20px 10px;">
+                    <p style="font-size:0.95rem; color:#64748b; margin-bottom:10px;">Nessun account operatore registrato.</p>
+                    <button type="button" class="primary-btn" onclick="openCreateUserModal();" style="padding:8px 14px;">
+                        ➕ Crea il primo utente
+                    </button>
+                </div>
+            `;
+        }
         return;
     }
 
@@ -6894,9 +7014,28 @@ function renderAdminUsersList() {
                     </div>
                     <div class="user-email-subtitle">
                         📧 <strong>${escapeHtml(u.email || '')}</strong>
-                        ${u.createdAt ? ` &bull; Creato il: ${new Date(u.createdAt).toLocaleDateString('it-IT')}` : ''}
+                        ${u.createdAt ? ` &bull; Registrato: ${new Date(u.createdAt).toLocaleDateString('it-IT')}` : ''}
                     </div>
                 </div>
+                <div class="user-card-actions">
+                    ${!isAdminRole && !isCurrentAuthUser ? `
+                        <button type="button" class="btn-action-icon ${isDisabled ? 'btn-action-success' : 'btn-action-danger'}" onclick="toggleUserStatus('${escapeHtml(u.uid)}', '${isDisabled ? 'active' : 'disabled'}')" title="${isDisabled ? 'Riabilita accesso utente' : 'Disabilita accesso utente'}">
+                            ${isDisabled ? '✅ Riabilita' : '🚫 Disabilita'}
+                        </button>
+                        <button type="button" class="btn-action-icon" onclick="triggerAdminSendReset('${escapeHtml(u.email)}')" title="Invia email per reimpostare password">
+                            📧 Reset PW
+                        </button>
+                        <button type="button" class="btn-action-icon btn-action-danger" onclick="deleteAuthorizedUser('${escapeHtml(u.uid)}', '${escapeHtml(u.name || u.email)}')" title="Elimina account utente">
+                            🗑️
+                        </button>
+                    ` : '<span style="font-size:0.75rem; color:#64748b; font-weight:700; padding:6px 8px;">(Account Amministratore)</span>'}
+                </div>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+}
                 <div class="user-card-actions">
                     ${!isCurrentAuthUser ? `
                         <button type="button" class="btn-action-icon ${isDisabled ? 'btn-action-success' : 'btn-action-danger'}" onclick="toggleUserStatus('${escapeHtml(u.uid)}', '${isDisabled ? 'active' : 'disabled'}')" title="${isDisabled ? 'Riabilita accesso utente' : 'Disabilita accesso utente'}">
@@ -7056,10 +7195,55 @@ async function handleCreateUserSubmit() {
         showToast(`Utente "${name}" creato con successo!`, "success", 3500);
     } catch (err) {
         console.error('Errore creazione utente:', err);
-        let msg = 'Errore creazione account: ' + err.message;
         if (err.code === 'auth/email-already-in-use') {
-            msg = `L'indirizzo "${normalizedEmail}" è già registrato nel sistema.`;
-        } else if (err.code === 'auth/invalid-email') {
+            // L'utente esiste già in Firebase Auth (es. creato prima del fix permessi).
+            // Proviamo a recuperare l'UID autenticandolo con la password fornita e salvando il profilo nel database!
+            try {
+                const tempAppName = 'RecoveryAuth_' + Date.now();
+                const tempApp = firebase.initializeApp(firebaseConfig, tempAppName);
+                const tempAuth = tempApp.auth();
+
+                const existingUserCred = await tempAuth.signInWithEmailAndPassword(normalizedEmail, password);
+                const existingUid = existingUserCred.user.uid;
+
+                await tempAuth.signOut();
+                await tempApp.delete();
+
+                const userProfile = {
+                    uid: existingUid,
+                    name: name,
+                    email: normalizedEmail,
+                    role: role,
+                    status: 'active',
+                    mustChangePassword: mustChange,
+                    createdAt: Date.now(),
+                    createdBy: auth?.currentUser?.email || 'admin'
+                };
+
+                await authorizedUsersRef.child(existingUid).set(userProfile);
+
+                const createModal = document.getElementById('create-user-modal');
+                if (createModal) createModal.classList.add('hidden');
+
+                showCreatedUserSuccessModal(name, normalizedEmail, password, role);
+                showToast(`Account "${name}" sincronizzato con successo!`, "success", 3500);
+                return;
+            } catch (recoveryErr) {
+                console.warn('Errore recovery utente:', recoveryErr);
+                let recoveryMsg = `L'indirizzo "${normalizedEmail}" è già registrato.`;
+                if (recoveryErr.code === 'auth/wrong-password' || recoveryErr.code === 'auth/invalid-credential') {
+                    recoveryMsg = `L'utente "${normalizedEmail}" esiste già con un'altra password. Inserisci la password corretta per collegarlo o usa un altro username.`;
+                }
+                if (errorEl) {
+                    errorEl.textContent = recoveryMsg;
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+        }
+
+        let msg = 'Errore creazione account: ' + err.message;
+        if (err.code === 'auth/invalid-email') {
             msg = 'Indirizzo email non valido.';
         }
         if (errorEl) {
@@ -7180,6 +7364,7 @@ function initUsersModule() {
 
     if (adminUsersBtn) {
         adminUsersBtn.addEventListener('click', () => {
+            initAdminUsersListener();
             document.getElementById('admin-users-modal')?.classList.remove('hidden');
             renderAdminUsersList();
         });

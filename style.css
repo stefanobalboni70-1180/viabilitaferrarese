@@ -3776,21 +3776,64 @@ h1 {
 }
 
 /* Admin Users Management Modal */
-.admin-users-content {
-    max-width: 680px !important;
-}
-
 .admin-users-toolbar {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 12px;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .admin-users-search-box {
     flex: 1;
-    min-width: 200px;
+    min-width: 220px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-box-icon {
+    position: absolute;
+    left: 12px;
+    font-size: 15px;
+    color: #64748b;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.admin-users-search-box input {
+    width: 100% !important;
+    padding: 10px 34px 10px 36px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 10px !important;
+    font-size: 0.90rem !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+}
+
+.admin-users-search-box input:focus {
+    border-color: #0d9488 !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2) !important;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 50%;
+    line-height: 1;
+    transition: all 0.2s;
+}
+
+.clear-search-btn:hover {
+    color: #0f172a;
+    background: #e2e8f0;
 }
 
 .admin-users-stats {
