@@ -1,5 +1,5 @@
-﻿// Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.14';
+// Viabilità Ferrara 118 - Client App Logic
+const APP_VERSION = '3.9.15';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -58,6 +58,7 @@ let markersRef = null;
 let reportsRef = null;
 let deletedMarkersRef = null;
 let urgentNewsRef = null;
+let customRoutesRef = null;
 let urgentNewsData = []; // Notizie urgenti attive (massimo 3)
 let allUrgentNewsRaw = []; // Tutte le notizie (inclusi stati inattivi/scaduti per l'admin)
 let urgentNewsTimerInterval = null;
@@ -189,11 +190,15 @@ function initFirebase() {
             reportsRef = db.ref("user_reports");
             deletedMarkersRef = db.ref("deleted_markers");
             urgentNewsRef = db.ref("urgent_news");
+            customRoutesRef = db.ref("custom_routes");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
 
             // Inizializza ascolto Notizie Urgenti 118
             initUrgentNewsListener();
+
+            // Inizializza ascolto Percorsi ed Eventi Speciali
+            initCustomRoutesListener();
 
             // Ascolto in tempo reale degli eventi eliminati definitivamente
             deletedMarkersRef.on('value', function (snapshot) {
@@ -249,8 +254,10 @@ function initFirebase() {
         reportsRef = null;
         deletedMarkersRef = null;
         urgentNewsRef = null;
+        customRoutesRef = null;
         isFirebaseOnline = false;
         loadUrgentNewsFromLocalStorage();
+        loadCustomRoutesFromLocalStorage();
     }
 }
 
@@ -1772,6 +1779,28 @@ let selectedAdminType = 'lavori';
 let selectedScheduleMode = 'always'; // 'always' | 'window' | 'recurring'
 let selectedRecurringDays = [1, 2, 3, 4, 5]; // Default: Lun-Ven
 
+// Stato Percorsi ed Eventi Speciali (Admin)
+let customRoutesData = [];
+let activeCustomRouteLayers = {};
+let isDrawingCustomRoute = false;
+let drawingRoutePoints = [];
+let drawingPolyline = null;
+let drawingMarkersGroup = null;
+let editingRouteId = null;
+let selectedRouteType = 'corteo';
+let selectedRouteColor = '#8b5cf6';
+let selectedRouteScheduleMode = 'manual';
+
+// Tipologie Percorsi Evento
+const ROUTE_TYPES_CONFIG = {
+    corteo: { icon: '🚩', label: 'Corteo / Manifestazione' },
+    gara: { icon: '🏃', label: 'Gara Podistica' },
+    ciclismo: { icon: '🚴', label: 'Gara Ciclistica' },
+    sfilata: { icon: '🎭', label: 'Sfilata / Carnevale' },
+    processione: { icon: '🕯️', label: 'Processione Religiosa' },
+    altro: { icon: '🌟', label: 'Altro Evento Speciale' }
+};
+
 // Elementi DOM (Admin Markers Modal & Form)
 const modalOverlay = document.getElementById('marker-modal');
 const closeModalBtn = document.getElementById('close-modal');
@@ -1840,6 +1869,45 @@ const adminReportsList = document.getElementById('admin-reports-list');
 const reportsBadge = document.getElementById('reports-badge');
 const adminReportsCount = document.getElementById('admin-reports-count');
 
+// Elementi DOM (Admin Percorsi & Eventi)
+const adminRoutesBtn = document.getElementById('admin-routes-btn');
+const adminRoutesBadge = document.getElementById('admin-routes-badge');
+const adminRoutesModal = document.getElementById('admin-routes-modal');
+const closeAdminRoutesModalBtn = document.getElementById('close-admin-routes-modal');
+const startDrawRouteBtn = document.getElementById('start-draw-route-btn');
+const adminRoutesItemsList = document.getElementById('admin-routes-items-list');
+const adminRoutesCount = document.getElementById('admin-routes-count');
+const adminRoutesTotalCount = document.getElementById('admin-routes-total-count');
+
+// Elementi DOM (Toolbar Disegno Percorso)
+const routeDrawToolbar = document.getElementById('route-draw-toolbar');
+const routePointsCount = document.getElementById('route-points-count');
+const routeUndoPtBtn = document.getElementById('route-undo-pt-btn');
+const routeClearPtsBtn = document.getElementById('route-clear-pts-btn');
+const routeFinishDrawBtn = document.getElementById('route-finish-draw-btn');
+const routeCancelDrawBtn = document.getElementById('route-cancel-draw-btn');
+
+// Elementi DOM (Modal Configurazione Percorso)
+const routeEditModal = document.getElementById('route-edit-modal');
+const closeRouteEditModalBtn = document.getElementById('close-route-edit-modal');
+const routeEditModalTitle = document.getElementById('route-edit-modal-title');
+const routeNameInput = document.getElementById('route-name-input');
+const routeTypesCards = document.querySelectorAll('#route-types-grid .route-type-card');
+const routeColorSwatches = document.querySelectorAll('#route-color-palette .color-swatch-btn');
+const routeCustomColor = document.getElementById('route-custom-color');
+const routeWeightSelect = document.getElementById('route-weight-select');
+const routeDashSelect = document.getElementById('route-dash-select');
+const routeNoteInput = document.getElementById('route-note-input');
+const routeActiveToggle = document.getElementById('route-active-toggle');
+const routeActiveStatusText = document.getElementById('route-active-status-text');
+const routeSchedTypeBtns = document.querySelectorAll('.route-sched-type-btn');
+const routeSchedWindowBlock = document.getElementById('route-sched-window-block');
+const routeSchedStart = document.getElementById('route-sched-start');
+const routeSchedEnd = document.getElementById('route-sched-end');
+const routeEditError = document.getElementById('route-edit-error');
+const routeCancelSaveBtn = document.getElementById('route-cancel-save-btn');
+const routeConfirmSaveBtn = document.getElementById('route-confirm-save-btn');
+
 // Mostra un messaggio Toast
 function showToast(message, type = 'normal', duration = 3500) {
     const toast = document.getElementById('toast');
@@ -1855,6 +1923,7 @@ function showToast(message, type = 'normal', duration = 3500) {
 // Aggiorna UI in base allo stato
 function updateUI() {
     const adminNewsBtn = document.getElementById('admin-news-btn');
+    const adminRoutesBtn = document.getElementById('admin-routes-btn');
     document.body.classList.toggle('admin-logged-in', !!isAdmin);
 
     if (isAdmin) {
@@ -1864,6 +1933,7 @@ function updateUI() {
         if (adminFilterBar) adminFilterBar.classList.remove('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.remove('hidden');
         if (adminNewsBtn) adminNewsBtn.classList.remove('hidden');
+        if (adminRoutesBtn) adminRoutesBtn.classList.remove('hidden');
         headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
     } else {
         if (searchContainer) searchContainer.classList.add('hidden');
@@ -1872,10 +1942,15 @@ function updateUI() {
         if (adminFilterBar) adminFilterBar.classList.add('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.add('hidden');
         if (adminNewsBtn) adminNewsBtn.classList.add('hidden');
+        if (adminRoutesBtn) adminRoutesBtn.classList.add('hidden');
+        if (isDrawingCustomRoute) {
+            cancelDrawingCustomRoute();
+        }
         headerSubtitle.textContent = "Modalità Visualizzazione: clicca sui marker per i dettagli";
     }
-    // Ridisegna i marker
+    // Ridisegna i marker e i percorsi speciali
     refreshMarkers();
+    renderCustomRoutesOnMap();
 }
 
 // Inizializzazione Mappa
@@ -1901,12 +1976,20 @@ function initMap() {
 
     // Evento doppio click sulla mappa (solo admin)
     map.on('dblclick', function (e) {
-        if (!isAdmin) return;
+        if (!isAdmin || isDrawingCustomRoute) return;
         openMarkerModal(e.latlng);
     });
 
-    // Evento click sulla mappa (per selezione punto da parte dell'utente o per navigazione)
+    // Evento click sulla mappa (per selezione punto da parte dell'utente, tracciamento percorso o navigazione)
     map.on('click', async function (e) {
+        if (isDrawingCustomRoute) {
+            const lat = Number(e.latlng.lat.toFixed(6));
+            const lng = Number(e.latlng.lng.toFixed(6));
+            drawingRoutePoints.push([lat, lng]);
+            updateDrawingRoutePreview();
+            return;
+        }
+
         if (navPickerMode) {
             const mode = navPickerMode;
             navPickerMode = null;
@@ -5582,9 +5665,776 @@ function initPushModule() {
     loadFcmKeysFromDb();
 }
 
-// Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone
+// =======================================================
+// MODULO GESTIONE TRACCIATI E PERCORSI EVENTI SPECIALI (ADMIN)
+// =======================================================
+
+function initCustomRoutesListener() {
+    if (!isFirebaseOnline || !customRoutesRef) return;
+
+    customRoutesRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        customRoutesData = [];
+        if (val) {
+            Object.entries(val).forEach(([key, item]) => {
+                customRoutesData.push({
+                    id: key,
+                    ...item
+                });
+            });
+            // Ordina per data creazione decrescente
+            customRoutesData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        }
+
+        // Cache locale offline
+        try {
+            localStorage.setItem('ferrara_viabilita_custom_routes', JSON.stringify(customRoutesData));
+        } catch (e) { }
+
+        renderCustomRoutesOnMap();
+        renderAdminRoutesList();
+        updateAdminRoutesBadge();
+    }, (err) => {
+        console.warn("Errore lettura custom_routes Firebase:", err.message);
+        loadCustomRoutesFromLocalStorage();
+    });
+}
+
+function loadCustomRoutesFromLocalStorage() {
+    try {
+        const cached = localStorage.getItem('ferrara_viabilita_custom_routes');
+        if (cached) {
+            customRoutesData = JSON.parse(cached);
+        } else {
+            customRoutesData = [];
+        }
+    } catch (e) {
+        customRoutesData = [];
+    }
+    renderCustomRoutesOnMap();
+    renderAdminRoutesList();
+    updateAdminRoutesBadge();
+}
+
+function calculateRouteDistance(points) {
+    if (!points || points.length < 2) return '0 m';
+    let totalMeters = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        const p1 = L.latLng(points[i][0], points[i][1]);
+        const p2 = L.latLng(points[i + 1][0], points[i + 1][1]);
+        totalMeters += p1.distanceTo(p2);
+    }
+    if (totalMeters >= 1000) {
+        return (totalMeters / 1000).toFixed(2) + ' km';
+    }
+    return Math.round(totalMeters) + ' m';
+}
+
+function getDashArray(dashStyle) {
+    if (dashStyle === 'dashed') return '12, 10';
+    if (dashStyle === 'dotted') return '4, 8';
+    return null;
+}
+
+function isCustomRouteVisible(route, now = new Date()) {
+    if (!route || !route.points || route.points.length < 2) return false;
+    
+    // Se non è attivo manualmente, non è visibile
+    if (route.active === false) return false;
+
+    // Se è impostata una finestra temporale
+    if (route.scheduleMode === 'window') {
+        if (route.schedStart) {
+            const startDate = new Date(route.schedStart);
+            if (!isNaN(startDate.getTime()) && now < startDate) return false;
+        }
+        if (route.schedEnd) {
+            const endDate = new Date(route.schedEnd);
+            if (!isNaN(endDate.getTime()) && now > endDate) return false;
+        }
+    }
+
+    return true;
+}
+
+function updateAdminRoutesBadge() {
+    const activeCount = customRoutesData.filter(r => isCustomRouteVisible(r)).length;
+    if (adminRoutesBadge) {
+        adminRoutesBadge.textContent = activeCount;
+    }
+    if (adminRoutesCount) {
+        adminRoutesCount.textContent = `${activeCount} attivi`;
+    }
+    if (adminRoutesTotalCount) {
+        adminRoutesTotalCount.textContent = customRoutesData.length;
+    }
+}
+
+function renderCustomRoutesOnMap() {
+    if (!map) return;
+    const now = new Date();
+
+    const currentVisibleIds = new Set();
+
+    customRoutesData.forEach((route) => {
+        const visible = isCustomRouteVisible(route, now);
+        if (visible) {
+            currentVisibleIds.add(route.id);
+            const color = route.color || '#8b5cf6';
+            const weight = Number(route.weight) || 6;
+            const dashArray = getDashArray(route.dashStyle);
+            const typeConfig = ROUTE_TYPES_CONFIG[route.type] || ROUTE_TYPES_CONFIG['corteo'];
+
+            const polylineOptions = {
+                color: color,
+                weight: weight,
+                opacity: 0.92,
+                lineJoin: 'round',
+                lineCap: 'round',
+                dashArray: dashArray,
+                className: 'custom-event-route-polyline'
+            };
+
+            if (!activeCustomRouteLayers[route.id]) {
+                const polyline = L.polyline(route.points, polylineOptions).addTo(map);
+
+                // Tooltip
+                polyline.bindTooltip(`${typeConfig.icon} ${escapeHtml(route.name)}`, {
+                    permanent: false,
+                    direction: 'center',
+                    className: 'custom-route-tooltip'
+                });
+
+                // Popup
+                polyline.bindPopup(createRoutePopupContent(route), {
+                    className: 'custom-route-popup',
+                    maxWidth: 320
+                });
+
+                activeCustomRouteLayers[route.id] = polyline;
+            } else {
+                const existingLayer = activeCustomRouteLayers[route.id];
+                existingLayer.setLatLngs(route.points);
+                existingLayer.setStyle(polylineOptions);
+                existingLayer.setTooltipContent(`${typeConfig.icon} ${escapeHtml(route.name)}`);
+                existingLayer.setPopupContent(createRoutePopupContent(route));
+            }
+        }
+    });
+
+    // Rimuovi layer non più visibili o eliminati
+    Object.keys(activeCustomRouteLayers).forEach((routeId) => {
+        if (!currentVisibleIds.has(routeId)) {
+            map.removeLayer(activeCustomRouteLayers[routeId]);
+            delete activeCustomRouteLayers[routeId];
+        }
+    });
+
+    updateAdminRoutesBadge();
+}
+
+function createRoutePopupContent(route) {
+    const typeConfig = ROUTE_TYPES_CONFIG[route.type] || ROUTE_TYPES_CONFIG['corteo'];
+    const distText = route.distanceText || calculateRouteDistance(route.points);
+    let schedHtml = '';
+    if (route.scheduleMode === 'window' && (route.schedStart || route.schedEnd)) {
+        const startStr = route.schedStart ? new Date(route.schedStart).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Subito';
+        const endStr = route.schedEnd ? new Date(route.schedEnd).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Sempre';
+        schedHtml = `<div class="custom-route-popup-meta">⏱️ <strong>Orario previsto:</strong> dal ${startStr} al ${endStr}</div>`;
+    }
+
+    let adminActionsHtml = '';
+    if (isAdmin) {
+        const activeText = route.active ? '⚪ Nascondi' : '🟢 Mostra';
+        adminActionsHtml = `
+            <div class="custom-route-popup-actions">
+                <button type="button" class="route-icon-btn" onclick="toggleCustomRouteVisibility('${escapeHtml(route.id)}')" title="Attiva o disattiva visibilità">${activeText}</button>
+                <button type="button" class="route-icon-btn" onclick="editCustomRoute('${escapeHtml(route.id)}')" title="Modifica dettagli percorso">✏️ Modifica</button>
+                <button type="button" class="route-icon-btn delete" onclick="deleteCustomRoute('${escapeHtml(route.id)}')" title="Elimina percorso">🗑️ Elimina</button>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="custom-route-popup-content" style="--route-color: ${escapeHtml(route.color || '#8b5cf6')};">
+            <div class="custom-route-popup-header">
+                <span class="custom-route-popup-icon">${typeConfig.icon}</span>
+                <h4 class="custom-route-popup-title">${escapeHtml(route.name)}</h4>
+            </div>
+            <div class="custom-route-popup-meta">
+                <span class="route-item-type-badge">${typeConfig.label}</span>
+                <span>• Lunghezza: <strong>${distText}</strong></span>
+            </div>
+            ${schedHtml}
+            ${route.note ? `<div class="custom-route-popup-note"><strong>Note:</strong> ${escapeHtml(route.note)}</div>` : ''}
+            ${adminActionsHtml}
+        </div>
+    `;
+}
+
+function renderAdminRoutesList() {
+    if (!adminRoutesItemsList) return;
+
+    if (customRoutesData.length === 0) {
+        adminRoutesItemsList.innerHTML = `
+            <div style="text-align:center; padding: 24px 12px; color: #94a3b8; font-size: 0.9rem;">
+                <p>Nessun percorso speciale tracciato.</p>
+                <small>Clicca sul pulsante in alto per tracciare a mano un corteo, gara o evento sulla mappa.</small>
+            </div>
+        `;
+        return;
+    }
+
+    const now = new Date();
+    let html = '';
+
+    customRoutesData.forEach((route) => {
+        const isNowVisible = isCustomRouteVisible(route, now);
+        const typeConfig = ROUTE_TYPES_CONFIG[route.type] || ROUTE_TYPES_CONFIG['corteo'];
+        const distText = route.distanceText || calculateRouteDistance(route.points);
+        const color = route.color || '#8b5cf6';
+
+        let statusBadge = '';
+        if (route.active) {
+            if (isNowVisible) {
+                statusBadge = '<span style="color:#4ade80; font-weight:700;">🟢 Attivo sulla mappa</span>';
+            } else {
+                statusBadge = '<span style="color:#facc15; font-weight:600;">⏳ Programmato (orario futuro/passato)</span>';
+            }
+        } else {
+            statusBadge = '<span style="color:#94a3b8; font-weight:600;">⚪ Nascosto</span>';
+        }
+
+        let schedSummary = '';
+        if (route.scheduleMode === 'window' && (route.schedStart || route.schedEnd)) {
+            const startStr = route.schedStart ? new Date(route.schedStart).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Subito';
+            const endStr = route.schedEnd ? new Date(route.schedEnd).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Indefinito';
+            schedSummary = `<div class="route-item-meta">⏱️ ${startStr} ➔ ${endStr}</div>`;
+        }
+
+        html += `
+            <div class="route-item-card" data-route-id="${escapeHtml(route.id)}">
+                <div class="route-item-info">
+                    <span class="route-color-indicator" style="background-color: ${escapeHtml(color)}; color: ${escapeHtml(color)};"></span>
+                    <div class="route-item-texts">
+                        <div class="route-item-title-row">
+                            <span class="route-item-name">${escapeHtml(route.name)}</span>
+                            <span class="route-item-type-badge">${typeConfig.icon} ${typeConfig.label}</span>
+                        </div>
+                        <div class="route-item-meta">
+                            <span>Lunghezza: <strong>${distText}</strong> (${route.points ? route.points.length : 0} punti) • ${statusBadge}</span>
+                        </div>
+                        ${schedSummary}
+                        ${route.note ? `<div class="route-item-meta" style="color:#cbd5e1; font-style:italic;">"${escapeHtml(route.note)}"</div>` : ''}
+                    </div>
+                </div>
+
+                <div class="route-item-actions">
+                    <button type="button" class="route-icon-btn" onclick="zoomToCustomRoute('${escapeHtml(route.id)}')" title="Centra e visualizza sulla mappa">🔍 Mappa</button>
+                    <button type="button" class="route-icon-btn" onclick="toggleCustomRouteVisibility('${escapeHtml(route.id)}')" title="${route.active ? 'Disattiva e nascondi' : 'Attiva e rendi visibile'}">
+                        ${route.active ? '👁️ Nascondi' : '🟢 Mostra'}
+                    </button>
+                    <button type="button" class="route-icon-btn" onclick="editCustomRoute('${escapeHtml(route.id)}')" title="Modifica dettagli e colore">✏️</button>
+                    <button type="button" class="route-icon-btn delete" onclick="deleteCustomRoute('${escapeHtml(route.id)}')" title="Elimina definitivamente">🗑️</button>
+                </div>
+            </div>
+        `;
+    });
+
+    adminRoutesItemsList.innerHTML = html;
+}
+
+// Modalità Disegno a Mano Libera / Punti
+function startDrawingCustomRoute() {
+    if (!isAdmin) {
+        showToast("Accesso riservato all'amministratore.", "warning", 3000);
+        return;
+    }
+
+    isDrawingCustomRoute = true;
+    drawingRoutePoints = [];
+
+    // Chiudi modale lista
+    if (adminRoutesModal) adminRoutesModal.classList.add('hidden');
+
+    // Mostra toolbar
+    if (routeDrawToolbar) routeDrawToolbar.classList.remove('hidden');
+    if (routePointsCount) routePointsCount.textContent = '0';
+
+    if (map) {
+        map.doubleClickZoom.disable();
+    }
+
+    showToast("🚩 Tocca o clicca sulla mappa punto dopo punto per tracciare il percorso.", "info", 4000);
+}
+
+function updateDrawingRoutePreview() {
+    if (routePointsCount) {
+        routePointsCount.textContent = drawingRoutePoints.length;
+    }
+
+    if (!map) return;
+
+    if (!drawingPolyline) {
+        drawingPolyline = L.polyline(drawingRoutePoints, {
+            color: selectedRouteColor || '#8b5cf6',
+            weight: 6,
+            opacity: 0.9,
+            dashArray: '8, 8',
+            lineJoin: 'round',
+            lineCap: 'round'
+        }).addTo(map);
+    } else {
+        drawingPolyline.setLatLngs(drawingRoutePoints);
+        drawingPolyline.setStyle({ color: selectedRouteColor || '#8b5cf6' });
+    }
+
+    if (!drawingMarkersGroup) {
+        drawingMarkersGroup = L.layerGroup().addTo(map);
+    } else {
+        drawingMarkersGroup.clearLayers();
+    }
+
+    drawingRoutePoints.forEach((pt, index) => {
+        const isStart = index === 0;
+        const isEnd = index === drawingRoutePoints.length - 1;
+        const radius = (isStart || isEnd) ? 6 : 4;
+        const fillColor = isStart ? '#22c55e' : (isEnd ? '#ef4444' : (selectedRouteColor || '#8b5cf6'));
+
+        L.circleMarker(pt, {
+            radius: radius,
+            color: '#ffffff',
+            fillColor: fillColor,
+            fillOpacity: 1,
+            weight: 2
+        }).addTo(drawingMarkersGroup);
+    });
+}
+
+function undoLastDrawingPoint() {
+    if (drawingRoutePoints.length > 0) {
+        drawingRoutePoints.pop();
+        updateDrawingRoutePreview();
+        showToast("Ultimo punto rimosso.", "normal", 1500);
+    }
+}
+
+function clearDrawingPoints() {
+    drawingRoutePoints = [];
+    if (drawingPolyline && map) {
+        map.removeLayer(drawingPolyline);
+        drawingPolyline = null;
+    }
+    if (drawingMarkersGroup && map) {
+        drawingMarkersGroup.clearLayers();
+    }
+    if (routePointsCount) routePointsCount.textContent = '0';
+    showToast("Tracciato azzerato.", "normal", 1500);
+}
+
+function cancelDrawingCustomRoute() {
+    isDrawingCustomRoute = false;
+    clearDrawingPoints();
+    if (routeDrawToolbar) routeDrawToolbar.classList.add('hidden');
+    if (map) {
+        map.doubleClickZoom.enable();
+    }
+}
+
+function finishDrawingCustomRoute() {
+    if (drawingRoutePoints.length < 2) {
+        showToast("Traccia almeno 2 punti sulla mappa per creare il percorso!", "warning", 3500);
+        return;
+    }
+
+    openRouteEditModal(null, drawingRoutePoints);
+}
+
+function openRouteEditModal(routeObj = null, points = null) {
+    if (!isAdmin) return;
+
+    const modal = document.getElementById('route-edit-modal');
+    if (!modal) return;
+
+    if (routeEditError) routeEditError.classList.add('hidden');
+
+    if (routeObj) {
+        // Modalità Modifica
+        editingRouteId = routeObj.id;
+        if (routeEditModalTitle) routeEditModalTitle.textContent = "✏️ Modifica Percorso Evento";
+        if (routeNameInput) routeNameInput.value = routeObj.name || '';
+        selectedRouteType = routeObj.type || 'corteo';
+        selectedRouteColor = routeObj.color || '#8b5cf6';
+        if (routeWeightSelect) routeWeightSelect.value = String(routeObj.weight || 6);
+        if (routeDashSelect) routeDashSelect.value = routeObj.dashStyle || 'solid';
+        if (routeNoteInput) routeNoteInput.value = routeObj.note || '';
+        if (routeActiveToggle) routeActiveToggle.checked = (routeObj.active !== false);
+        selectedRouteScheduleMode = routeObj.scheduleMode || 'manual';
+        if (routeSchedStart) routeSchedStart.value = routeObj.schedStart || '';
+        if (routeSchedEnd) routeSchedEnd.value = routeObj.schedEnd || '';
+    } else {
+        // Modalità Nuovo Percorso
+        editingRouteId = null;
+        if (routeEditModalTitle) routeEditModalTitle.textContent = "🚩 Configura Percorso Evento";
+        if (routeNameInput) routeNameInput.value = '';
+        selectedRouteType = 'corteo';
+        selectedRouteColor = '#8b5cf6';
+        if (routeWeightSelect) routeWeightSelect.value = '6';
+        if (routeDashSelect) routeDashSelect.value = 'solid';
+        if (routeNoteInput) routeNoteInput.value = '';
+        if (routeActiveToggle) routeActiveToggle.checked = true;
+        selectedRouteScheduleMode = 'manual';
+        if (routeSchedStart) routeSchedStart.value = '';
+        if (routeSchedEnd) routeSchedEnd.value = '';
+    }
+
+    // Aggiorna UI selettori
+    updateRouteTypesGridUI();
+    updateRouteColorPaletteUI();
+    updateRouteActiveStatusUI();
+    updateRouteSchedModeUI();
+
+    modal.classList.remove('hidden');
+}
+
+function closeRouteEditModal() {
+    if (routeEditModal) routeEditModal.classList.add('hidden');
+}
+
+function updateRouteTypesGridUI() {
+    if (routeTypesCards) {
+        routeTypesCards.forEach(card => {
+            if (card.getAttribute('data-type') === selectedRouteType) {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        });
+    }
+}
+
+function updateRouteColorPaletteUI() {
+    if (routeColorSwatches) {
+        let matchFound = false;
+        routeColorSwatches.forEach(swatch => {
+            const col = swatch.getAttribute('data-color');
+            if (col && col.toLowerCase() === (selectedRouteColor || '').toLowerCase()) {
+                swatch.classList.add('active');
+                matchFound = true;
+            } else {
+                swatch.classList.remove('active');
+            }
+        });
+        if (routeCustomColor) {
+            routeCustomColor.value = selectedRouteColor || '#8b5cf6';
+        }
+    }
+}
+
+function updateRouteActiveStatusUI() {
+    if (routeActiveStatusText && routeActiveToggle) {
+        if (routeActiveToggle.checked) {
+            routeActiveStatusText.textContent = "🟢 Visibile subito al pubblico";
+            routeActiveStatusText.style.color = "#4ade80";
+        } else {
+            routeActiveStatusText.textContent = "⚪ Nascosto / Non visibile";
+            routeActiveStatusText.style.color = "#94a3b8";
+        }
+    }
+}
+
+function updateRouteSchedModeUI() {
+    if (routeSchedTypeBtns) {
+        routeSchedTypeBtns.forEach(btn => {
+            if (btn.getAttribute('data-mode') === selectedRouteScheduleMode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+    if (routeSchedWindowBlock) {
+        if (selectedRouteScheduleMode === 'window') {
+            routeSchedWindowBlock.classList.remove('hidden');
+        } else {
+            routeSchedWindowBlock.classList.add('hidden');
+        }
+    }
+}
+
+async function saveCustomRouteFromForm() {
+    if (!isAdmin) {
+        showToast("Accesso riservato all'amministratore.", "warning", 3000);
+        return;
+    }
+
+    const name = (routeNameInput ? routeNameInput.value : '').trim();
+    if (!name) {
+        if (routeEditError) {
+            routeEditError.textContent = "Inserisci il nome del percorso o dell'evento!";
+            routeEditError.classList.remove('hidden');
+        }
+        return;
+    }
+
+    let points = [];
+    let existingItem = null;
+
+    if (editingRouteId) {
+        existingItem = customRoutesData.find(r => r.id === editingRouteId);
+        if (existingItem) {
+            points = (drawingRoutePoints && drawingRoutePoints.length >= 2) ? drawingRoutePoints : existingItem.points;
+        }
+    } else {
+        points = drawingRoutePoints;
+    }
+
+    if (!points || points.length < 2) {
+        if (routeEditError) {
+            routeEditError.textContent = "Il percorso deve contenere almeno 2 punti!";
+            routeEditError.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const distText = calculateRouteDistance(points);
+    const id = editingRouteId || ('route_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+    const nowTs = Date.now();
+
+    const payload = {
+        name: name,
+        type: selectedRouteType || 'corteo',
+        color: selectedRouteColor || '#8b5cf6',
+        weight: Number(routeWeightSelect ? routeWeightSelect.value : 6) || 6,
+        dashStyle: routeDashSelect ? routeDashSelect.value : 'solid',
+        note: (routeNoteInput ? routeNoteInput.value : '').trim(),
+        active: routeActiveToggle ? routeActiveToggle.checked : true,
+        scheduleMode: selectedRouteScheduleMode || 'manual',
+        schedStart: (selectedRouteScheduleMode === 'window' && routeSchedStart) ? routeSchedStart.value : '',
+        schedEnd: (selectedRouteScheduleMode === 'window' && routeSchedEnd) ? routeSchedEnd.value : '',
+        points: points,
+        distanceText: distText,
+        updatedAt: nowTs,
+        createdAt: existingItem ? (existingItem.createdAt || nowTs) : nowTs
+    };
+
+    try {
+        if (isFirebaseOnline && customRoutesRef) {
+            await customRoutesRef.child(id).set(payload);
+        } else {
+            const idx = customRoutesData.findIndex(r => r.id === id);
+            if (idx >= 0) {
+                customRoutesData[idx] = { id, ...payload };
+            } else {
+                customRoutesData.unshift({ id, ...payload });
+            }
+            localStorage.setItem('ferrara_viabilita_custom_routes', JSON.stringify(customRoutesData));
+            renderCustomRoutesOnMap();
+            renderAdminRoutesList();
+            updateAdminRoutesBadge();
+        }
+
+        closeRouteEditModal();
+        cancelDrawingCustomRoute();
+        showToast(editingRouteId ? "Percorso aggiornato con successo!" : "Nuovo percorso evento salvato!", "success", 3500);
+    } catch (err) {
+        console.error("Errore salvataggio custom route:", err);
+        if (routeEditError) {
+            routeEditError.textContent = "Errore durante il salvataggio: " + err.message;
+            routeEditError.classList.remove('hidden');
+        }
+    }
+}
+
+// Funzioni Globali per i bottoni (popup e lista)
+window.toggleCustomRouteVisibility = async function (id) {
+    if (!isAdmin) {
+        showToast("Accesso riservato all'amministratore.", "warning", 3000);
+        return;
+    }
+    const route = customRoutesData.find(r => r.id === id);
+    if (!route) return;
+
+    const newActiveState = !route.active;
+
+    try {
+        if (isFirebaseOnline && customRoutesRef) {
+            await customRoutesRef.child(id).update({ active: newActiveState, updatedAt: Date.now() });
+        } else {
+            route.active = newActiveState;
+            route.updatedAt = Date.now();
+            localStorage.setItem('ferrara_viabilita_custom_routes', JSON.stringify(customRoutesData));
+            renderCustomRoutesOnMap();
+            renderAdminRoutesList();
+            updateAdminRoutesBadge();
+        }
+        showToast(newActiveState ? "Percorso reso visibile sulla mappa!" : "Percorso nascosto dalla mappa.", "info", 2500);
+    } catch (err) {
+        console.error("Errore modifica visibilità percorso:", err);
+        showToast("Errore durante l'aggiornamento: " + err.message, "error", 3500);
+    }
+};
+
+window.editCustomRoute = function (id) {
+    if (!isAdmin) {
+        showToast("Accesso riservato all'amministratore.", "warning", 3000);
+        return;
+    }
+    const route = customRoutesData.find(r => r.id === id);
+    if (!route) return;
+    openRouteEditModal(route);
+};
+
+window.deleteCustomRoute = async function (id) {
+    if (!isAdmin) {
+        showToast("Accesso riservato all'amministratore.", "warning", 3000);
+        return;
+    }
+    const route = customRoutesData.find(r => r.id === id);
+    if (!route) return;
+
+    if (!confirm(`Sei sicuro di voler eliminare definitivamente il percorso "${route.name}"?`)) {
+        return;
+    }
+
+    try {
+        if (isFirebaseOnline && customRoutesRef) {
+            await customRoutesRef.child(id).remove();
+        } else {
+            customRoutesData = customRoutesData.filter(r => r.id !== id);
+            localStorage.setItem('ferrara_viabilita_custom_routes', JSON.stringify(customRoutesData));
+            renderCustomRoutesOnMap();
+            renderAdminRoutesList();
+            updateAdminRoutesBadge();
+        }
+        showToast("Percorso eliminato con successo.", "info", 2500);
+    } catch (err) {
+        console.error("Errore cancellazione percorso:", err);
+        showToast("Errore durante l'eliminazione: " + err.message, "error", 3500);
+    }
+};
+
+window.zoomToCustomRoute = function (id) {
+    const route = customRoutesData.find(r => r.id === id);
+    if (!route || !route.points || route.points.length < 2) return;
+
+    if (adminRoutesModal) adminRoutesModal.classList.add('hidden');
+
+    const latLngs = route.points.map(p => L.latLng(p[0], p[1]));
+    const bounds = L.latLngBounds(latLngs);
+    if (map) {
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+    }
+
+    if (activeCustomRouteLayers[id]) {
+        activeCustomRouteLayers[id].openPopup();
+    }
+};
+
+function initCustomRoutesModule() {
+    // Pulsante apertura modale gestione percorsi
+    if (adminRoutesBtn) {
+        adminRoutesBtn.addEventListener('click', () => {
+            if (!isAdmin) {
+                showToast("Accesso riservato all'amministratore.", "warning", 3000);
+                return;
+            }
+            renderAdminRoutesList();
+            if (adminRoutesModal) adminRoutesModal.classList.remove('hidden');
+        });
+    }
+
+    if (closeAdminRoutesModalBtn) {
+        closeAdminRoutesModalBtn.addEventListener('click', () => {
+            if (adminRoutesModal) adminRoutesModal.classList.add('hidden');
+        });
+    }
+
+    // Pulsante avvia tracciamento da modale
+    if (startDrawRouteBtn) {
+        startDrawRouteBtn.addEventListener('click', startDrawingCustomRoute);
+    }
+
+    // Pulsanti toolbar disegno
+    if (routeUndoPtBtn) {
+        routeUndoPtBtn.addEventListener('click', undoLastDrawingPoint);
+    }
+    if (routeClearPtsBtn) {
+        routeClearPtsBtn.addEventListener('click', clearDrawingPoints);
+    }
+    if (routeFinishDrawBtn) {
+        routeFinishDrawBtn.addEventListener('click', finishDrawingCustomRoute);
+    }
+    if (routeCancelDrawBtn) {
+        routeCancelDrawBtn.addEventListener('click', cancelDrawingCustomRoute);
+    }
+
+    // Modale configurazione percorso
+    if (closeRouteEditModalBtn) {
+        closeRouteEditModalBtn.addEventListener('click', closeRouteEditModal);
+    }
+    if (routeCancelSaveBtn) {
+        routeCancelSaveBtn.addEventListener('click', closeRouteEditModal);
+    }
+    if (routeConfirmSaveBtn) {
+        routeConfirmSaveBtn.addEventListener('click', saveCustomRouteFromForm);
+    }
+
+    // Selettore tipologie
+    if (routeTypesCards) {
+        routeTypesCards.forEach(card => {
+            card.addEventListener('click', () => {
+                selectedRouteType = card.getAttribute('data-type') || 'corteo';
+                updateRouteTypesGridUI();
+            });
+        });
+    }
+
+    // Palette colori
+    if (routeColorSwatches) {
+        routeColorSwatches.forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                selectedRouteColor = swatch.getAttribute('data-color') || '#8b5cf6';
+                updateRouteColorPaletteUI();
+                if (drawingPolyline) {
+                    drawingPolyline.setStyle({ color: selectedRouteColor });
+                }
+            });
+        });
+    }
+
+    if (routeCustomColor) {
+        routeCustomColor.addEventListener('input', (e) => {
+            selectedRouteColor = e.target.value;
+            if (routeColorSwatches) {
+                routeColorSwatches.forEach(s => s.classList.remove('active'));
+            }
+            if (drawingPolyline) {
+                drawingPolyline.setStyle({ color: selectedRouteColor });
+            }
+        });
+    }
+
+    // Switch visibilità
+    if (routeActiveToggle) {
+        routeActiveToggle.addEventListener('change', updateRouteActiveStatusUI);
+    }
+
+    // Selettore modalità programmazione
+    if (routeSchedTypeBtns) {
+        routeSchedTypeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedRouteScheduleMode = btn.getAttribute('data-mode') || 'manual';
+                updateRouteSchedModeUI();
+            });
+        });
+    }
+}
+
+// Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone e percorsi
 setInterval(() => {
     refreshMarkers();
+    renderCustomRoutesOnMap();
 }, 30000);
 
 // Avvia tutto quando il DOM è pronto
@@ -5592,5 +6442,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initUrgentNewsModule();
     initPushModule();
+    initCustomRoutesModule();
 });
 

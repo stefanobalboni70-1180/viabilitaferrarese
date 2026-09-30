@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -6,14 +6,14 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Viabilità Ferrara v3.9.14 - Viabilità 118</title>
+    <title>Viabilità Ferrara v3.9.15 - Viabilità 118</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="manifest.json?v=3.9.14">
+    <link rel="manifest" href="manifest.json?v=3.9.15">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.9.14">
+    <meta name="apple-mobile-web-app-title" content="Viabilità 118 v3.9.15">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -30,7 +30,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.9.14">
+    <link rel="stylesheet" href="style.css?v=3.9.15">
 </head>
 <body>
     
@@ -40,7 +40,7 @@
             <div class="header-row-title">
                 <div class="header-title-group">
                     <img src="logo_118.png" alt="118 Emilia Romagna" class="header-logo-118" />
-                    <h1>Situazione viabilità provincia <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v. 3.9.3</span></h1>
+                    <h1>Situazione viabilità provincia <span class="city-name">Ferrara</span> <span class="version-tag" id="app-version">v. 3.9.15</span></h1>
                 </div>
             </div>
 
@@ -61,6 +61,9 @@
                 </div>
 
                 <div class="header-actions">
+                    <button id="admin-routes-btn" class="admin-routes-btn hidden" title="Gestione Percorsi ed Eventi Speciali" type="button">
+                        <span>🚩</span> <span class="btn-text">Percorsi</span> <span id="admin-routes-badge" class="badge">0</span>
+                    </button>
                     <button id="admin-news-btn" class="admin-news-btn hidden" title="Gestione Comunicazioni Urgenti" type="button">
                         <span>📢</span> <span class="btn-text">News</span> <span id="admin-news-badge" class="badge">0/3</span>
                     </button>
@@ -111,6 +114,22 @@
             <span class="picker-banner-icon">📍</span>
             <span class="picker-banner-text">Tocca o clicca sulla mappa per indicare il punto del problema</span>
             <button id="cancel-picker-btn" class="picker-cancel-btn">Annulla</button>
+        </div>
+    </div>
+
+    <!-- Toolbar Tracciamento Percorsi Eventi (Admin) -->
+    <div id="route-draw-toolbar" class="route-draw-toolbar hidden">
+        <div class="route-draw-content">
+            <div class="route-draw-status">
+                <span class="draw-pulse-dot"></span>
+                <span class="route-draw-text">🚩 <strong>Tracciamento attivo:</strong> tocca la mappa (<span id="route-points-count">0</span> punti)</span>
+            </div>
+            <div class="route-draw-actions">
+                <button id="route-undo-pt-btn" class="route-tool-btn" type="button" title="Annulla ultimo punto">↩️ Annulla punto</button>
+                <button id="route-clear-pts-btn" class="route-tool-btn" type="button" title="Azzera punti">🗑️ Pulisci</button>
+                <button id="route-finish-draw-btn" class="route-tool-btn primary" type="button" title="Salva e configura percorso">💾 Salva Percorso</button>
+                <button id="route-cancel-draw-btn" class="route-tool-btn cancel" type="button" title="Annulla tracciamento">❌ Chiudi</button>
+            </div>
         </div>
     </div>
 
@@ -473,6 +492,156 @@
 
             <div id="admin-reports-list" class="reports-list-container">
                 <!-- Verrà popolato dinamicamente da JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gestione Percorsi ed Eventi per Amministratore -->
+    <div id="admin-routes-modal" class="modal-overlay hidden">
+        <div class="modal-content admin-routes-content">
+            <div class="modal-header">
+                <div class="admin-routes-title-wrapper">
+                    <h2>🚩 Percorsi ed Eventi Speciali</h2>
+                    <span id="admin-routes-count" class="reports-count-tag">0 attivi</span>
+                </div>
+                <button id="close-admin-routes-modal" class="close-btn" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">Traccia percorsi speciali (gare podistiche o ciclistiche, cortei, sfilate, processioni) con colori personalizzati e controllane l'apparizione sulla mappa quando lo desideri.</p>
+
+            <div class="admin-routes-actions-bar">
+                <button id="start-draw-route-btn" type="button" class="primary-btn draw-start-btn">
+                    <span>➕ Traccia Nuovo Percorso sulla Mappa</span>
+                </button>
+            </div>
+
+            <!-- Lista Percorsi Esistenti -->
+            <div class="admin-routes-section">
+                <h4 class="admin-section-subtitle">Percorsi Salvati (<span id="admin-routes-total-count">0</span>)</h4>
+                <div id="admin-routes-items-list" class="admin-routes-items-list">
+                    <!-- Popolato dinamicamente da JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Salvataggio / Modifica Percorso -->
+    <div id="route-edit-modal" class="modal-overlay hidden">
+        <div class="modal-content route-edit-content">
+            <div class="modal-header">
+                <h2 id="route-edit-modal-title">Configura Percorso Evento</h2>
+                <button id="close-route-edit-modal" class="close-btn" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div class="modal-body-scroll">
+                <input type="hidden" id="route-edit-id" value="" />
+
+                <!-- 1. Nome Percorso / Evento -->
+                <div class="form-section-item">
+                    <label class="section-label" for="route-name-input">1. Nome Evento / Percorso <span style="color:#ef4444; font-weight:700;">*</span></label>
+                    <input type="text" id="route-name-input" placeholder="Es. Gara Podistica Ferrara Marathon, Corteo 1° Maggio, Carnevale..." required />
+                </div>
+
+                <!-- 2. Tipo Evento -->
+                <div class="form-section-item">
+                    <label class="section-label">2. Tipologia Evento</label>
+                    <div class="route-types-grid" id="route-types-grid">
+                        <button type="button" class="route-type-card active" data-type="corteo">🚩 Corteo / Manifestazione</button>
+                        <button type="button" class="route-type-card" data-type="gara">🏃 Gara Podistica</button>
+                        <button type="button" class="route-type-card" data-type="ciclismo">🚴 Gara Ciclistica</button>
+                        <button type="button" class="route-type-card" data-type="sfilata">🎭 Sfilata / Carnevale</button>
+                        <button type="button" class="route-type-card" data-type="processione">🕯️ Processione Religiosa</button>
+                        <button type="button" class="route-type-card" data-type="altro">🌟 Altro Evento</button>
+                    </div>
+                </div>
+
+                <!-- 3. Colore del Tracciato -->
+                <div class="form-section-item">
+                    <label class="section-label">3. Colore Tracciato (non rosso)</label>
+                    <div class="route-color-palette" id="route-color-palette">
+                        <button type="button" class="color-swatch-btn active" data-color="#8b5cf6" style="--c:#8b5cf6;" title="Viola Elettrico"></button>
+                        <button type="button" class="color-swatch-btn" data-color="#2563eb" style="--c:#2563eb;" title="Blu Intenso"></button>
+                        <button type="button" class="color-swatch-btn" data-color="#f97316" style="--c:#f97316;" title="Arancione Fluo"></button>
+                        <button type="button" class="color-swatch-btn" data-color="#eab308" style="--c:#eab308;" title="Giallo Oro"></button>
+                        <button type="button" class="color-swatch-btn" data-color="#10b981" style="--c:#10b981;" title="Verde Smeraldo"></button>
+                        <button type="button" class="color-swatch-btn" data-color="#ec4899" style="--c:#ec4899;" title="Fucsia Neon"></button>
+                        <button type="button" class="color-swatch-btn" data-color="#06b6d4" style="--c:#06b6d4;" title="Ciano / Turchese"></button>
+                        <div class="color-custom-picker" title="Colore personalizzato">
+                            <input type="color" id="route-custom-color" value="#8b5cf6" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Stile Linea -->
+                <div class="form-section-item">
+                    <div class="sched-grid">
+                        <div class="sched-field">
+                            <label for="route-weight-select">Spessore Linea:</label>
+                            <select id="route-weight-select">
+                                <option value="4">Sottile (4px)</option>
+                                <option value="6" selected>Normale (6px)</option>
+                                <option value="8">Marcato (8px)</option>
+                                <option value="11">Molto evidente (11px)</option>
+                            </select>
+                        </div>
+                        <div class="sched-field">
+                            <label for="route-dash-select">Stile Linea:</label>
+                            <select id="route-dash-select">
+                                <option value="solid" selected>Continua</option>
+                                <option value="dashed">Tratteggiata</option>
+                                <option value="dotted">Puntinata</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Dettagli / Note Viabilità -->
+                <div class="form-section-item">
+                    <label class="section-label" for="route-note-input">5. Note e Impatto sulla Viabilità (opzionale)</label>
+                    <textarea id="route-note-input" rows="2" placeholder="Es. Chiusura temporanea al transito durante il passaggio della gara tra le 15:00 e le 17:30..."></textarea>
+                </div>
+
+                <!-- 6. Visibilità & Programmazione -->
+                <div class="form-section-item schedule-box">
+                    <label class="section-label" style="margin-bottom:6px;">⏱️ Visibilità sulla Mappa</label>
+                    
+                    <div class="route-vis-toggle-row">
+                        <label class="route-switch-label">
+                            <input type="checkbox" id="route-active-toggle" checked />
+                            <span class="route-switch-slider"></span>
+                            <span id="route-active-status-text" style="font-weight:600; color:#4ade80;">🟢 Visibile subito al pubblico</span>
+                        </label>
+                    </div>
+
+                    <div class="schedule-type-selector" style="margin-top:12px;">
+                        <button type="button" class="route-sched-type-btn active" data-mode="manual">👆 Attivazione Manuale</button>
+                        <button type="button" class="route-sched-type-btn" data-mode="window">⏱️ Finestra Temporale Automatica</button>
+                    </div>
+
+                    <div id="route-sched-window-block" class="sched-detail-block hidden" style="margin-top:10px;">
+                        <div class="sched-grid">
+                            <div class="sched-field">
+                                <label for="route-sched-start">📅 Visibile dal:</label>
+                                <input type="datetime-local" id="route-sched-start" />
+                            </div>
+                            <div class="sched-field">
+                                <label for="route-sched-end">🏁 Fino al:</label>
+                                <input type="datetime-local" id="route-sched-end" />
+                            </div>
+                        </div>
+                        <span class="sched-hint">💡 Il tracciato apparirà e scomparirà automaticamente sulla mappa di tutti gli utenti negli orari indicati.</span>
+                    </div>
+                </div>
+            </div>
+
+            <p id="route-edit-error" class="error-msg hidden"></p>
+
+            <div class="modal-footer-actions">
+                <button type="button" id="route-cancel-save-btn" class="btn-cancel">Annulla</button>
+                <button type="button" id="route-confirm-save-btn" class="primary-btn">Salva Percorso</button>
             </div>
         </div>
     </div>

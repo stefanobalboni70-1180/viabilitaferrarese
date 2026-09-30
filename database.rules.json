@@ -9,6 +9,10 @@
         }
       }
     },
+    "custom_routes": {
+      ".read": true,
+      ".write": "auth != null"
+    },
     "deleted_markers": {
       ".read": true,
       ".write": "auth != null"
