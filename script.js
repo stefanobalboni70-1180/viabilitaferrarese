@@ -6496,6 +6496,9 @@ function normalizeAuthEmail(input) {
     if (clean.includes('@')) {
         return clean;
     }
+    if (clean === 'admin') {
+        return ADMIN_EMAIL; // admin@viabilitaferrara.it
+    }
     // Rimuovi caratteri non ammessi nell'username
     const sanitizedUser = clean.replace(/[^a-z0-9._-]/g, '');
     return `${sanitizedUser}${DEFAULT_AUTH_DOMAIN}`;

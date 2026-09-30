@@ -2254,6 +2254,45 @@ h1 {
         display: none !important;
     }
 
+    .admin-users-btn {
+        height: 32px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        background: #0d9488 !important;
+        color: #ffffff !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3) !important;
+        flex-shrink: 0 !important;
+    }
+
+    .admin-users-btn .btn-text {
+        display: none !important;
+    }
+
+    .user-profile-btn {
+        height: 32px !important;
+        padding: 0 6px !important;
+        border-radius: 8px !important;
+        background: #334155 !important;
+        color: #f8fafc !important;
+        white-space: nowrap !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        box-sizing: border-box !important;
+        flex-shrink: 0 !important;
+    }
+
+    .user-profile-btn .btn-text {
+        display: none !important;
+    }
+
     /* Barra Filtri Admin (Mobile) */
     .search-container {
         width: 100% !important;
