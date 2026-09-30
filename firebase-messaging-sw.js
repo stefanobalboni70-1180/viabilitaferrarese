@@ -25,7 +25,7 @@ try {
         const notificationOptions = {
             body: notificationText,
             icon: 'icon-512.jpg',
-            badge: 'logo_118.png',
+            badge: 'icon-512.jpg',
             tag: 'urgent-news-118',
             renotify: true,
             requireInteraction: true,
@@ -56,7 +56,7 @@ self.addEventListener('push', (event) => {
         const notificationOptions = {
             body: payload.notification?.body || payload.body || 'Nuova allerta di viabilità a Ferrara',
             icon: 'icon-512.jpg',
-            badge: 'logo_118.png',
+            badge: 'icon-512.jpg',
             tag: 'urgent-news-118',
             renotify: true,
             requireInteraction: true,
@@ -73,7 +73,7 @@ self.addEventListener('push', (event) => {
         event.waitUntil(self.registration.showNotification('🚨 COMUNICAZIONE URGENTE 118', {
             body: text || 'Nuova allerta di viabilità a Ferrara',
             icon: 'icon-512.jpg',
-            badge: 'logo_118.png',
+            badge: 'icon-512.jpg',
             vibrate: [300, 100, 300, 100, 300]
         }));
     }
