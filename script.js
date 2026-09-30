@@ -7036,25 +7036,6 @@ function renderAdminUsersList() {
 
     listEl.innerHTML = html;
 }
-                <div class="user-card-actions">
-                    ${!isCurrentAuthUser ? `
-                        <button type="button" class="btn-action-icon ${isDisabled ? 'btn-action-success' : 'btn-action-danger'}" onclick="toggleUserStatus('${escapeHtml(u.uid)}', '${isDisabled ? 'active' : 'disabled'}')" title="${isDisabled ? 'Riabilita accesso utente' : 'Disabilita accesso utente'}">
-                            ${isDisabled ? '✅ Riabilita' : '🚫 Disabilita'}
-                        </button>
-                        <button type="button" class="btn-action-icon" onclick="triggerAdminSendReset('${escapeHtml(u.email)}')" title="Invia email per reimpostare password">
-                            📧 Reset PW
-                        </button>
-                        <button type="button" class="btn-action-icon btn-action-danger" onclick="deleteAuthorizedUser('${escapeHtml(u.uid)}', '${escapeHtml(u.name || u.email)}')" title="Elimina account utente">
-                            🗑️
-                        </button>
-                    ` : '<span style="font-size:0.75rem; color:#64748b; font-weight:700; padding:6px 8px;">(Il tuo account)</span>'}
-                </div>
-            </div>
-        `;
-    });
-
-    listEl.innerHTML = html;
-}
 
 // Toggle Stato Utente (Attivo / Disabilitato)
 async function toggleUserStatus(uid, newStatus) {
