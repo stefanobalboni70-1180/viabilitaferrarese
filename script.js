@@ -59,6 +59,11 @@ let reportsRef = null;
 let deletedMarkersRef = null;
 let urgentNewsRef = null;
 let customRoutesRef = null;
+let authorizedUsersRef = null;
+let currentUser = null;
+let currentUserProfile = null;
+let allAuthorizedUsers = [];
+const DEFAULT_AUTH_DOMAIN = '@118fe.it';
 let urgentNewsData = []; // Notizie urgenti attive (massimo 3)
 let allUrgentNewsRaw = []; // Tutte le notizie (inclusi stati inattivi/scaduti per l'admin)
 let urgentNewsTimerInterval = null;
@@ -191,6 +196,7 @@ function initFirebase() {
             deletedMarkersRef = db.ref("deleted_markers");
             urgentNewsRef = db.ref("urgent_news");
             customRoutesRef = db.ref("custom_routes");
+            authorizedUsersRef = db.ref("authorized_users");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
 
@@ -232,16 +238,80 @@ function initFirebase() {
                 }
             });
 
-            // Ascolto dello stato di autenticazione dell'amministratore
-            auth.onAuthStateChanged((user) => {
-                isAdmin = !!user;
-                console.log(`🔐 Stato Auth: ${isAdmin ? 'Amministratore (' + user.email + ')' : 'Utente pubblico'}`);
-                if (isAdmin) {
-                    initAdminReportsListener();
-                } else {
+            // Ascolto dello stato di autenticazione e controllo accessi
+            auth.onAuthStateChanged(async (user) => {
+                if (!user) {
+                    currentUser = null;
+                    currentUserProfile = null;
+                    isAdmin = false;
+                    console.log('🔒 Nessun utente loggato — Visualizzazione Gatekeeper di sicurezza');
                     stopAdminReportsListener();
+                    stopAdminUsersListener();
+                    showGatekeeper();
+                    updateUI();
+                    return;
                 }
-                updateUI();
+
+                currentUser = user;
+                console.log(`🔐 Utente collegato: ${user.email} (UID: ${user.uid})`);
+
+                try {
+                    // Recupera il profilo utente da authorized_users
+                    const snap = await authorizedUsersRef.child(user.uid).once('value');
+                    let profile = snap.val();
+
+                    if (!profile) {
+                        // Se è l'admin principale o primo login dell'account di root
+                        const isMasterAdmin = (user.email === ADMIN_EMAIL || user.email === 'stefano.balboni@ausl.fe.it' || (user.email && user.email.startsWith('admin')));
+                        profile = {
+                            uid: user.uid,
+                            name: isMasterAdmin ? 'Amministratore 118' : (user.displayName || user.email.split('@')[0]),
+                            email: user.email,
+                            role: isMasterAdmin ? 'admin' : 'operator',
+                            status: 'active',
+                            mustChangePassword: false,
+                            createdAt: Date.now(),
+                            createdBy: 'system'
+                        };
+                        await authorizedUsersRef.child(user.uid).set(profile);
+                    }
+
+                    currentUserProfile = profile;
+
+                    // Controllo stato disabilitato
+                    if (profile.status === 'disabled') {
+                        console.warn('⛔ Account disabilitato!');
+                        showToast("Account disabilitato dall'Amministratore. Accesso revocato.", "error", 5000);
+                        await auth.signOut();
+                        showGatekeeper("Accesso negato: l'account è stato disabilitato dall'Amministratore.");
+                        return;
+                    }
+
+                    // Controllo obbligo cambio password
+                    if (profile.mustChangePassword) {
+                        showMandatoryPasswordChangeModal();
+                    } else {
+                        hideMandatoryPasswordChangeModal();
+                    }
+
+                    isAdmin = (profile.role === 'admin' || user.email === ADMIN_EMAIL);
+                    hideGatekeeper();
+
+                    if (isAdmin) {
+                        initAdminReportsListener();
+                        initAdminUsersListener();
+                    } else {
+                        stopAdminReportsListener();
+                        stopAdminUsersListener();
+                    }
+
+                    updateUI();
+                } catch (err) {
+                    console.error('Errore gestione profilo utente:', err);
+                    isAdmin = (user.email === ADMIN_EMAIL);
+                    hideGatekeeper();
+                    updateUI();
+                }
             });
         } else {
             console.warn('⚠️ Firebase SDK non disponibile — modalità locale');
@@ -1924,29 +1994,48 @@ function showToast(message, type = 'normal', duration = 3500) {
 function updateUI() {
     const adminNewsBtn = document.getElementById('admin-news-btn');
     const adminRoutesBtn = document.getElementById('admin-routes-btn');
+    const adminUsersBtn = document.getElementById('admin-users-btn');
+    const userProfileBtn = document.getElementById('user-profile-btn');
+    const userDisplayName = document.getElementById('user-display-name');
+
     document.body.classList.toggle('admin-logged-in', !!isAdmin);
+
+    if (currentUser) {
+        if (userProfileBtn) {
+            userProfileBtn.classList.remove('hidden');
+            if (userDisplayName) {
+                userDisplayName.textContent = currentUserProfile?.name || currentUser.email.split('@')[0];
+            }
+        }
+        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        if (loginBtn) loginBtn.classList.add('hidden');
+    } else {
+        if (userProfileBtn) userProfileBtn.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (loginBtn) loginBtn.classList.remove('hidden');
+    }
 
     if (isAdmin) {
         if (searchContainer) searchContainer.classList.remove('hidden');
-        loginBtn.classList.add('hidden');
-        logoutBtn.classList.remove('hidden');
         if (adminFilterBar) adminFilterBar.classList.remove('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.remove('hidden');
         if (adminNewsBtn) adminNewsBtn.classList.remove('hidden');
         if (adminRoutesBtn) adminRoutesBtn.classList.remove('hidden');
-        headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
+        if (adminUsersBtn) adminUsersBtn.classList.remove('hidden');
+        if (headerSubtitle) headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
     } else {
         if (searchContainer) searchContainer.classList.add('hidden');
-        loginBtn.classList.remove('hidden');
-        logoutBtn.classList.add('hidden');
         if (adminFilterBar) adminFilterBar.classList.add('hidden');
         if (adminReportsBtn) adminReportsBtn.classList.add('hidden');
         if (adminNewsBtn) adminNewsBtn.classList.add('hidden');
         if (adminRoutesBtn) adminRoutesBtn.classList.add('hidden');
+        if (adminUsersBtn) adminUsersBtn.classList.add('hidden');
         if (isDrawingCustomRoute) {
             cancelDrawingCustomRoute();
         }
-        headerSubtitle.textContent = "Modalità Visualizzazione: clicca sui marker per i dettagli";
+        if (headerSubtitle) {
+            headerSubtitle.textContent = currentUser ? `Accesso Operatore 118: ${currentUserProfile?.name || currentUser.email}` : "Accesso Riservato 118";
+        }
     }
     // Ridisegna i marker e i percorsi speciali
     refreshMarkers();
@@ -2147,65 +2236,10 @@ document.getElementById('locate-btn').addEventListener('click', () => locateUser
 // Email di sistema usata per l'autenticazione amministratore
 const ADMIN_EMAIL = 'admin@viabilitaferrara.it';
 
-loginBtn.addEventListener('click', () => {
-    loginModal.classList.remove('hidden');
-    if (passwordInput) passwordInput.value = '';
-    loginError.classList.add('hidden');
-    if (passwordInput) passwordInput.focus();
-});
-
-closeLoginBtn.addEventListener('click', () => {
-    loginModal.classList.add('hidden');
-});
-
-submitLoginBtn.addEventListener('click', attemptLogin);
-if (passwordInput) {
-    passwordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') attemptLogin();
+if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+        showGatekeeper();
     });
-}
-
-async function attemptLogin() {
-    const password = passwordInput ? passwordInput.value : '';
-
-    if (!password) {
-        loginError.textContent = 'Inserisci la password.';
-        loginError.classList.remove('hidden');
-        return;
-    }
-
-    if (!auth) {
-        loginError.textContent = 'Firebase Auth non disponibile al momento.';
-        loginError.classList.remove('hidden');
-        return;
-    }
-
-    submitLoginBtn.disabled = true;
-    submitLoginBtn.textContent = 'Verifica in corso...';
-    loginError.classList.add('hidden');
-
-    try {
-        await auth.signInWithEmailAndPassword(ADMIN_EMAIL, password);
-        loginModal.classList.add('hidden');
-        if (passwordInput) passwordInput.value = '';
-    } catch (error) {
-        console.error('Errore autenticazione:', error.code, error.message);
-        let errorMsg = 'Password errata!';
-        if (error.code === 'auth/user-not-found') {
-            errorMsg = `Utente ${ADMIN_EMAIL} non ancora registrato su Firebase. Crealo nella console Firebase con password adminviabilita118.`;
-        } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            errorMsg = 'Password errata!';
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMsg = 'Troppi tentativi falliti. Riprova più tardi.';
-        } else if (error.code === 'auth/network-request-failed') {
-            errorMsg = 'Errore di connessione di rete.';
-        }
-        loginError.textContent = errorMsg;
-        loginError.classList.remove('hidden');
-    } finally {
-        submitLoginBtn.disabled = false;
-        submitLoginBtn.textContent = 'Accedi';
-    }
 }
 
 if (logoutBtn) {
@@ -6452,6 +6486,779 @@ function initCustomRoutesModule() {
     }
 }
 
+// =======================================================
+// MODULO GESTIONE UTENTI, RUOLI E ACCESSI 118
+// =======================================================
+
+function normalizeAuthEmail(input) {
+    if (!input || typeof input !== 'string') return '';
+    const clean = input.trim().toLowerCase();
+    if (clean.includes('@')) {
+        return clean;
+    }
+    // Rimuovi caratteri non ammessi nell'username
+    const sanitizedUser = clean.replace(/[^a-z0-9._-]/g, '');
+    return `${sanitizedUser}${DEFAULT_AUTH_DOMAIN}`;
+}
+
+function generateRandomPassword(length = 10) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Mostra / Nascondi Schermata Gatekeeper
+function showGatekeeper(errorMsg = '') {
+    const gatekeeperOverlay = document.getElementById('auth-gatekeeper-overlay');
+    const gatekeeperError = document.getElementById('gatekeeper-error');
+    if (!gatekeeperOverlay) return;
+    gatekeeperOverlay.classList.remove('hidden');
+    if (errorMsg && gatekeeperError) {
+        gatekeeperError.textContent = errorMsg;
+        gatekeeperError.classList.remove('hidden');
+    } else if (gatekeeperError) {
+        gatekeeperError.classList.add('hidden');
+    }
+}
+
+function hideGatekeeper() {
+    const gatekeeperOverlay = document.getElementById('auth-gatekeeper-overlay');
+    if (gatekeeperOverlay) {
+        gatekeeperOverlay.classList.add('hidden');
+    }
+}
+
+// Tentativo di Login da Gatekeeper
+async function attemptGatekeeperLogin() {
+    const usernameInput = document.getElementById('gatekeeper-username');
+    const passwordInput = document.getElementById('gatekeeper-password');
+    const errorEl = document.getElementById('gatekeeper-error');
+    const submitBtn = document.getElementById('gatekeeper-submit-btn');
+
+    const rawUser = usernameInput ? usernameInput.value : '';
+    const rawPass = passwordInput ? passwordInput.value : '';
+
+    if (!rawUser || !rawPass) {
+        if (errorEl) {
+            errorEl.textContent = 'Inserisci sia username/email che la password.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (!auth) {
+        if (errorEl) {
+            errorEl.textContent = 'Servizio di autenticazione non raggiungibile al momento.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const email = normalizeAuthEmail(rawUser);
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳</span> Verifica credenziali...';
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+
+    try {
+        await auth.signInWithEmailAndPassword(email, rawPass);
+        if (passwordInput) passwordInput.value = '';
+    } catch (err) {
+        console.error('Errore Login 118:', err.code, err.message);
+        let msg = 'Credenziali non corrette. Riprova.';
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+            msg = 'Username o password errati. Verifica i dati o contatta l\'Amministratore.';
+        } else if (err.code === 'auth/too-many-requests') {
+            msg = 'Troppi tentativi falliti. Attendi qualche minuto prima di riprovare.';
+        } else if (err.code === 'auth/network-request-failed') {
+            msg = 'Errore di connessione a Internet.';
+        }
+        if (errorEl) {
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>🔐</span> Accedi al Sistema 118';
+        }
+    }
+}
+
+// Gestione Cambio Password Obbligatorio al Primo Accesso
+function showMandatoryPasswordChangeModal() {
+    const modal = document.getElementById('mandatory-password-change-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function hideMandatoryPasswordChangeModal() {
+    const modal = document.getElementById('mandatory-password-change-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveMandatoryPassword() {
+    const newPassInput = document.getElementById('mandatory-new-password');
+    const confirmPassInput = document.getElementById('mandatory-confirm-password');
+    const errorEl = document.getElementById('mandatory-pw-error');
+    const saveBtn = document.getElementById('mandatory-pw-save-btn');
+
+    const newPass = newPassInput ? newPassInput.value : '';
+    const confirmPass = confirmPassInput ? confirmPassInput.value : '';
+
+    if (!newPass || newPass.length < 6) {
+        if (errorEl) {
+            errorEl.textContent = 'La password deve contenere almeno 6 caratteri.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        if (errorEl) {
+            errorEl.textContent = 'Le due password inserite non coincidono.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (!auth || !auth.currentUser) return;
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Salvataggio in corso...';
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+
+    try {
+        await auth.currentUser.updatePassword(newPass);
+        if (authorizedUsersRef && auth.currentUser) {
+            await authorizedUsersRef.child(auth.currentUser.uid).update({
+                mustChangePassword: false,
+                passwordUpdatedAt: Date.now()
+            });
+        }
+        if (currentUserProfile) {
+            currentUserProfile.mustChangePassword = false;
+        }
+        hideMandatoryPasswordChangeModal();
+        showToast("Password personale impostata con successo!", "success", 4000);
+    } catch (err) {
+        console.error('Errore cambio password obbligatorio:', err);
+        if (errorEl) {
+            errorEl.textContent = 'Errore durante l\'aggiornamento della password: ' + err.message;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Salva Password e Accedi';
+        }
+    }
+}
+
+// Profilo Utente & Cambio Password Personale
+function openUserProfileModal() {
+    const modal = document.getElementById('user-profile-modal');
+    const nameEl = document.getElementById('profile-name-text');
+    const emailEl = document.getElementById('profile-email-text');
+    const roleEl = document.getElementById('profile-role-badge');
+    const newPassInput = document.getElementById('profile-new-password');
+    const confirmPassInput = document.getElementById('profile-confirm-password');
+    const errorEl = document.getElementById('profile-pw-error');
+
+    if (nameEl) nameEl.textContent = currentUserProfile?.name || 'Operatore 118';
+    if (emailEl) emailEl.textContent = currentUser?.email || '-';
+    if (roleEl) {
+        const isAdminRole = (currentUserProfile?.role === 'admin' || isAdmin);
+        roleEl.className = `role-badge ${isAdminRole ? 'role-admin' : 'role-operator'}`;
+        roleEl.textContent = isAdminRole ? '👑 Amministratore' : '🚑 Operatore 118';
+    }
+
+    if (newPassInput) newPassInput.value = '';
+    if (confirmPassInput) confirmPassInput.value = '';
+    if (errorEl) errorEl.classList.add('hidden');
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+async function handleSaveProfilePassword() {
+    const newPassInput = document.getElementById('profile-new-password');
+    const confirmPassInput = document.getElementById('profile-confirm-password');
+    const errorEl = document.getElementById('profile-pw-error');
+    const saveBtn = document.getElementById('profile-pw-save-btn');
+
+    const newPass = newPassInput ? newPassInput.value : '';
+    const confirmPass = confirmPassInput ? confirmPassInput.value : '';
+
+    if (!newPass || newPass.length < 6) {
+        if (errorEl) {
+            errorEl.textContent = 'La nuova password deve contenere almeno 6 caratteri.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        if (errorEl) {
+            errorEl.textContent = 'Le password non coincidono.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (!auth || !auth.currentUser) return;
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Aggiornamento in corso...';
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+
+    try {
+        await auth.currentUser.updatePassword(newPass);
+        if (authorizedUsersRef && auth.currentUser) {
+            await authorizedUsersRef.child(auth.currentUser.uid).update({
+                mustChangePassword: false,
+                passwordUpdatedAt: Date.now()
+            });
+        }
+        if (newPassInput) newPassInput.value = '';
+        if (confirmPassInput) confirmPassInput.value = '';
+        const modal = document.getElementById('user-profile-modal');
+        if (modal) modal.classList.add('hidden');
+        showToast("Password aggiornata con successo!", "success", 3500);
+    } catch (err) {
+        console.error('Errore aggiornamento password profilo:', err);
+        let msg = 'Errore durante l\'aggiornamento della password.';
+        if (err.code === 'auth/requires-recent-login') {
+            msg = 'Per sicurezza è necessario riconnettersi prima di cambiare password. Esegui il logout e riaccedi.';
+        }
+        if (errorEl) {
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Aggiorna la mia Password';
+        }
+    }
+}
+
+// Reset Password (Invio Email di Ripristino)
+function openResetPasswordModal() {
+    const modal = document.getElementById('reset-password-modal');
+    const emailInput = document.getElementById('reset-email-input');
+    const errorEl = document.getElementById('reset-pw-error');
+    const successEl = document.getElementById('reset-pw-success');
+
+    if (emailInput) {
+        const currentVal = document.getElementById('gatekeeper-username')?.value || '';
+        emailInput.value = currentVal;
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+    if (successEl) successEl.classList.add('hidden');
+    if (modal) modal.classList.remove('hidden');
+}
+
+async function handleSendResetPasswordEmail() {
+    const emailInput = document.getElementById('reset-email-input');
+    const errorEl = document.getElementById('reset-pw-error');
+    const successEl = document.getElementById('reset-pw-success');
+    const submitBtn = document.getElementById('submit-reset-pw-btn');
+
+    const raw = emailInput ? emailInput.value.trim() : '';
+    if (!raw) {
+        if (errorEl) {
+            errorEl.textContent = 'Inserisci l\'email o username.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const email = normalizeAuthEmail(raw);
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Invio in corso...';
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+    if (successEl) successEl.classList.add('hidden');
+
+    try {
+        await auth.sendPasswordResetEmail(email);
+        if (successEl) {
+            successEl.textContent = `Link di ripristino inviato con successo a ${email}! Controlla la casella di posta.`;
+            successEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error('Errore invio reset email:', err);
+        if (errorEl) {
+            errorEl.textContent = 'Impossibile inviare il link di ripristino: ' + err.message;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Invia Link di Ripristino';
+        }
+    }
+}
+
+// --- GESTIONE UTENTI ADMIN (PANNELLO AMMINISTRAZIONE) ---
+
+let adminUsersListenerActive = false;
+
+function initAdminUsersListener() {
+    if (!authorizedUsersRef || adminUsersListenerActive) return;
+    adminUsersListenerActive = true;
+
+    authorizedUsersRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        allAuthorizedUsers = [];
+        if (val) {
+            Object.keys(val).forEach(uid => {
+                allAuthorizedUsers.push({
+                    uid: uid,
+                    ...val[uid]
+                });
+            });
+            // Ordina per data di creazione più recente
+            allAuthorizedUsers.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        }
+        updateAdminUsersBadge();
+        renderAdminUsersList();
+    });
+}
+
+function stopAdminUsersListener() {
+    if (authorizedUsersRef && adminUsersListenerActive) {
+        authorizedUsersRef.off('value');
+        adminUsersListenerActive = false;
+    }
+    allAuthorizedUsers = [];
+    updateAdminUsersBadge();
+}
+
+function updateAdminUsersBadge() {
+    const badge = document.getElementById('admin-users-badge');
+    const totalCountEl = document.getElementById('admin-users-total-count');
+    const count = allAuthorizedUsers.length;
+    if (badge) badge.textContent = count;
+    if (totalCountEl) totalCountEl.textContent = count;
+}
+
+function renderAdminUsersList() {
+    const listEl = document.getElementById('admin-users-list');
+    const searchInput = document.getElementById('admin-users-search-input');
+    if (!listEl) return;
+
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    const filtered = allAuthorizedUsers.filter(u => {
+        if (!query) return true;
+        const nameMatch = (u.name || '').toLowerCase().includes(query);
+        const emailMatch = (u.email || '').toLowerCase().includes(query);
+        const roleMatch = (u.role || '').toLowerCase().includes(query);
+        return nameMatch || emailMatch || roleMatch;
+    });
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="users-empty-state">${query ? 'Nessun utente trovato corrispondente alla ricerca.' : 'Nessun account operatore registrato.'}</div>`;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(u => {
+        const isAdminRole = (u.role === 'admin');
+        const isDisabled = (u.status === 'disabled');
+        const mustChange = !!u.mustChangePassword;
+        const isCurrentAuthUser = (auth?.currentUser && auth.currentUser.uid === u.uid);
+
+        html += `
+            <div class="user-card-item ${isDisabled ? 'user-disabled' : ''}" data-uid="${escapeHtml(u.uid)}">
+                <div class="user-main-info">
+                    <div class="user-name-title">
+                        <span>${escapeHtml(u.name || 'Operatore 118')}</span>
+                        <span class="role-badge ${isAdminRole ? 'role-admin' : 'role-operator'}">${isAdminRole ? '👑 Admin' : '🚑 Operatore'}</span>
+                        <span class="status-badge ${isDisabled ? 'status-disabled' : 'status-active'}">${isDisabled ? '🔴 Disabilitato' : '🟢 Attivo'}</span>
+                        ${mustChange ? '<span class="status-badge status-disabled" title="Deve impostare la password al prossimo login">🔑 Da cambiare</span>' : ''}
+                    </div>
+                    <div class="user-email-subtitle">
+                        📧 <strong>${escapeHtml(u.email || '')}</strong>
+                        ${u.createdAt ? ` &bull; Creato il: ${new Date(u.createdAt).toLocaleDateString('it-IT')}` : ''}
+                    </div>
+                </div>
+                <div class="user-card-actions">
+                    ${!isCurrentAuthUser ? `
+                        <button type="button" class="btn-action-icon ${isDisabled ? 'btn-action-success' : 'btn-action-danger'}" onclick="toggleUserStatus('${escapeHtml(u.uid)}', '${isDisabled ? 'active' : 'disabled'}')" title="${isDisabled ? 'Riabilita accesso utente' : 'Disabilita accesso utente'}">
+                            ${isDisabled ? '✅ Riabilita' : '🚫 Disabilita'}
+                        </button>
+                        <button type="button" class="btn-action-icon" onclick="triggerAdminSendReset('${escapeHtml(u.email)}')" title="Invia email per reimpostare password">
+                            📧 Reset PW
+                        </button>
+                        <button type="button" class="btn-action-icon btn-action-danger" onclick="deleteAuthorizedUser('${escapeHtml(u.uid)}', '${escapeHtml(u.name || u.email)}')" title="Elimina account utente">
+                            🗑️
+                        </button>
+                    ` : '<span style="font-size:0.75rem; color:#64748b; font-weight:700; padding:6px 8px;">(Il tuo account)</span>'}
+                </div>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+}
+
+// Toggle Stato Utente (Attivo / Disabilitato)
+async function toggleUserStatus(uid, newStatus) {
+    if (!authorizedUsersRef) return;
+    try {
+        await authorizedUsersRef.child(uid).update({
+            status: newStatus,
+            statusUpdatedAt: Date.now(),
+            statusUpdatedBy: auth?.currentUser?.email || 'admin'
+        });
+        showToast(`Stato utente aggiornato a: ${newStatus === 'active' ? '🟢 Attivo' : '🔴 Disabilitato'}`, "success", 2500);
+    } catch (err) {
+        console.error('Errore aggiornamento stato utente:', err);
+        showToast("Errore durante l'aggiornamento dello stato.", "error", 3000);
+    }
+}
+
+// Invia email di reset password da admin
+async function triggerAdminSendReset(email) {
+    if (!email || !auth) return;
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showToast(`Email di ripristino password inviata a: ${email}`, "success", 4000);
+    } catch (err) {
+        console.error('Errore invio reset:', err);
+        showToast("Impossibile inviare email di reset: " + err.message, "error", 4000);
+    }
+}
+
+// Elimina Utente
+async function deleteAuthorizedUser(uid, name) {
+    if (!confirm(`Sei sicuro di voler eliminare l'account di "${name}"?\nL'utente non potrà più accedere al sistema.`)) {
+        return;
+    }
+    if (!authorizedUsersRef) return;
+    try {
+        await authorizedUsersRef.child(uid).remove();
+        showToast("Account rimosso con successo.", "success", 2500);
+    } catch (err) {
+        console.error('Errore eliminazione utente:', err);
+        showToast("Errore durante l'eliminazione dell'account.", "error", 3000);
+    }
+}
+
+// Apertura Modal Creazione Utente
+function openCreateUserModal() {
+    const modal = document.getElementById('create-user-modal');
+    const nameInput = document.getElementById('new-user-name');
+    const emailInput = document.getElementById('new-user-email');
+    const passwordInput = document.getElementById('new-user-password');
+    const roleSelect = document.getElementById('new-user-role');
+    const mustChangeCheck = document.getElementById('new-user-must-change');
+    const errorEl = document.getElementById('create-user-error');
+
+    if (nameInput) nameInput.value = '';
+    if (emailInput) emailInput.value = '';
+    if (passwordInput) passwordInput.value = generateRandomPassword(8);
+    if (roleSelect) roleSelect.value = 'operator';
+    if (mustChangeCheck) mustChangeCheck.checked = true;
+    if (errorEl) errorEl.classList.add('hidden');
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Creazione Nuovo Utente da parte dell'Admin
+async function handleCreateUserSubmit() {
+    const nameInput = document.getElementById('new-user-name');
+    const emailInput = document.getElementById('new-user-email');
+    const passwordInput = document.getElementById('new-user-password');
+    const roleSelect = document.getElementById('new-user-role');
+    const mustChangeCheck = document.getElementById('new-user-must-change');
+    const errorEl = document.getElementById('create-user-error');
+    const submitBtn = document.getElementById('submit-create-user-btn');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const rawEmail = emailInput ? emailInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
+    const role = roleSelect ? roleSelect.value : 'operator';
+    const mustChange = mustChangeCheck ? mustChangeCheck.checked : true;
+
+    if (!name || !rawEmail || !password) {
+        if (errorEl) {
+            errorEl.textContent = 'Tutti i campi obbligatori contrassegnati da * devono essere compilati.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (password.length < 6) {
+        if (errorEl) {
+            errorEl.textContent = 'La password iniziale deve contenere almeno 6 caratteri.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    const normalizedEmail = normalizeAuthEmail(rawEmail);
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creazione account in corso...';
+    }
+    if (errorEl) errorEl.classList.add('hidden');
+
+    try {
+        // Creazione tramite istanza Firebase Auth secondaria isolata (senza disconnettere l'Admin!)
+        const tempAppName = 'SecondaryAuth_' + Date.now();
+        const tempApp = firebase.initializeApp(firebaseConfig, tempAppName);
+        const tempAuth = tempApp.auth();
+
+        const userCredential = await tempAuth.createUserWithEmailAndPassword(normalizedEmail, password);
+        const newUid = userCredential.user.uid;
+
+        // Disconnetti ed elimina istanza temporanea
+        await tempAuth.signOut();
+        await tempApp.delete();
+
+        // Salva profilo utente nel database principale
+        const userProfile = {
+            uid: newUid,
+            name: name,
+            email: normalizedEmail,
+            role: role,
+            status: 'active',
+            mustChangePassword: mustChange,
+            createdAt: Date.now(),
+            createdBy: auth?.currentUser?.email || 'admin'
+        };
+
+        await authorizedUsersRef.child(newUid).set(userProfile);
+
+        // Chiudi modal creazione
+        const createModal = document.getElementById('create-user-modal');
+        if (createModal) createModal.classList.add('hidden');
+
+        // Mostra modal di riepilogo credenziali per invio
+        showCreatedUserSuccessModal(name, normalizedEmail, password, role);
+        showToast(`Utente "${name}" creato con successo!`, "success", 3500);
+    } catch (err) {
+        console.error('Errore creazione utente:', err);
+        let msg = 'Errore creazione account: ' + err.message;
+        if (err.code === 'auth/email-already-in-use') {
+            msg = `L'indirizzo "${normalizedEmail}" è già registrato nel sistema.`;
+        } else if (err.code === 'auth/invalid-email') {
+            msg = 'Indirizzo email non valido.';
+        }
+        if (errorEl) {
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Crea e Abilita Utente';
+        }
+    }
+}
+
+// Mostra Modal Successo Creazione con Riepilogo Credenziali
+function showCreatedUserSuccessModal(name, email, password, role) {
+    const modal = document.getElementById('user-created-success-modal');
+    const nameEl = document.getElementById('created-summary-name');
+    const emailEl = document.getElementById('created-summary-email');
+    const passEl = document.getElementById('created-summary-password');
+    const roleEl = document.getElementById('created-summary-role');
+
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) emailEl.textContent = email;
+    if (passEl) passEl.textContent = password;
+    if (roleEl) roleEl.textContent = (role === 'admin' ? '👑 Amministratore' : '🚑 Operatore 118');
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Copia Credenziali per Messaggio / WhatsApp
+function copyCreatedCredentials() {
+    const name = document.getElementById('created-summary-name')?.textContent || '';
+    const email = document.getElementById('created-summary-email')?.textContent || '';
+    const pass = document.getElementById('created-summary-password')?.textContent || '';
+    const role = document.getElementById('created-summary-role')?.textContent || '';
+
+    const textToCopy = 
+`🚑 *CREDENZIALI ACCESSO VIABILITÀ 118 FERRARA*
+👤 Operatore/Postazione: ${name}
+📧 Login / Email: ${email}
+🔑 Password provvisoria: ${pass}
+🛡️ Ruolo: ${role}
+🌐 Link applicazione: https://viabilita118fe.vercel.app/
+
+*(Al primo accesso ti verrà richiesto di impostare la tua nuova password personale)*`;
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        showToast("Credenziali copiate negli appunti! Incollale su WhatsApp o Email.", "success", 4000);
+    }).catch(() => {
+        showToast("Seleziona e copia manualmente il testo.", "info", 3000);
+    });
+}
+
+// Inizializzazione Completa del Modulo Gestione Utenti & Auth
+function initUsersModule() {
+    // 1. Gatekeeper Events
+    const gatekeeperSubmitBtn = document.getElementById('gatekeeper-submit-btn');
+    const gatekeeperForgotBtn = document.getElementById('gatekeeper-forgot-btn');
+    const gatekeeperUsernameInput = document.getElementById('gatekeeper-username');
+    const gatekeeperPasswordInput = document.getElementById('gatekeeper-password');
+
+    if (gatekeeperSubmitBtn) {
+        gatekeeperSubmitBtn.addEventListener('click', attemptGatekeeperLogin);
+    }
+    if (gatekeeperForgotBtn) {
+        gatekeeperForgotBtn.addEventListener('click', openResetPasswordModal);
+    }
+    if (gatekeeperPasswordInput) {
+        gatekeeperPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') attemptGatekeeperLogin();
+        });
+    }
+    if (gatekeeperUsernameInput) {
+        gatekeeperUsernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && gatekeeperPasswordInput) gatekeeperPasswordInput.focus();
+        });
+    }
+
+    // 2. Mandatory Password Change Events
+    const mandatorySaveBtn = document.getElementById('mandatory-pw-save-btn');
+    const mandatoryLogoutBtn = document.getElementById('mandatory-pw-logout-btn');
+    if (mandatorySaveBtn) {
+        mandatorySaveBtn.addEventListener('click', handleSaveMandatoryPassword);
+    }
+    if (mandatoryLogoutBtn) {
+        mandatoryLogoutBtn.addEventListener('click', async () => {
+            if (auth) await auth.signOut();
+            hideMandatoryPasswordChangeModal();
+        });
+    }
+
+    // 3. User Profile Events
+    const userProfileBtn = document.getElementById('user-profile-btn');
+    const closeUserProfileBtn = document.getElementById('close-user-profile-modal');
+    const profilePwSaveBtn = document.getElementById('profile-pw-save-btn');
+    const profileLogoutBtn = document.getElementById('profile-logout-btn');
+
+    if (userProfileBtn) userProfileBtn.addEventListener('click', openUserProfileModal);
+    if (closeUserProfileBtn) {
+        closeUserProfileBtn.addEventListener('click', () => {
+            document.getElementById('user-profile-modal')?.classList.add('hidden');
+        });
+    }
+    if (profilePwSaveBtn) profilePwSaveBtn.addEventListener('click', handleSaveProfilePassword);
+    if (profileLogoutBtn) {
+        profileLogoutBtn.addEventListener('click', async () => {
+            document.getElementById('user-profile-modal')?.classList.add('hidden');
+            if (auth) await auth.signOut();
+        });
+    }
+
+    // 4. Admin Users Management Events
+    const adminUsersBtn = document.getElementById('admin-users-btn');
+    const closeAdminUsersBtn = document.getElementById('close-admin-users-modal');
+    const openCreateUserBtn = document.getElementById('open-create-user-btn');
+    const adminUsersSearchInput = document.getElementById('admin-users-search-input');
+
+    if (adminUsersBtn) {
+        adminUsersBtn.addEventListener('click', () => {
+            document.getElementById('admin-users-modal')?.classList.remove('hidden');
+            renderAdminUsersList();
+        });
+    }
+    if (closeAdminUsersBtn) {
+        closeAdminUsersBtn.addEventListener('click', () => {
+            document.getElementById('admin-users-modal')?.classList.add('hidden');
+        });
+    }
+    if (openCreateUserBtn) openCreateUserBtn.addEventListener('click', openCreateUserModal);
+    if (adminUsersSearchInput) {
+        adminUsersSearchInput.addEventListener('input', renderAdminUsersList);
+    }
+
+    // 5. Create User Modal Events
+    const closeCreateUserBtn = document.getElementById('close-create-user-modal');
+    const cancelCreateUserBtn = document.getElementById('cancel-create-user-btn');
+    const submitCreateUserBtn = document.getElementById('submit-create-user-btn');
+    const generatePwBtn = document.getElementById('generate-pw-btn');
+
+    if (closeCreateUserBtn) {
+        closeCreateUserBtn.addEventListener('click', () => {
+            document.getElementById('create-user-modal')?.classList.add('hidden');
+        });
+    }
+    if (cancelCreateUserBtn) {
+        cancelCreateUserBtn.addEventListener('click', () => {
+            document.getElementById('create-user-modal')?.classList.add('hidden');
+        });
+    }
+    if (submitCreateUserBtn) submitCreateUserBtn.addEventListener('click', handleCreateUserSubmit);
+    if (generatePwBtn) {
+        generatePwBtn.addEventListener('click', () => {
+            const pwInput = document.getElementById('new-user-password');
+            if (pwInput) pwInput.value = generateRandomPassword(8);
+        });
+    }
+
+    // 6. User Created Success Modal Events
+    const copyCredentialsBtn = document.getElementById('copy-created-credentials-btn');
+    const closeCreatedSuccessBtn = document.getElementById('close-created-success-btn');
+    if (copyCredentialsBtn) copyCredentialsBtn.addEventListener('click', copyCreatedCredentials);
+    if (closeCreatedSuccessBtn) {
+        closeCreatedSuccessBtn.addEventListener('click', () => {
+            document.getElementById('user-created-success-modal')?.classList.add('hidden');
+        });
+    }
+
+    // 7. Reset Password Modal Events
+    const closeResetPwBtn = document.getElementById('close-reset-pw-modal');
+    const cancelResetPwBtn = document.getElementById('cancel-reset-pw-btn');
+    const submitResetPwBtn = document.getElementById('submit-reset-pw-btn');
+
+    if (closeResetPwBtn) {
+        closeResetPwBtn.addEventListener('click', () => {
+            document.getElementById('reset-password-modal')?.classList.add('hidden');
+        });
+    }
+    if (cancelResetPwBtn) {
+        cancelResetPwBtn.addEventListener('click', () => {
+            document.getElementById('reset-password-modal')?.classList.add('hidden');
+        });
+    }
+    if (submitResetPwBtn) submitResetPwBtn.addEventListener('click', handleSendResetPasswordEmail);
+
+    // 8. Password Toggle (Mostra / Nascondi) per tutti i campi password con icona occhio
+    document.querySelectorAll('.toggle-pw-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        });
+    });
+}
+
 // Controllo temporale periodico (ogni 30 secondi): aggiorna automaticamente comparsa e scomparsa delle icone e percorsi
 setInterval(() => {
     refreshMarkers();
@@ -6464,5 +7271,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initUrgentNewsModule();
     initPushModule();
     initCustomRoutesModule();
+    initUsersModule();
 });
+
 

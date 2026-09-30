@@ -1,40 +1,44 @@
 {
   "rules": {
     "markers": {
-      ".read": true,
+      ".read": "auth != null",
       ".write": "auth != null",
       "$markerId": {
         "note": {
-          ".write": "newData.isString() && newData.val().length < 500"
+          ".write": "auth != null && newData.isString() && newData.val().length < 500"
         }
       }
     },
     "custom_routes": {
-      ".read": true,
+      ".read": "auth != null",
       ".write": "auth != null"
     },
     "deleted_markers": {
-      ".read": true,
+      ".read": "auth != null",
       ".write": "auth != null"
     },
     "urgent_news": {
-      ".read": true,
+      ".read": "auth != null",
       ".write": "auth != null"
     },
     "user_reports": {
       ".read": "auth != null",
       ".write": "auth != null",
       "$reportId": {
-        ".write": "!data.exists() && newData.exists() && newData.hasChildren(['lat', 'lng', 'type', 'timestamp'])"
+        ".write": "auth != null && (!data.exists() && newData.exists() && newData.hasChildren(['lat', 'lng', 'type', 'timestamp']))"
       }
     },
     "fcm_tokens": {
       ".read": "auth != null",
       "$tokenId": {
-        ".write": "newData.exists() && newData.hasChildren(['token', 'timestamp'])"
+        ".write": "auth != null && newData.exists() && newData.hasChildren(['token', 'timestamp'])"
       }
     },
     "admin_settings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "authorized_users": {
       ".read": "auth != null",
       ".write": "auth != null"
     }

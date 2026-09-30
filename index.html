@@ -69,10 +69,16 @@
                     <button id="admin-reports-btn" class="admin-reports-btn hidden" title="Segnalazioni ricevute dagli utenti" type="button">
                         <span>🔔</span> <span class="btn-text">Segnalazioni</span> <span id="reports-badge" class="badge">0</span>
                     </button>
-                    <button id="admin-login-btn" class="admin-btn icon-btn" title="Accesso Admin" type="button">
+                    <button id="admin-users-btn" class="admin-users-btn hidden" title="Gestione Account & Accessi Utenti 118" type="button">
+                        <span>👥</span> <span class="btn-text">Utenti</span> <span id="admin-users-badge" class="badge">0</span>
+                    </button>
+                    <button id="user-profile-btn" class="user-profile-btn hidden" title="Il tuo Profilo / Cambia Password" type="button">
+                        <span>👤</span> <span class="btn-text" id="user-display-name">Profilo</span>
+                    </button>
+                    <button id="admin-login-btn" class="admin-btn icon-btn" title="Accedi al Sistema 118" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     </button>
-                    <button id="admin-logout-btn" class="admin-btn hidden icon-btn" title="Esci (Admin)" type="button">
+                    <button id="admin-logout-btn" class="admin-btn hidden icon-btn" title="Disconnetti (Logout)" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     </button>
                 </div>
@@ -645,20 +651,271 @@
         </div>
     </div>
 
-    <!-- Modal for Admin Login -->
-    <div id="login-modal" class="modal-overlay hidden">
-        <div class="modal-content login-content">
+    <!-- ========================================================
+         SISTEMA AUTENTICAZIONE E GESTIONE ACCESSI UTENTI 118
+         ======================================================== -->
+
+    <!-- Gatekeeper: Schermata di Accesso Obbligatoria (Blocco Iniziale) -->
+    <div id="auth-gatekeeper-overlay" class="gatekeeper-overlay hidden">
+        <div class="gatekeeper-card">
+            <div class="gatekeeper-header">
+                <div class="gatekeeper-icon-wrap">
+                    <span class="gatekeeper-badge-icon">🚨</span>
+                </div>
+                <h2>VIABILITÀ 118 FERRARA</h2>
+                <p class="gatekeeper-subtitle">Portale Riservato Operatori e Personale 118</p>
+                <div class="gatekeeper-notice">
+                    <span>🔒 Accesso protetto. Inserisci le credenziali fornite dall'Amministratore del servizio.</span>
+                </div>
+            </div>
+
+            <form id="gatekeeper-form" class="gatekeeper-form" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="gatekeeper-username">👤 Username o Email</label>
+                    <input type="text" id="gatekeeper-username" placeholder="Es. mario.rossi oppure postazione1" autocomplete="username" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="gatekeeper-password">🔑 Password</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="gatekeeper-password" placeholder="Inserisci la password" autocomplete="current-password" required />
+                        <button type="button" class="toggle-pw-btn" data-target="gatekeeper-password" title="Mostra/Nascondi password">👁️</button>
+                    </div>
+                </div>
+
+                <p id="gatekeeper-error" class="error-msg hidden"></p>
+
+                <button type="button" id="gatekeeper-submit-btn" class="primary-btn btn-block">
+                    <span>🔐</span> Accedi al Sistema 118
+                </button>
+
+                <div class="gatekeeper-links">
+                    <button type="button" id="gatekeeper-forgot-btn" class="link-btn">Hai dimenticato la password?</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Cambio Password Obbligatorio (Primo Accesso) -->
+    <div id="mandatory-password-change-modal" class="modal-overlay hidden">
+        <div class="modal-content profile-content">
             <div class="modal-header">
-                <h2>Accesso Amministratore</h2>
-                <button id="close-login" class="close-btn">
+                <h2>🔑 Primo Accesso: Imposta Password</h2>
+            </div>
+            <p class="modal-desc" style="color:#f59e0b; font-weight:600;">
+                ⚠️ È il tuo primo accesso con password provvisoria. Per motivi di sicurezza del servizio 118, è obbligatorio impostare la tua nuova password personale.
+            </p>
+            <div class="profile-form">
+                <div class="form-group">
+                    <label for="mandatory-new-password">Nuova Password Personale (min. 6 caratteri):</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="mandatory-new-password" placeholder="Inserisci nuova password" />
+                        <button type="button" class="toggle-pw-btn" data-target="mandatory-new-password">👁️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="mandatory-confirm-password">Conferma Nuova Password:</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="mandatory-confirm-password" placeholder="Ripeti la nuova password" />
+                        <button type="button" class="toggle-pw-btn" data-target="mandatory-confirm-password">👁️</button>
+                    </div>
+                </div>
+                <p id="mandatory-pw-error" class="error-msg hidden"></p>
+                <div class="modal-footer-actions">
+                    <button type="button" id="mandatory-pw-logout-btn" class="btn-cancel">Esci</button>
+                    <button type="button" id="mandatory-pw-save-btn" class="primary-btn">Salva Password e Accedi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Profilo Utente & Cambio Password Autonomo -->
+    <div id="user-profile-modal" class="modal-overlay hidden">
+        <div class="modal-content profile-content">
+            <div class="modal-header">
+                <h2>👤 Il Tuo Profilo 118</h2>
+                <button id="close-user-profile-modal" class="close-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
-            <p class="modal-desc">Inserisci la password di amministrazione.</p>
-            <div class="login-form">
-                <input type="password" id="admin-password" placeholder="Password amministratore" autocomplete="current-password" />
-                <p id="login-error" class="error-msg hidden">Password errata!</p>
-                <button id="submit-login" class="primary-btn">Accedi</button>
+            
+            <div class="user-profile-card">
+                <div class="profile-info-row">
+                    <span class="profile-info-label">Nome / Postazione:</span>
+                    <strong id="profile-name-text">-</strong>
+                </div>
+                <div class="profile-info-row">
+                    <span class="profile-info-label">Account / Email:</span>
+                    <span id="profile-email-text">-</span>
+                </div>
+                <div class="profile-info-row">
+                    <span class="profile-info-label">Ruolo nel Sistema:</span>
+                    <span id="profile-role-badge" class="role-badge role-operator">Operatore</span>
+                </div>
+            </div>
+
+            <hr class="profile-divider" />
+
+            <h3 class="profile-section-title">🔑 Modifica la tua Password</h3>
+            <p class="profile-section-desc">Inserisci la tua nuova password personale per i futuri accessi.</p>
+
+            <div class="profile-pw-form">
+                <div class="form-group">
+                    <label for="profile-new-password">Nuova Password (almeno 6 caratteri):</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="profile-new-password" placeholder="Nuova password" />
+                        <button type="button" class="toggle-pw-btn" data-target="profile-new-password">👁️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="profile-confirm-password">Conferma Nuova Password:</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="profile-confirm-password" placeholder="Ripeti la nuova password" />
+                        <button type="button" class="toggle-pw-btn" data-target="profile-confirm-password">👁️</button>
+                    </div>
+                </div>
+                <p id="profile-pw-error" class="error-msg hidden"></p>
+                <button type="button" id="profile-pw-save-btn" class="primary-btn btn-block">Aggiorna la mia Password</button>
+            </div>
+
+            <hr class="profile-divider" />
+
+            <div class="profile-logout-row">
+                <button type="button" id="profile-logout-btn" class="btn-danger btn-block">🚪 Disconnetti Account da questo dispositivo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gestione Utenti (Pannello Admin) -->
+    <div id="admin-users-modal" class="modal-overlay hidden">
+        <div class="modal-content admin-users-content">
+            <div class="modal-header">
+                <h2>👥 Gestione Utenti & Accessi 118</h2>
+                <button id="close-admin-users-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <p class="modal-desc">Crea nuovi account per le postazioni/operatori, modifica le password o revoca immediatamente gli accessi.</p>
+
+            <div class="admin-users-toolbar">
+                <button type="button" id="open-create-user-btn" class="primary-btn">
+                    <span>➕</span> Crea Nuovo Utente / Postazione
+                </button>
+                <div class="admin-users-search-box">
+                    <input type="text" id="admin-users-search-input" placeholder="🔍 Cerca per nome o email..." />
+                </div>
+            </div>
+
+            <div class="admin-users-stats">
+                <span>Account registrati: <strong id="admin-users-total-count">0</strong></span>
+            </div>
+
+            <div id="admin-users-list" class="admin-users-list">
+                <div class="users-empty-state">Caricamento elenco utenti in corso...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Creazione Nuovo Utente (Admin) -->
+    <div id="create-user-modal" class="modal-overlay hidden">
+        <div class="modal-content create-user-content">
+            <div class="modal-header">
+                <h2>➕ Crea Nuovo Account Utente 118</h2>
+                <button id="close-create-user-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+
+            <form id="create-user-form" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="new-user-name">Nome e Cognome o Nome Postazione <span style="color:#ef4444;">*</span></label>
+                    <input type="text" id="new-user-name" placeholder="Es. Marco Rossi (Ambulanza Mirabello)" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="new-user-email">Username o Indirizzo Email <span style="color:#ef4444;">*</span></label>
+                    <input type="text" id="new-user-email" placeholder="Es. mirabello1 (diventerà mirabello1@118fe.it) oppure email reale" required />
+                    <span class="field-hint">💡 Se inserisci solo il nome utente senza @, verrà associato automaticamente al dominio @118fe.it</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="new-user-password">Password Iniziale Provvisoria <span style="color:#ef4444;">*</span></label>
+                    <div class="pw-gen-wrapper">
+                        <input type="text" id="new-user-password" placeholder="Password (min. 6 caratteri)" required />
+                        <button type="button" id="generate-pw-btn" class="btn-secondary" title="Genera password casuale sicura">🎲 Genera</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="new-user-role">Ruolo & Autorizzazioni</label>
+                    <select id="new-user-role" class="styled-select">
+                        <option value="operator">🚑 Operatore 118 (Sola consultazione viabilità & invio segnalazioni)</option>
+                        <option value="admin">👑 Amministratore (Pieno controllo strade, percorsi, news e utenti)</option>
+                    </select>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="new-user-must-change" checked />
+                        <span>Richiedi cambio password obbligatorio al primo accesso dell'utente</span>
+                    </label>
+                </div>
+
+                <p id="create-user-error" class="error-msg hidden"></p>
+
+                <div class="modal-footer-actions">
+                    <button type="button" id="cancel-create-user-btn" class="btn-cancel">Annulla</button>
+                    <button type="button" id="submit-create-user-btn" class="primary-btn">Crea e Abilita Utente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Successo Creazione Utente con Copia Credenziali -->
+    <div id="user-created-success-modal" class="modal-overlay hidden">
+        <div class="modal-content credentials-content">
+            <div class="modal-header">
+                <h2>✅ Account Utente Creato!</h2>
+            </div>
+            <p class="modal-desc">L'account è ora attivo. Puoi copiare le credenziali di seguito e inviarle all'operatore.</p>
+
+            <div class="credentials-box" id="credentials-copy-box">
+                <div class="cred-row"><span>👤 Operatore:</span> <strong id="created-summary-name">-</strong></div>
+                <div class="cred-row"><span>📧 Email / Login:</span> <strong id="created-summary-email">-</strong></div>
+                <div class="cred-row"><span>🔑 Password Iniziale:</span> <code id="created-summary-password">-</code></div>
+                <div class="cred-row"><span>🛡️ Ruolo:</span> <span id="created-summary-role">-</span></div>
+                <div class="cred-row"><span>🌐 Link Accesso:</span> <code>https://viabilita118fe.vercel.app/</code></div>
+            </div>
+
+            <div class="modal-footer-actions">
+                <button type="button" id="copy-created-credentials-btn" class="primary-btn">
+                    <span>📋</span> Copia Credenziali per Messaggio / WhatsApp
+                </button>
+                <button type="button" id="close-created-success-btn" class="btn-secondary">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recupero / Reset Password -->
+    <div id="reset-password-modal" class="modal-overlay hidden">
+        <div class="modal-content reset-content">
+            <div class="modal-header">
+                <h2>🔑 Recupero Password</h2>
+                <button id="close-reset-pw-modal" class="close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p class="modal-desc">Inserisci il tuo indirizzo email o username registrato. Ti invieremo un link per impostare una nuova password.</p>
+            <div class="form-group">
+                <label for="reset-email-input">Email registrata:</label>
+                <input type="text" id="reset-email-input" placeholder="Es. mario.rossi@118fe.it oppure postazione1" />
+            </div>
+            <p id="reset-pw-error" class="error-msg hidden"></p>
+            <p id="reset-pw-success" class="success-msg hidden"></p>
+            <div class="modal-footer-actions">
+                <button type="button" id="cancel-reset-pw-btn" class="btn-cancel">Annulla</button>
+                <button type="button" id="submit-reset-pw-btn" class="primary-btn">Invia Link di Ripristino</button>
             </div>
         </div>
     </div>
