@@ -82,8 +82,8 @@ body {
     background: rgba(255, 255, 255, 0.98);
 }
 
-/* Riga 1: Titolo a sinistra, Ricerca e Segnalazioni a destra */
-.header-top-row {
+/* Riga 1 Desktop: Titolo a sinistra, Ricerca e Profilo/Esci a destra */
+.header-main-row {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -92,7 +92,7 @@ body {
     width: 100%;
 }
 
-.header-row-title {
+.header-top-row {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -1808,7 +1808,6 @@ h1 span.city-name {
     outline-offset: 2px;
 }
 
-/* Responsive Design per Dispositivi Mobili: Header Rigorosamente a 2 Righe per Utente e 3 Righe per Admin */
 /* Responsive Design per Dispositivi Mobili */
 @media (max-width: 768px) {
     .top-nav-wrapper {
@@ -1827,36 +1826,37 @@ h1 span.city-name {
         box-sizing: border-box !important;
         padding: 8px 10px !important;
         border-radius: 14px !important;
-        gap: 6px 5px !important;
+        gap: 6px !important;
         background: rgba(255, 255, 255, 0.96) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
         border: 1px solid rgba(0, 0, 0, 0.08) !important;
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
         display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        overflow: visible !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
     }
 
-    .header-top-row,
-    .header-search-row,
-    .header-actions-row {
+    .header-main-row {
         display: contents !important;
     }
 
-    /* RIGA 1: TITOLO APP */
-    .header-row-title {
+    /* RIGA 1: TITOLO APP CENTRATO */
+    .header-top-row {
         order: 1 !important;
-        width: 100% !important;
-        flex: 1 0 100% !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        text-align: center !important;
+        width: 100% !important;
         margin: 0 !important;
         padding: 0 0 2px 0 !important;
+    }
+
+    .header-row-title {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
     }
 
     .header-title-group {
@@ -1899,14 +1899,35 @@ h1 span.city-name {
         border-radius: 999px !important;
     }
 
-    /* RIGA 2: BARRA AZIONI (BADGE ADMIN OPPURE AZIONI UTENTE) */
-    
-    /* 1. Badge Admin (Percorsi, News, Segnalazioni, Utenti) */
-    .admin-routes-btn,
-    .admin-news-btn,
-    .admin-reports-btn,
-    .admin-users-btn {
-        flex: 1 1 calc(25% - 4px) !important;
+    /* RIGA 2: BARRA AZIONI E BADGE (TRA IL TITOLO E LA RICERCA) */
+    .header-actions-row {
+        order: 2 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 4px !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border-top: none !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .header-actions-row:not(:has(button:not(.hidden))) {
+        display: none !important;
+    }
+
+    /* In Admin mode: nascondi user-report-btn per fare spazio ai 4 badge */
+    body.admin-logged-in .user-report-btn {
+        display: none !important;
+    }
+
+    /* In Admin mode: i 4 badge sono affiancati orizzontalmente in modo perfetto (25% ciascuno) */
+    body.admin-logged-in .admin-routes-btn,
+    body.admin-logged-in .admin-news-btn,
+    body.admin-logged-in .admin-reports-btn,
+    body.admin-logged-in .admin-users-btn {
+        flex: 1 1 25% !important;
         min-width: 0 !important;
         height: 34px !important;
         padding: 0 4px !important;
@@ -1921,10 +1942,10 @@ h1 span.city-name {
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
     }
 
-    .admin-routes-btn { order: 20 !important; background: #7c3aed !important; color: #ffffff !important; }
-    .admin-news-btn { order: 21 !important; background: #1e293b !important; color: #ffffff !important; }
-    .admin-reports-btn { order: 22 !important; background: #d97706 !important; color: #ffffff !important; }
-    .admin-users-btn { order: 23 !important; background: #0d9488 !important; color: #ffffff !important; }
+    .admin-routes-btn { background: #7c3aed !important; color: #ffffff !important; }
+    .admin-news-btn { background: #1e293b !important; color: #ffffff !important; }
+    .admin-reports-btn { background: #d97706 !important; color: #ffffff !important; }
+    .admin-users-btn { background: #0d9488 !important; color: #ffffff !important; }
 
     .admin-routes-btn .btn-text,
     .admin-news-btn .btn-text,
@@ -1933,17 +1954,12 @@ h1 span.city-name {
         display: none !important;
     }
 
-    /* 2. Pulsanti Azioni Utente (Invia Segnalazione, News Urgenti) */
-    body.admin-logged-in .user-report-btn {
-        display: none !important;
-    }
-
+    /* In User mode: pulsanti segnalazioni e news nella riga 2 */
     body:not(.admin-logged-in) .user-report-btn {
-        order: 24 !important;
         flex: 1 1 auto !important;
         height: 34px !important;
         padding: 0 10px !important;
-        font-size: 0.80rem !important;
+        font-size: 0.82rem !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
         background: #059669 !important;
@@ -1965,12 +1981,11 @@ h1 span.city-name {
         line-height: 1 !important;
     }
 
-    .user-news-btn {
-        order: 25 !important;
+    body:not(.admin-logged-in) .user-news-btn {
         flex: 1 1 auto !important;
         height: 34px !important;
         padding: 0 8px !important;
-        font-size: 0.80rem !important;
+        font-size: 0.82rem !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
         background: #ef4444 !important;
@@ -1983,15 +1998,26 @@ h1 span.city-name {
         box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3) !important;
     }
 
-    .user-news-btn .btn-text {
+    body:not(.admin-logged-in) .user-news-btn .btn-text {
         display: inline !important;
     }
 
-    /* RIGA 3: BARRA CONTROLLI (PROFILO + RICERCA VIE + ESCI / ACCEDI) */
+    /* RIGA 3: CONTROLLI E RICERCA (Profilo + Ricerca Vie + Logout / Login) */
+    .header-search-row {
+        order: 3 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 5px !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex-wrap: nowrap !important;
+    }
 
-    /* Profilo Utente (Icona Compatta a Sinistra) */
+    /* Profilo a Sinistra */
     .user-profile-btn {
-        order: 30 !important;
         width: 34px !important;
         min-width: 34px !important;
         height: 34px !important;
@@ -2002,8 +2028,8 @@ h1 span.city-name {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-sizing: border-box !important;
         flex-shrink: 0 !important;
+        box-sizing: border-box !important;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
     }
 
@@ -2011,9 +2037,8 @@ h1 span.city-name {
         display: none !important;
     }
 
-    /* Ricerca Vie (Centro - Espandibile nello spazio azzurro) */
+    /* Ricerca Vie al Centro (Espandibile) */
     .search-in-header {
-        order: 31 !important;
         flex: 1 1 auto !important;
         min-width: 0 !important;
         width: auto !important;
@@ -2031,7 +2056,7 @@ h1 span.city-name {
         width: 100% !important;
         height: 34px !important;
         padding: 0 8px !important;
-        font-size: 0.82rem !important;
+        font-size: 0.80rem !important;
         border-radius: 8px !important;
         border: 1px solid rgba(0, 0, 0, 0.15) !important;
         background: rgba(0, 0, 0, 0.05) !important;
@@ -2053,7 +2078,6 @@ h1 span.city-name {
         height: 34px !important;
         padding: 0 !important;
         font-size: 0.82rem !important;
-        font-weight: 700 !important;
         border-radius: 8px !important;
         background: var(--primary) !important;
         color: #ffffff !important;
@@ -2063,7 +2087,6 @@ h1 span.city-name {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 0 !important;
         box-sizing: border-box !important;
         box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3) !important;
         transition: background 0.2s, transform 0.1s !important;
@@ -2078,14 +2101,12 @@ h1 span.city-name {
     }
 
     .search-in-header button .search-icon {
-        font-size: 0.90rem !important;
+        font-size: 0.88rem !important;
         display: inline-block !important;
-        margin: 0 !important;
     }
 
-    /* Accedi (Icona a Destra quando non loggati) */
+    /* Accedi a Destra (quando non loggati) */
     #admin-login-btn {
-        order: 32 !important;
         width: 34px !important;
         min-width: 34px !important;
         height: 34px !important;
@@ -2102,9 +2123,8 @@ h1 span.city-name {
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
     }
 
-    /* Esci (Ridotto a Icona a Destra quando loggati) */
+    /* Esci a Destra (quando loggati - sola icona) */
     #admin-logout-btn {
-        order: 33 !important;
         width: 34px !important;
         min-width: 34px !important;
         height: 34px !important;
@@ -3950,6 +3970,7 @@ span.hidden,
 .admin-users-btn.hidden,
 .user-profile-btn.hidden,
 .user-news-btn.hidden,
+#admin-login-btn.hidden,
 #admin-logout-btn.hidden,
 #auth-gatekeeper-overlay.hidden {
     display: none !important;
