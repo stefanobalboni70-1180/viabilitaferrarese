@@ -136,6 +136,17 @@ h1 span.city-name {
     display: inline-block;
 }
 
+.header-user-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+body.admin-logged-in .header-user-actions {
+    display: none !important;
+}
+
 .header-search-row {
     display: flex;
     align-items: center;
@@ -158,6 +169,50 @@ h1 span.city-name {
 
 .header-actions-row:not(:has(button:not(.hidden))) {
     display: none !important;
+}
+
+.user-news-btn {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0 14px;
+    height: 34px;
+    box-sizing: border-box;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+    animation: urgent-pulse 2s infinite ease-in-out;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.user-news-btn:hover {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+    transform: translateY(-1px);
+}
+
+.user-news-btn .btn-text {
+    display: inline !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    vertical-align: middle;
+}
+
+.user-news-btn .badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 999px;
 }
 
 .user-report-btn {
@@ -1954,52 +2009,61 @@ h1 span.city-name {
         display: none !important;
     }
 
-    /* In User mode: pulsanti segnalazioni e news nella riga 2 */
-    body:not(.admin-logged-in) .user-report-btn {
-        flex: 1 1 auto !important;
-        height: 34px !important;
-        padding: 0 10px !important;
-        font-size: 0.82rem !important;
-        font-weight: 600 !important;
-        border-radius: 8px !important;
-        background: #059669 !important;
-        color: #ffffff !important;
-        display: inline-flex !important;
+    /* RIGA 2 (MODALITÀ UTENTE): BARRA AZIONI UTENTE (SEGNALAZIONI + NEWS URGENTI) */
+    .header-user-actions {
+        order: 2 !important;
+        display: flex !important;
+        flex-direction: row !important;
         align-items: center !important;
-        justify-content: center !important;
+        justify-content: space-between !important;
         gap: 6px !important;
-        box-sizing: border-box !important;
-        box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex-wrap: nowrap !important;
     }
 
-    body:not(.admin-logged-in) .user-report-btn .btn-text {
-        display: inline !important;
+    body.admin-logged-in .header-user-actions {
+        display: none !important;
     }
 
-    .user-report-btn .report-icon {
-        font-size: 1rem !important;
-        line-height: 1 !important;
-    }
-
-    body:not(.admin-logged-in) .user-news-btn {
-        flex: 1 1 auto !important;
+    .header-user-actions .user-report-btn,
+    .header-user-actions .user-news-btn {
+        flex: 1 1 50% !important;
+        min-width: 0 !important;
         height: 34px !important;
         padding: 0 8px !important;
-        font-size: 0.82rem !important;
+        font-size: 0.80rem !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
-        background: #ef4444 !important;
-        color: #ffffff !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         gap: 4px !important;
         box-sizing: border-box !important;
+        white-space: nowrap !important;
+    }
+
+    .header-user-actions .user-report-btn {
+        background: #059669 !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3) !important;
+    }
+
+    .header-user-actions .user-news-btn {
+        background: #ef4444 !important;
+        color: #ffffff !important;
         box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3) !important;
     }
 
-    body:not(.admin-logged-in) .user-news-btn .btn-text {
+    .header-user-actions .user-report-btn .btn-text,
+    .header-user-actions .user-news-btn .btn-text {
         display: inline !important;
+    }
+
+    .header-user-actions .user-report-btn .report-icon {
+        font-size: 1rem !important;
+        line-height: 1 !important;
     }
 
     /* RIGA 3: CONTROLLI E RICERCA (Profilo + Ricerca Vie + Logout / Login) */
