@@ -137,6 +137,12 @@ function checkAndMigrateLocalStorage() {
         if (currentStoredVersion !== APP_VERSION) {
             console.log(`🔄 Aggiornamento versione a ${APP_VERSION}: sanitizzazione cache locale`);
             localStorage.setItem('ferrara_app_version', APP_VERSION);
+            // Pulisci CacheStorage API se presente
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => caches.delete(name));
+                }).catch(() => {});
+            }
             // Pulisci cache stradali obsolete
             localStorage.removeItem('ferrara_street_cache_v20');
             // Sanitizza i marker salvati in locale
