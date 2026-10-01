@@ -47,13 +47,19 @@
                 </div>
 
                 <div class="header-search-row">
-                    <button id="user-profile-btn" class="user-profile-btn hidden" title="Il tuo Profilo / Cambia Password" type="button">
-                        <span>👤</span> <span class="btn-text" id="user-display-name">Profilo</span>
+                    <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118" type="button">
+                        <span>🚨</span><span class="btn-text">News Urgenti</span> <span id="user-news-badge" class="badge">0</span>
+                    </button>
+                    <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità" type="button">
+                        <span class="report-icon">📢</span><span class="btn-text">Segnalazioni</span>
                     </button>
                     <div class="admin-top-row search-in-header">
                         <input type="text" id="admin-search-input" placeholder="🔍 Cerca una via (es. Via Bologna)..." />
                         <button id="admin-search-btn" title="Cerca via" type="button"><span class="search-icon">🔍</span><span class="btn-text">Cerca</span></button>
                     </div>
+                    <button id="user-profile-btn" class="user-profile-btn hidden" title="Il tuo Profilo / Cambia Password" type="button">
+                        <span>👤</span> <span class="btn-text" id="user-display-name">Profilo</span>
+                    </button>
                     <button id="admin-login-btn" class="admin-btn icon-btn" title="Accedi al Sistema 118" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     </button>
@@ -66,12 +72,6 @@
 
             <!-- Riga Azioni & Badge (Desktop: Riga 2 Sotto | Mobile: Riga 2 Centrale tra Titolo e Ricerca) -->
             <div class="header-actions-row">
-                <button id="user-report-btn" class="user-report-btn" title="Invia una segnalazione di viabilità" type="button">
-                    <span class="report-icon">📢</span><span class="btn-text">Segnalazioni</span>
-                </button>
-                <button id="user-news-btn" class="user-news-btn hidden" title="Notizie e comunicazioni urgenti 118" type="button">
-                    <span>🚨</span><span class="btn-text">News Urgenti</span> <span id="user-news-badge" class="badge">0</span>
-                </button>
                 <button id="admin-routes-btn" class="admin-routes-btn hidden" title="Gestione Percorsi ed Eventi Speciali" type="button">
                     <span>🚩</span> <span class="btn-text">Percorsi</span> <span id="admin-routes-badge" class="badge">0</span>
                 </button>

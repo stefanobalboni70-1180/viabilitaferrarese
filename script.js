@@ -2043,6 +2043,7 @@ function updateUI() {
             headerSubtitle.textContent = currentUser ? `Accesso Operatore 118: ${currentUserProfile?.name || currentUser.email}` : "Accesso Riservato 118";
         }
     }
+    updateUserNewsButton();
     // Ridisegna i marker e i percorsi speciali
     refreshMarkers();
     renderCustomRoutesOnMap();
@@ -4690,9 +4691,15 @@ function updateUserNewsButton() {
     if (!userNewsBtn) return;
 
     const count = urgentNewsData.length;
-    if (count > 0) {
+    if (userNewsBadge) userNewsBadge.textContent = count;
+
+    if (!isAdmin) {
         userNewsBtn.classList.remove('hidden');
-        if (userNewsBadge) userNewsBadge.textContent = count;
+        if (count > 0) {
+            userNewsBtn.classList.add('has-active-news');
+        } else {
+            userNewsBtn.classList.remove('has-active-news');
+        }
     } else {
         userNewsBtn.classList.add('hidden');
     }
