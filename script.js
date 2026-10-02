@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.18';
+const APP_VERSION = '3.9.19';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2040,7 +2040,19 @@ function updateUI() {
             cancelDrawingCustomRoute();
         }
         if (headerSubtitle) {
-            headerSubtitle.textContent = currentUser ? `Accesso Operatore 118: ${currentUserProfile?.name || currentUser.email}` : "Accesso Riservato 118";
+            if (currentUser) {
+                const userRole = currentUserProfile?.role;
+                const displayName = currentUserProfile?.name || currentUser.email;
+                if (userRole === 'police' || userRole === 'polizia') {
+                    headerSubtitle.textContent = `Accesso Forze di Polizia: ${displayName}`;
+                } else if (userRole === 'other_entity' || userRole === 'altro_ente') {
+                    headerSubtitle.textContent = `Accesso Altro Ente: ${displayName}`;
+                } else {
+                    headerSubtitle.textContent = `Accesso Operatore 118: ${displayName}`;
+                }
+            } else {
+                headerSubtitle.textContent = "Accesso Riservato 118";
+            }
         }
     }
     updateUserNewsButton();
@@ -6677,6 +6689,23 @@ async function handleSaveMandatoryPassword() {
     }
 }
 
+// Helper per ottenere dettagli grafici ed etichette dei ruoli utente
+function getRoleInfo(role) {
+    switch (role) {
+        case 'admin':
+            return { label: '👑 Amministratore', shortLabel: '👑 Admin', badgeClass: 'role-admin' };
+        case 'police':
+        case 'polizia':
+            return { label: '🚓 Forze di Polizia', shortLabel: '🚓 Polizia', badgeClass: 'role-police' };
+        case 'other_entity':
+        case 'altro_ente':
+            return { label: '🏢 Altro Ente', shortLabel: '🏢 Altro Ente', badgeClass: 'role-other' };
+        case 'operator':
+        default:
+            return { label: '🚑 Operatore 118', shortLabel: '🚑 Operatore', badgeClass: 'role-operator' };
+    }
+}
+
 // Profilo Utente & Cambio Password Personale
 function openUserProfileModal() {
     const modal = document.getElementById('user-profile-modal');
@@ -6690,9 +6719,10 @@ function openUserProfileModal() {
     if (nameEl) nameEl.textContent = currentUserProfile?.name || 'Operatore 118';
     if (emailEl) emailEl.textContent = currentUser?.email || '-';
     if (roleEl) {
-        const isAdminRole = (currentUserProfile?.role === 'admin' || isAdmin);
-        roleEl.className = `role-badge ${isAdminRole ? 'role-admin' : 'role-operator'}`;
-        roleEl.textContent = isAdminRole ? '👑 Amministratore' : '🚑 Operatore 118';
+        const userRole = (isAdmin ? 'admin' : (currentUserProfile?.role || 'operator'));
+        const roleInfo = getRoleInfo(userRole);
+        roleEl.className = `role-badge ${roleInfo.badgeClass}`;
+        roleEl.textContent = roleInfo.label;
     }
 
     if (newPassInput) newPassInput.value = '';
@@ -7012,6 +7042,7 @@ function renderAdminUsersList() {
     let html = '';
     filtered.forEach(u => {
         const isAdminRole = (u.role === 'admin');
+        const roleInfo = getRoleInfo(u.role);
         const isDisabled = (u.status === 'disabled');
         const mustChange = !!u.mustChangePassword;
         const isCurrentAuthUser = (auth?.currentUser && auth.currentUser.uid === u.uid);
@@ -7020,8 +7051,8 @@ function renderAdminUsersList() {
             <div class="user-card-item ${isDisabled ? 'user-disabled' : ''}" data-uid="${escapeHtml(u.uid)}">
                 <div class="user-main-info">
                     <div class="user-name-title">
-                        <span>${escapeHtml(u.name || 'Operatore 118')}</span>
-                        <span class="role-badge ${isAdminRole ? 'role-admin' : 'role-operator'}">${isAdminRole ? '👑 Admin' : '🚑 Operatore'}</span>
+                        <span>${escapeHtml(u.name || 'Utente')}</span>
+                        <span class="role-badge ${roleInfo.badgeClass}">${roleInfo.shortLabel}</span>
                         <span class="status-badge ${isDisabled ? 'status-disabled' : 'status-active'}">${isDisabled ? '🔴 Disabilitato' : '🟢 Attivo'}</span>
                         ${mustChange ? '<span class="status-badge status-disabled" title="Deve impostare la password al prossimo login">🔑 Da cambiare</span>' : ''}
                     </div>
@@ -7205,7 +7236,7 @@ async function copyResetCredentials() {
     const email = document.getElementById('reset-summary-email')?.textContent || '';
     const pass = document.getElementById('reset-summary-password')?.textContent || '';
 
-    const textToCopy = `🚑 VIABILITÀ 118 FERRARA\nNuove credenziali di accesso:\n\n👤 Operatore: ${name}\n📧 Login / Username: ${email}\n🔑 Nuova Password: ${pass}\n🌐 Accedi qui: https://viabilita118fe.vercel.app/\n\n(Al primo accesso ti verrà richiesto di confermare una nuova password personale).`;
+    const textToCopy = `🚑 VIABILITÀ 118 FERRARA\nNuove credenziali di accesso:\n\n👤 Utente / Ente: ${name}\n📧 Login / Username: ${email}\n🔑 Nuova Password: ${pass}\n🌐 Accedi qui: https://viabilita118fe.vercel.app/\n\n(Al primo accesso ti verrà richiesto di confermare una nuova password personale).`;
 
     try {
         await navigator.clipboard.writeText(textToCopy);
@@ -7437,7 +7468,10 @@ function showCreatedUserSuccessModal(name, email, password, role) {
     if (nameEl) nameEl.textContent = name;
     if (emailEl) emailEl.textContent = email;
     if (passEl) passEl.textContent = password;
-    if (roleEl) roleEl.textContent = (role === 'admin' ? '👑 Amministratore' : '🚑 Operatore 118');
+    if (roleEl) {
+        const roleInfo = getRoleInfo(role);
+        roleEl.textContent = roleInfo.label;
+    }
 
     if (modal) modal.classList.remove('hidden');
 }
@@ -7451,7 +7485,7 @@ function copyCreatedCredentials() {
 
     const textToCopy = 
 `🚑 *CREDENZIALI ACCESSO VIABILITÀ 118 FERRARA*
-👤 Operatore/Postazione: ${name}
+👤 Utente / Ente: ${name}
 📧 Login / Email: ${email}
 🔑 Password provvisoria: ${pass}
 🛡️ Ruolo: ${role}
