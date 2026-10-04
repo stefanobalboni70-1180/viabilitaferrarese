@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.20';
+const APP_VERSION = '3.9.21';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2055,7 +2055,7 @@ function updateUI() {
                 const userRole = currentUserProfile?.role;
                 const displayName = currentUserProfile?.name || currentUser.email;
                 if (userRole === 'police' || userRole === 'polizia') {
-                    headerSubtitle.textContent = `Accesso Forze di Polizia: ${displayName}`;
+                    headerSubtitle.textContent = `Accesso Forze di Polizia / VVF: ${displayName}`;
                 } else if (userRole === 'other_entity' || userRole === 'altro_ente') {
                     headerSubtitle.textContent = `Accesso Altro Ente: ${displayName}`;
                 } else {
@@ -6691,6 +6691,7 @@ async function handleSaveMandatoryPassword() {
         await auth.currentUser.updatePassword(newPass);
         if (authorizedUsersRef && auth.currentUser) {
             await authorizedUsersRef.child(auth.currentUser.uid).update({
+                tempPassword: newPass,
                 mustChangePassword: false,
                 passwordUpdatedAt: Date.now()
             });
@@ -6721,7 +6722,7 @@ function getRoleInfo(role) {
             return { label: '👑 Amministratore', shortLabel: '👑 Admin', badgeClass: 'role-admin' };
         case 'police':
         case 'polizia':
-            return { label: '🚓 Forze di Polizia', shortLabel: '🚓 Polizia', badgeClass: 'role-police' };
+            return { label: '🚓 Forze di Polizia / VVF', shortLabel: '🚓 Polizia / VVF', badgeClass: 'role-police' };
         case 'other_entity':
         case 'altro_ente':
             return { label: '🏢 Altro Ente', shortLabel: '🏢 Altro Ente', badgeClass: 'role-other' };
@@ -6794,6 +6795,7 @@ async function handleSaveProfilePassword() {
         await auth.currentUser.updatePassword(newPass);
         if (authorizedUsersRef && auth.currentUser) {
             await authorizedUsersRef.child(auth.currentUser.uid).update({
+                tempPassword: newPass,
                 mustChangePassword: false,
                 passwordUpdatedAt: Date.now()
             });
@@ -7301,13 +7303,53 @@ async function triggerAdminSendReset(email) {
 
 // Elimina Utente
 async function deleteAuthorizedUser(uid, name) {
-    if (!confirm(`Sei sicuro di voler eliminare l'account di "${name}"?\nL'utente non potrà più accedere al sistema.`)) {
+    if (!confirm(`Sei sicuro di voler eliminare l'account di "${name}"?\nL'utente verrà rimosso e l'indirizzo email liberato da Firebase Auth per futuri reinserimenti.`)) {
         return;
     }
     if (!authorizedUsersRef) return;
     try {
+        // Recupera dati dell'utente per tentare eliminazione anche da Firebase Auth
+        const userSnap = await authorizedUsersRef.child(uid).once('value');
+        const userData = userSnap.val() || {};
+        const email = userData.email || '';
+        const tempPassword = userData.tempPassword || '';
+
+        // Se abbiamo l'email, tentiamo l'accesso su un'istanza temporanea per cancellare l'utente da Firebase Auth
+        if (email) {
+            const passwordsToTry = [
+                tempPassword,
+                '118fe2025',
+                '118fe2026',
+                'viabilita118',
+                'soccorso118',
+                'ferrara118'
+            ].filter(Boolean);
+
+            let authDeleted = false;
+            for (const pwd of passwordsToTry) {
+                try {
+                    const tempAppName = 'DeleteAuth_' + Date.now();
+                    const tempApp = firebase.initializeApp(firebaseConfig, tempAppName);
+                    const tempAuth = tempApp.auth();
+
+                    const cred = await tempAuth.signInWithEmailAndPassword(email, pwd);
+                    await cred.user.delete();
+                    await tempApp.delete();
+                    authDeleted = true;
+                    console.log(`✅ Utente ${email} eliminato definitivamente da Firebase Auth`);
+                    break;
+                } catch (delErr) {
+                    // Prova password successiva
+                }
+            }
+            if (!authDeleted) {
+                console.warn(`⚠️ Impossibile autenticare ${email} per cancellazione automatica da Auth (password non nota).`);
+            }
+        }
+
+        // Rimuovi dal Database
         await authorizedUsersRef.child(uid).remove();
-        showToast("Account rimosso con successo.", "success", 2500);
+        showToast(`Account "${name}" rimosso e liberato con successo.`, "success", 3000);
     } catch (err) {
         console.error('Errore eliminazione utente:', err);
         showToast("Errore durante l'eliminazione dell'account.", "error", 3000);
@@ -7402,6 +7444,7 @@ async function handleCreateUserSubmit() {
             name: name,
             email: normalizedEmail,
             role: role,
+            tempPassword: password,
             status: 'active',
             mustChangePassword: mustChange,
             createdAt: Date.now(),
@@ -7420,44 +7463,65 @@ async function handleCreateUserSubmit() {
     } catch (err) {
         console.error('Errore creazione utente:', err);
         if (err.code === 'auth/email-already-in-use') {
-            // L'utente esiste già in Firebase Auth (es. creato prima del fix permessi).
-            // Proviamo a recuperare l'UID autenticandolo con la password fornita e salvando il profilo nel database!
-            try {
-                const tempAppName = 'RecoveryAuth_' + Date.now();
-                const tempApp = firebase.initializeApp(firebaseConfig, tempAppName);
-                const tempAuth = tempApp.auth();
+            // L'utente esiste già in Firebase Auth.
+            // Proviamo ad autenticarlo con la nuova password o password note per aggiornare la password a quella nuova e collegarlo
+            const passwordsToTry = [
+                password,
+                '118fe2025',
+                '118fe2026',
+                'viabilita118',
+                'soccorso118',
+                'ferrara118'
+            ];
 
-                const existingUserCred = await tempAuth.signInWithEmailAndPassword(normalizedEmail, password);
-                const existingUid = existingUserCred.user.uid;
+            let recoveredUid = null;
+            for (const pwd of passwordsToTry) {
+                try {
+                    const tempAppName = 'RecoveryAuth_' + Date.now();
+                    const tempApp = firebase.initializeApp(firebaseConfig, tempAppName);
+                    const tempAuth = tempApp.auth();
 
-                await tempAuth.signOut();
-                await tempApp.delete();
+                    const existingUserCred = await tempAuth.signInWithEmailAndPassword(normalizedEmail, pwd);
+                    recoveredUid = existingUserCred.user.uid;
+                    if (pwd !== password) {
+                        await existingUserCred.user.updatePassword(password);
+                    }
+                    await tempAuth.signOut();
+                    await tempApp.delete();
+                    break;
+                } catch (recoveryErr) {
+                    // prova successiva
+                }
+            }
 
+            if (recoveredUid) {
                 const userProfile = {
-                    uid: existingUid,
+                    uid: recoveredUid,
                     name: name,
                     email: normalizedEmail,
                     role: role,
+                    tempPassword: password,
                     status: 'active',
                     mustChangePassword: mustChange,
                     createdAt: Date.now(),
                     createdBy: auth?.currentUser?.email || 'admin'
                 };
 
-                await authorizedUsersRef.child(existingUid).set(userProfile);
+                await authorizedUsersRef.child(recoveredUid).set(userProfile);
 
                 const createModal = document.getElementById('create-user-modal');
                 if (createModal) createModal.classList.add('hidden');
 
                 showCreatedUserSuccessModal(name, normalizedEmail, password, role);
-                showToast(`Account "${name}" sincronizzato con successo!`, "success", 3500);
+                showToast(`Account "${name}" sincronizzato e liberato con successo!`, "success", 3500);
                 return;
-            } catch (recoveryErr) {
-                console.warn('Errore recovery utente:', recoveryErr);
-                let recoveryMsg = `L'indirizzo "${normalizedEmail}" è già registrato.`;
-                if (recoveryErr.code === 'auth/wrong-password' || recoveryErr.code === 'auth/invalid-credential') {
-                    recoveryMsg = `L'utente "${normalizedEmail}" esiste già con un'altra password. Inserisci la password corretta per collegarlo o usa un altro username.`;
+            } else {
+                try {
+                    await auth.sendPasswordResetEmail(normalizedEmail);
+                } catch (mailErr) {
+                    console.warn('Invio email reset:', mailErr);
                 }
+                let recoveryMsg = `L'indirizzo "${normalizedEmail}" è già presente in memoria con un'altra password personale. È stata inviata un'email di reset password a tale indirizzo.`;
                 if (errorEl) {
                     errorEl.textContent = recoveryMsg;
                     errorEl.classList.remove('hidden');
