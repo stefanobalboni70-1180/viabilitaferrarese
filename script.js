@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.21';
+const APP_VERSION = '3.9.22';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -267,19 +267,33 @@ function initFirebase() {
                     let profile = snap.val();
 
                     if (!profile) {
-                        // Se è l'admin principale o primo login dell'account di root
-                        const isMasterAdmin = (user.email === ADMIN_EMAIL || user.email === 'stefano.balboni@ausl.fe.it' || (user.email && user.email.startsWith('admin')));
-                        profile = {
-                            uid: user.uid,
-                            name: isMasterAdmin ? 'Amministratore 118' : (user.displayName || user.email.split('@')[0]),
-                            email: user.email,
-                            role: isMasterAdmin ? 'admin' : 'operator',
-                            status: 'active',
-                            mustChangePassword: false,
-                            createdAt: Date.now(),
-                            createdBy: 'system'
-                        };
-                        await authorizedUsersRef.child(user.uid).set(profile);
+                        // Controlla se l'amministratore aveva pre-autorizzato questa email con un ruolo specifico
+                        const allSnap = await authorizedUsersRef.once('value');
+                        const allData = allSnap.val() || {};
+                        const userEmailLower = (user.email || '').toLowerCase();
+                        const matchKey = Object.keys(allData).find(k => (allData[k].email || '').toLowerCase() === userEmailLower);
+
+                        if (matchKey) {
+                            profile = { ...allData[matchKey], uid: user.uid };
+                            await authorizedUsersRef.child(user.uid).set(profile);
+                            if (matchKey !== user.uid) {
+                                await authorizedUsersRef.child(matchKey).remove();
+                            }
+                        } else {
+                            // Se è l'admin principale o primo login dell'account di root
+                            const isMasterAdmin = (user.email === ADMIN_EMAIL || user.email === 'stefano.balboni@ausl.fe.it' || (user.email && user.email.startsWith('admin')));
+                            profile = {
+                                uid: user.uid,
+                                name: isMasterAdmin ? 'Amministratore 118' : (user.displayName || user.email.split('@')[0]),
+                                email: user.email,
+                                role: isMasterAdmin ? 'admin' : 'operator',
+                                status: 'active',
+                                mustChangePassword: false,
+                                createdAt: Date.now(),
+                                createdBy: 'system'
+                            };
+                            await authorizedUsersRef.child(user.uid).set(profile);
+                        }
                     }
 
                     currentUserProfile = profile;
@@ -7494,40 +7508,48 @@ async function handleCreateUserSubmit() {
                 }
             }
 
-            if (recoveredUid) {
-                const userProfile = {
-                    uid: recoveredUid,
-                    name: name,
-                    email: normalizedEmail,
-                    role: role,
-                    tempPassword: password,
-                    status: 'active',
-                    mustChangePassword: mustChange,
-                    createdAt: Date.now(),
-                    createdBy: auth?.currentUser?.email || 'admin'
-                };
+            // Identifica o genera l'ID per il database
+            let targetUid = recoveredUid;
+            if (!targetUid) {
+                const allSnap = await authorizedUsersRef.once('value');
+                const allData = allSnap.val() || {};
+                const matchKey = Object.keys(allData).find(k => (allData[k].email || '').toLowerCase() === normalizedEmail.toLowerCase());
+                targetUid = matchKey || `user_${Date.now()}`;
+            }
 
-                await authorizedUsersRef.child(recoveredUid).set(userProfile);
+            const userProfile = {
+                uid: targetUid,
+                name: name,
+                email: normalizedEmail,
+                role: role,
+                tempPassword: password,
+                status: 'active',
+                mustChangePassword: mustChange,
+                createdAt: Date.now(),
+                createdBy: auth?.currentUser?.email || 'admin'
+            };
 
-                const createModal = document.getElementById('create-user-modal');
-                if (createModal) createModal.classList.add('hidden');
+            await authorizedUsersRef.child(targetUid).set(userProfile);
 
-                showCreatedUserSuccessModal(name, normalizedEmail, password, role);
-                showToast(`Account "${name}" sincronizzato e liberato con successo!`, "success", 3500);
-                return;
-            } else {
+            // Se non siamo riusciti ad aggiornare direttamente la password in Auth, inviamo comunque l'email di reset password
+            if (!recoveredUid) {
                 try {
                     await auth.sendPasswordResetEmail(normalizedEmail);
                 } catch (mailErr) {
                     console.warn('Invio email reset:', mailErr);
                 }
-                let recoveryMsg = `L'indirizzo "${normalizedEmail}" è già presente in memoria con un'altra password personale. È stata inviata un'email di reset password a tale indirizzo.`;
-                if (errorEl) {
-                    errorEl.textContent = recoveryMsg;
-                    errorEl.classList.remove('hidden');
-                }
-                return;
             }
+
+            const createModal = document.getElementById('create-user-modal');
+            if (createModal) createModal.classList.add('hidden');
+
+            showCreatedUserSuccessModal(name, normalizedEmail, password, role);
+            if (recoveredUid) {
+                showToast(`Account "${name}" creato e sincronizzato con successo!`, "success", 3500);
+            } else {
+                showToast(`Account "${name}" abilitato con successo! (Inviato anche link reset password)`, "success", 4500);
+            }
+            return;
         }
 
         let msg = 'Errore creazione account: ' + err.message;
