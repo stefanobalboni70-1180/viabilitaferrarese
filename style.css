@@ -626,6 +626,33 @@ body.admin-logged-in .header-user-actions {
     color: white;
 }
 
+.gmaps-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #0284c7;
+    color: #ffffff !important;
+    border: 1px solid #0284c7;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.35);
+}
+.gmaps-nav-btn:hover, .gmaps-nav-btn:active {
+    background: #0369a1;
+    border-color: #0369a1;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(2, 132, 199, 0.45);
+}
+
 .popup-schedule-badge {
     display: inline-flex;
     align-items: center;

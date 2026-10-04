@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.22';
+const APP_VERSION = '3.9.23';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2368,25 +2368,60 @@ async function performSearch() {
                 map.removeLayer(userSearchMarker);
             }
 
+            const cleanStreetName = displayName || query;
+            const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${foundLat},${foundLon}`;
+
             userSearchMarker = L.marker([foundLat, foundLon], {
                 icon: L.divIcon({
                     className: 'search-result-pin',
-                    html: `<div style="background:#3b82f6; color:white; padding:6px 12px; border-radius:999px; font-weight:bold; font-size:0.82rem; box-shadow:0 4px 12px rgba(0,0,0,0.3); border:2px solid white; display:flex; align-items:center; gap:4px; white-space:nowrap;">📍 ${escapeHtml(displayName || query)}</div>`,
+                    html: `<div style="background:#0284c7; color:white; padding:6px 14px; border-radius:999px; font-weight:bold; font-size:0.85rem; box-shadow:0 4px 14px rgba(0,0,0,0.35); border:2px solid white; display:flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer;">📍 ${escapeHtml(cleanStreetName)}</div>`,
                     iconSize: [0, 0],
-                    iconAnchor: [0, 20]
+                    iconAnchor: [0, 18]
                 })
             }).addTo(map);
 
-            showToast(`📍 Posizione trovata: ${displayName || query}`, "info", 3500);
+            const popupContent = `
+                <div class="popup-content" style="min-width: 230px; text-align: center; padding: 4px 0;">
+                    <h3 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1rem;">📍 ${escapeHtml(cleanStreetName)}</h3>
+                    <span class="popup-date" style="display:block; margin-bottom: 10px; color: #64748b; font-size: 0.78rem;">Via identificata con successo</span>
+                    <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
+                        🧭 Naviga con Google Maps
+                    </a>
+                </div>
+            `;
 
-            setTimeout(() => {
-                if (userSearchMarker) {
-                    map.removeLayer(userSearchMarker);
-                    userSearchMarker = null;
-                }
-            }, 10000);
+            userSearchMarker.bindPopup(popupContent).openPopup();
+            showToast(`📍 Posizione trovata: ${cleanStreetName}`, "info", 3500);
+
         } else if (matchingMarker) {
             map.flyTo([matchingMarker.lat, matchingMarker.lng], 17, { duration: 1.2 });
+            const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${matchingMarker.lat},${matchingMarker.lng}`;
+
+            if (userSearchMarker) {
+                map.removeLayer(userSearchMarker);
+            }
+
+            userSearchMarker = L.marker([matchingMarker.lat, matchingMarker.lng], {
+                icon: L.divIcon({
+                    className: 'search-result-pin',
+                    html: `<div style="background:#ef4444; color:white; padding:6px 14px; border-radius:999px; font-weight:bold; font-size:0.85rem; box-shadow:0 4px 14px rgba(0,0,0,0.35); border:2px solid white; display:flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer;">⚠️ ${escapeHtml(matchingMarker.street || query)}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 18]
+                })
+            }).addTo(map);
+
+            const popupContent = `
+                <div class="popup-content" style="min-width: 230px; text-align: center; padding: 4px 0;">
+                    <h3 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1rem;">⚠️ ${escapeHtml(matchingMarker.street || query)}</h3>
+                    <span class="popup-date" style="display:block; margin-bottom: 8px; color: #ef4444; font-weight:600; font-size: 0.8rem;">Segnalazione presente</span>
+                    ${matchingMarker.note ? `<div class="user-note" style="margin-bottom:10px; text-align:left; font-size:0.8rem;"><strong>Nota:</strong> ${escapeHtml(matchingMarker.note)}</div>` : ''}
+                    <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
+                        🧭 Naviga con Google Maps
+                    </a>
+                </div>
+            `;
+
+            userSearchMarker.bindPopup(popupContent).openPopup();
             showToast(`📍 Trovata segnalazione su: ${matchingMarker.street}`, "info", 3500);
         } else {
             showToast("Nessuna via trovata con questo nome. Prova a specificare anche il comune (es. Via Roma, Copparo).", "warning", 4500);
@@ -2841,6 +2876,13 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         if (safeNote) {
             popupContent += `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>`;
         }
+
+        const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+        popupContent += `
+            <a href="${navUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn" style="margin-top: 8px; margin-bottom: 8px;">
+                🧭 Naviga con Google Maps
+            </a>
+        `;
 
         if (isAdmin) {
             popupContent += `
@@ -5970,6 +6012,17 @@ function createRoutePopupContent(route) {
         `;
     }
 
+    let navRouteHtml = '';
+    if (route.points && route.points.length > 0) {
+        const startPt = route.points[0];
+        const routeNavUrl = `https://www.google.com/maps/dir/?api=1&destination=${startPt[0]},${startPt[1]}`;
+        navRouteHtml = `
+            <a href="${routeNavUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn" style="margin-top: 8px; margin-bottom: 6px;">
+                🧭 Naviga al percorso con Google Maps
+            </a>
+        `;
+    }
+
     return `
         <div class="custom-route-popup-content" style="--route-color: ${escapeHtml(route.color || '#8b5cf6')};">
             <div class="custom-route-popup-header">
@@ -5982,6 +6035,7 @@ function createRoutePopupContent(route) {
             </div>
             ${schedHtml}
             ${route.note ? `<div class="custom-route-popup-note"><strong>Note:</strong> ${escapeHtml(route.note)}</div>` : ''}
+            ${navRouteHtml}
             ${adminActionsHtml}
         </div>
     `;
