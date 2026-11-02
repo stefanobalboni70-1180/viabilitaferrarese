@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.24';
+const APP_VERSION = '3.9.27';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2109,7 +2109,7 @@ function initMap() {
 
     // Evento doppio click sulla mappa (solo admin)
     map.on('dblclick', function (e) {
-        if (!isAdmin || isDrawingCustomRoute) return;
+        if (!isAdmin || isDrawingCustomRoute || isIdentifyingPointOnMap) return;
         openMarkerModal(e.latlng);
     });
 
@@ -2120,6 +2120,11 @@ function initMap() {
             const lng = Number(e.latlng.lng.toFixed(6));
             drawingRoutePoints.push([lat, lng]);
             updateDrawingRoutePreview();
+            return;
+        }
+
+        if (isIdentifyingPointOnMap) {
+            await handleManualMapPointIdentify(e.latlng.lat, e.latlng.lng);
             return;
         }
 
@@ -2316,6 +2321,376 @@ searchInput.addEventListener('keypress', (e) => {
 });
 
 let userSearchMarker = null;
+let isIdentifyingPointOnMap = false;
+let identifiedPointCounter = 0;
+const identifiedPoints = new Map();
+
+const identifyPointBtn = document.getElementById('identify-point-btn');
+const clearIdentifiedPointsBtn = document.getElementById('clear-identified-points-btn');
+const identifyPickerBanner = document.getElementById('identify-picker-banner');
+const cancelIdentifyPickerBtn = document.getElementById('cancel-identify-picker-btn');
+
+function updateClearIdentifiedPointsBtnUI() {
+    if (!clearIdentifiedPointsBtn) return;
+    const count = identifiedPoints.size;
+    if (count > 0) {
+        clearIdentifiedPointsBtn.classList.remove('hidden');
+        clearIdentifiedPointsBtn.title = count === 1
+            ? 'Cancella il punto identificato sulla mappa'
+            : `Cancella tutti i punti identificati (${count})`;
+    } else {
+        clearIdentifiedPointsBtn.classList.add('hidden');
+    }
+}
+
+function buildIdentifiedPointIcon(entry) {
+    const safeColor = entry.color || '#0284c7';
+    const safeIcon = entry.icon || '📍';
+    return L.divIcon({
+        className: 'identified-point-pin',
+        html: `
+            <div class="identified-point-dot" style="--pin-bg:${safeColor};"></div>
+            <div class="identified-point-wrapper">
+                <div class="identified-point-badge" style="--pin-bg:${safeColor};">
+                    <span class="identified-point-icon">${safeIcon}</span>
+                    <span class="identified-point-label">${escapeHtml(entry.label)}</span>
+                    <span role="button" tabindex="0" class="identified-point-close" data-point-id="${entry.id}" title="Cancella questo punto" aria-label="Cancella questo punto" onclick="window.removeIdentifiedPointFromBadge(event, '${entry.id}')" ontouchend="window.removeIdentifiedPointFromBadge(event, '${entry.id}')">✕</span>
+                </div>
+                <div class="identified-point-stem"></div>
+            </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+        popupAnchor: [0, -62]
+    });
+}
+
+function bindIdentifiedBadgeEvents(entry) {
+    if (!entry || !entry.marker) return;
+    const el = entry.marker.getElement();
+    if (!el) return;
+    const closeBtn = el.querySelector('.identified-point-close');
+    if (!closeBtn || closeBtn.dataset.bound === '1') return;
+    closeBtn.dataset.bound = '1';
+
+    if (typeof L !== 'undefined' && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(closeBtn);
+    }
+    closeBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        deleteIdentifiedPointById(entry.id, false);
+    });
+}
+
+function buildIdentifiedPointPopupHtml(entry) {
+    const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`;
+    const safeIcon = entry.icon || '📍';
+    const subtitleColor = entry.color === '#ef4444' ? 'color:#ef4444; font-weight:600;' : '';
+    return `
+        <div class="popup-content identified-popup-box">
+            <h3 class="identified-popup-title">${safeIcon} ${escapeHtml(entry.label)}</h3>
+            <span class="identified-popup-subtitle" style="${subtitleColor}">${escapeHtml(entry.subtitle || 'Punto identificato sulla mappa')}</span>
+            ${entry.extraNote ? `<div class="user-note" style="margin-bottom:8px; text-align:left; font-size:0.8rem;"><strong>Nota:</strong> ${escapeHtml(entry.extraNote)}</div>` : ''}
+            <div class="identified-coords-row">
+                <span>${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}</span>
+                <button type="button" class="identified-copy-coords-btn" onclick="window.copyIdentifiedPointCoords('${entry.lat.toFixed(6)}', '${entry.lng.toFixed(6)}')">📋 Copia</button>
+            </div>
+            <div class="identified-rename-group">
+                <label class="identified-rename-label" for="identified-label-input-${entry.id}">✏️ Personalizza nome / nota punto:</label>
+                <div class="identified-rename-row">
+                    <input type="text" id="identified-label-input-${entry.id}" class="identified-rename-input" value="${escapeHtml(entry.label)}" placeholder="Es. Civico 14, Cancello..." maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();window.saveIdentifiedPointLabel('${entry.id}');}" />
+                    <button type="button" class="identified-rename-save-btn" onclick="window.saveIdentifiedPointLabel('${entry.id}')">Salva</button>
+                </div>
+            </div>
+            <div class="identified-popup-actions">
+                <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
+                    🧭 Naviga con Google Maps
+                </a>
+                <button type="button" class="identified-delete-btn" onclick="window.removeIdentifiedPoint('${entry.id}')">
+                    🗑️ Cancella punto
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function createIdentifiedPoint({ lat, lng, label, subtitle = 'Punto identificato sulla mappa', color = '#0284c7', icon = '📍', extraNote = '', source = 'manual', openPopup = true }) {
+    if (!map) return null;
+
+    // Se proviene dalla barra di ricerca, sostituisce il precedente risultato di ricerca
+    if (source === 'search') {
+        for (const [existingId, existingEntry] of identifiedPoints.entries()) {
+            if (existingEntry.source === 'search') {
+                deleteIdentifiedPointById(existingId, true);
+            }
+        }
+    }
+
+    const id = `idpt_${Date.now()}_${++identifiedPointCounter}`;
+    const entry = {
+        id,
+        lat: Number(lat),
+        lng: Number(lng),
+        label: label || 'Punto identificato',
+        subtitle,
+        color,
+        icon,
+        extraNote,
+        source,
+        customRenamed: false,
+        marker: null
+    };
+
+    const marker = L.marker([entry.lat, entry.lng], {
+        icon: buildIdentifiedPointIcon(entry),
+        zIndexOffset: 950
+    });
+
+    entry.marker = marker;
+    marker.on('add', () => bindIdentifiedBadgeEvents(entry));
+    marker.addTo(map);
+    bindIdentifiedBadgeEvents(entry);
+
+    marker.bindPopup(buildIdentifiedPointPopupHtml(entry), { maxWidth: 300 });
+    if (marker._openPopup) {
+        marker.off('click', marker._openPopup, marker);
+    }
+    marker.on('click', (e) => {
+        const origTarget = e && e.originalEvent ? e.originalEvent.target : null;
+        if (origTarget && origTarget.closest && origTarget.closest('.identified-point-close')) {
+            deleteIdentifiedPointById(entry.id, false);
+            return;
+        }
+        if (marker.isPopupOpen()) {
+            marker.closePopup();
+        } else {
+            marker.openPopup();
+        }
+    });
+    if (openPopup) {
+        marker.openPopup();
+    }
+
+    identifiedPoints.set(id, entry);
+    if (source === 'search') {
+        userSearchMarker = marker;
+    }
+    updateClearIdentifiedPointsBtnUI();
+    return entry;
+}
+
+function updateIdentifiedPoint(id, patch = {}) {
+    const entry = identifiedPoints.get(id);
+    if (!entry) return;
+    Object.assign(entry, patch);
+    if (entry.marker) {
+        entry.marker.setIcon(buildIdentifiedPointIcon(entry));
+        bindIdentifiedBadgeEvents(entry);
+        setTimeout(() => bindIdentifiedBadgeEvents(entry), 0);
+        entry.marker.setPopupContent(buildIdentifiedPointPopupHtml(entry));
+    }
+}
+
+function deleteIdentifiedPointById(id, silent = false) {
+    const entry = identifiedPoints.get(id);
+    if (!entry) return;
+    if (entry.marker && map) {
+        map.closePopup(entry.marker.getPopup());
+        map.removeLayer(entry.marker);
+    }
+    if (userSearchMarker === entry.marker) {
+        userSearchMarker = null;
+    }
+    identifiedPoints.delete(id);
+    updateClearIdentifiedPointsBtnUI();
+    if (!silent) {
+        showToast('🗑️ Punto identificato rimosso dalla mappa', 'info', 2200);
+    }
+}
+
+function clearAllIdentifiedPoints() {
+    if (identifiedPoints.size === 0) return;
+    for (const entry of identifiedPoints.values()) {
+        if (entry.marker && map) {
+            map.removeLayer(entry.marker);
+        }
+    }
+    identifiedPoints.clear();
+    userSearchMarker = null;
+    if (searchInput) searchInput.value = '';
+    updateClearIdentifiedPointsBtnUI();
+    showToast('🗑️ Tutti i punti identificati sono stati cancellati', 'info', 2500);
+}
+
+window.removeIdentifiedPoint = function (id) {
+    deleteIdentifiedPointById(id, false);
+};
+
+window.removeIdentifiedPointFromBadge = function (ev, id) {
+    if (ev) {
+        if (typeof ev.preventDefault === 'function') ev.preventDefault();
+        if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+    }
+    deleteIdentifiedPointById(id, false);
+};
+
+window.saveIdentifiedPointLabel = function (id) {
+    const entry = identifiedPoints.get(id);
+    if (!entry) return;
+    const inputEl = document.getElementById(`identified-label-input-${id}`);
+    if (!inputEl) return;
+    const newLabel = inputEl.value.trim();
+    if (!newLabel) {
+        showToast('Inserisci un nome valido per il punto.', 'warning', 2200);
+        return;
+    }
+    updateIdentifiedPoint(id, {
+        label: newLabel,
+        customRenamed: true,
+        subtitle: 'Punto personalizzato sulla mappa'
+    });
+    showToast(`✏️ Punto rinominato: ${newLabel}`, 'info', 2400);
+};
+
+window.copyIdentifiedPointCoords = function (latStr, lngStr) {
+    const text = `${latStr}, ${lngStr}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(`📋 Coordinate copiate: ${text}`, 'info', 2200);
+        }).catch(() => {
+            showToast(`Coordinate: ${text}`, 'info', 3000);
+        });
+    } else {
+        showToast(`Coordinate: ${text}`, 'info', 3000);
+    }
+};
+
+function enableIdentifyPointMode() {
+    if (isDrawingCustomRoute) {
+        showToast('Termina o chiudi prima il tracciamento del percorso.', 'warning', 2800);
+        return;
+    }
+    if (isPickingPointOnMap) {
+        isPickingPointOnMap = false;
+        if (pickerBanner) pickerBanner.classList.add('hidden');
+    }
+    isIdentifyingPointOnMap = true;
+    if (identifyPointBtn) identifyPointBtn.classList.add('active');
+    if (identifyPickerBanner) identifyPickerBanner.classList.remove('hidden');
+    const mapEl = document.getElementById('map');
+    if (mapEl) mapEl.classList.add('identify-mode-cursor');
+}
+
+function disableIdentifyPointMode() {
+    isIdentifyingPointOnMap = false;
+    if (identifyPointBtn) identifyPointBtn.classList.remove('active');
+    if (identifyPickerBanner) identifyPickerBanner.classList.add('hidden');
+    const mapEl = document.getElementById('map');
+    if (mapEl) mapEl.classList.remove('identify-mode-cursor');
+}
+
+function toggleIdentifyPointMode() {
+    if (isIdentifyingPointOnMap) {
+        disableIdentifyPointMode();
+    } else {
+        enableIdentifyPointMode();
+    }
+}
+
+async function reverseGeocodeDetailed(lat, lng) {
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&zoom=18&lat=${lat}&lon=${lng}`
+        );
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.address) {
+            const addr = data.address;
+            const street = addr.road || addr.highway || addr.pedestrian || addr.square || addr.path || addr.footway || addr.cycleway || data.name || null;
+            const houseNumber = addr.house_number ? `, ${addr.house_number}` : '';
+            const locality = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || '';
+            return {
+                label: street ? `${street}${houseNumber}` : (locality || null),
+                locality
+            };
+        }
+    } catch (e) {
+        console.warn('Reverse geocoding dettagliato non disponibile:', e.message);
+    }
+    return null;
+}
+
+async function handleManualMapPointIdentify(lat, lng) {
+    disableIdentifyPointMode();
+
+    const tempLabel = `Punto (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    const entry = createIdentifiedPoint({
+        lat,
+        lng,
+        label: tempLabel,
+        subtitle: 'Rilevamento indirizzo in corso...',
+        color: '#0284c7',
+        icon: '📍',
+        source: 'manual',
+        openPopup: true
+    });
+    if (!entry) return;
+
+    const geo = await reverseGeocodeDetailed(lat, lng);
+    const current = identifiedPoints.get(entry.id);
+    if (!current || current.customRenamed) return;
+
+    if (geo && geo.label) {
+        const sub = geo.locality ? `Punto identificato • ${geo.locality}` : 'Punto identificato sulla mappa';
+        updateIdentifiedPoint(entry.id, {
+            label: geo.label,
+            subtitle: sub
+        });
+        showToast(`📍 Punto identificato: ${geo.label}`, 'info', 3000);
+    } else {
+        updateIdentifiedPoint(entry.id, {
+            subtitle: 'Punto selezionato sulla mappa'
+        });
+        showToast('📍 Punto identificato sulla mappa', 'info', 2500);
+    }
+}
+
+if (identifyPointBtn) {
+    identifyPointBtn.addEventListener('click', toggleIdentifyPointMode);
+}
+if (cancelIdentifyPickerBtn) {
+    cancelIdentifyPickerBtn.addEventListener('click', disableIdentifyPointMode);
+}
+if (clearIdentifiedPointsBtn) {
+    clearIdentifiedPointsBtn.addEventListener('click', clearAllIdentifiedPoints);
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isIdentifyingPointOnMap) {
+        disableIdentifyPointMode();
+    }
+});
+
+// Intercettazione in fase di capture per garantire che il click/tap sulla ✕ del badge
+// funzioni sempre al primo colpo su desktop e smartphone senza essere intercettato da Leaflet
+document.addEventListener('pointerdown', (ev) => {
+    const closeEl = ev.target && ev.target.closest ? ev.target.closest('.identified-point-close') : null;
+    if (closeEl) {
+        ev.stopPropagation();
+    }
+}, true);
+
+document.addEventListener('click', (ev) => {
+    const closeEl = ev.target && ev.target.closest ? ev.target.closest('.identified-point-close') : null;
+    if (closeEl) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const ptId = closeEl.getAttribute('data-point-id');
+        if (ptId) {
+            deleteIdentifiedPointById(ptId, false);
+        }
+    }
+}, true);
 
 async function performSearch() {
     const query = searchInput.value.trim();
@@ -2348,13 +2723,16 @@ async function performSearch() {
 
         for (const q of queries) {
             try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(q)}&limit=1`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.length > 0) {
                         foundLat = parseFloat(data[0].lat);
                         foundLon = parseFloat(data[0].lon);
-                        displayName = data[0].display_name.split(',')[0];
+                        const addr = data[0].address || {};
+                        const road = addr.road || addr.pedestrian || addr.square || addr.highway || '';
+                        const houseNum = addr.house_number ? `, ${addr.house_number}` : '';
+                        displayName = road ? `${road}${houseNum}` : data[0].display_name.split(',')[0];
                         break;
                     }
                 }
@@ -2364,65 +2742,35 @@ async function performSearch() {
         if (foundLat !== null && foundLon !== null) {
             map.flyTo([foundLat, foundLon], 17, { duration: 1.2 });
 
-            if (userSearchMarker) {
-                map.removeLayer(userSearchMarker);
-            }
-
             const cleanStreetName = displayName || query;
-            const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${foundLat},${foundLon}`;
-
-            userSearchMarker = L.marker([foundLat, foundLon], {
-                icon: L.divIcon({
-                    className: 'search-result-pin',
-                    html: `<div style="background:#0284c7; color:white; padding:6px 14px; border-radius:999px; font-weight:bold; font-size:0.85rem; box-shadow:0 4px 14px rgba(0,0,0,0.35); border:2px solid white; display:flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer;">📍 ${escapeHtml(cleanStreetName)}</div>`,
-                    iconSize: [0, 0],
-                    iconAnchor: [0, 18]
-                })
-            }).addTo(map);
-
-            const popupContent = `
-                <div class="popup-content" style="min-width: 230px; text-align: center; padding: 4px 0;">
-                    <h3 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1rem;">📍 ${escapeHtml(cleanStreetName)}</h3>
-                    <span class="popup-date" style="display:block; margin-bottom: 10px; color: #64748b; font-size: 0.78rem;">Via identificata con successo</span>
-                    <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
-                        🧭 Naviga con Google Maps
-                    </a>
-                </div>
-            `;
-
-            userSearchMarker.bindPopup(popupContent).openPopup();
+            createIdentifiedPoint({
+                lat: foundLat,
+                lng: foundLon,
+                label: cleanStreetName,
+                subtitle: 'Via identificata con successo',
+                color: '#0284c7',
+                icon: '📍',
+                source: 'search',
+                openPopup: true
+            });
             showToast(`📍 Posizione trovata: ${cleanStreetName}`, "info", 3500);
 
         } else if (matchingMarker) {
             map.flyTo([matchingMarker.lat, matchingMarker.lng], 17, { duration: 1.2 });
-            const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${matchingMarker.lat},${matchingMarker.lng}`;
 
-            if (userSearchMarker) {
-                map.removeLayer(userSearchMarker);
-            }
-
-            userSearchMarker = L.marker([matchingMarker.lat, matchingMarker.lng], {
-                icon: L.divIcon({
-                    className: 'search-result-pin',
-                    html: `<div style="background:#ef4444; color:white; padding:6px 14px; border-radius:999px; font-weight:bold; font-size:0.85rem; box-shadow:0 4px 14px rgba(0,0,0,0.35); border:2px solid white; display:flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer;">⚠️ ${escapeHtml(matchingMarker.street || query)}</div>`,
-                    iconSize: [0, 0],
-                    iconAnchor: [0, 18]
-                })
-            }).addTo(map);
-
-            const popupContent = `
-                <div class="popup-content" style="min-width: 230px; text-align: center; padding: 4px 0;">
-                    <h3 style="margin: 0 0 4px 0; color: #1e293b; font-size: 1rem;">⚠️ ${escapeHtml(matchingMarker.street || query)}</h3>
-                    <span class="popup-date" style="display:block; margin-bottom: 8px; color: #ef4444; font-weight:600; font-size: 0.8rem;">Segnalazione presente</span>
-                    ${matchingMarker.note ? `<div class="user-note" style="margin-bottom:10px; text-align:left; font-size:0.8rem;"><strong>Nota:</strong> ${escapeHtml(matchingMarker.note)}</div>` : ''}
-                    <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
-                        🧭 Naviga con Google Maps
-                    </a>
-                </div>
-            `;
-
-            userSearchMarker.bindPopup(popupContent).openPopup();
-            showToast(`📍 Trovata segnalazione su: ${matchingMarker.street}`, "info", 3500);
+            const matchedLabel = matchingMarker.street || query;
+            createIdentifiedPoint({
+                lat: matchingMarker.lat,
+                lng: matchingMarker.lng,
+                label: matchedLabel,
+                subtitle: 'Segnalazione presente',
+                color: '#ef4444',
+                icon: '⚠️',
+                extraNote: matchingMarker.note || '',
+                source: 'search',
+                openPopup: true
+            });
+            showToast(`📍 Trovata segnalazione su: ${matchedLabel}`, "info", 3500);
         } else {
             showToast("Nessuna via trovata con questo nome. Prova a specificare anche il comune (es. Via Roma, Copparo).", "warning", 4500);
         }
@@ -6134,6 +6482,7 @@ function startDrawingCustomRoute() {
         map.doubleClickZoom.disable();
     }
 
+    disableIdentifyPointMode();
     showToast("🚩 Tocca o clicca sulla mappa punto dopo punto per tracciare il percorso.", "info", 4000);
 }
 
