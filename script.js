@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.32';
+const APP_VERSION = '3.9.33';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -10,8 +10,8 @@ const ICON_SAGRA = '<img src="icon-sagra.png" class="sign-sagra-img" alt="Sagra 
 // Icona SVG per "Mercato settimanale" (Carrello nero su cerchio bianco)
 const ICON_MERCATO = '<svg class="sign-market-cart" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#10b981" stroke-width="2.8"/><path d="M8.5 9.5h2.2l2.1 7.2a1 1 0 0 0 .96.72h6.88a1 1 0 0 0 .96-.72l1.6-5.7H12.2" fill="none" stroke="#111827" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.3" cy="20.8" r="1.5" fill="#111827"/><circle cx="20.7" cy="20.8" r="1.5" fill="#111827"/></svg>';
 
-// Icona SVG per "Elisoccorso / Eliporto (HEMS)" (Grande H azzurra con elicottero rosso 118 al centro)
-const ICON_ELISOCCORSO = '<svg class="sign-eliporto sign-h-red" viewBox="0 0 64 64" width="23" height="23" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><path d="M8 7h12v19h24V7h12v50H44V38H20v19H8V7z" fill="#0284c7"/><g stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"><line x1="18" y1="22" x2="48" y2="22"/><line x1="33" y1="22" x2="33" y2="26"/><path d="M13 29h12l4-3h10c6 0 10 3.5 10 7.5S45 40 39 40H27c-3.5 0-6-2.5-7-6l-7-2v-3z"/><path d="M12 25l3 5-3 3"/><line x1="25" y1="44" x2="43" y2="44"/></g><line x1="18" y1="22" x2="48" y2="22" stroke="#b91c1c" stroke-width="2.6" stroke-linecap="round"/><line x1="33" y1="22" x2="33" y2="26" stroke="#b91c1c" stroke-width="2.4"/><path d="M12 25l3.5 5-3.5 3.5" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 29.5h12l4-3.5h10c6 0 10 3.5 10 7.5S45 40 39 40H27c-3.5 0-6-2.5-7-6l-7-1.5v-3z" fill="#dc2626"/><path d="M36 28.2h3c3.8 0 6.8 2 6.8 4.8 0 1.2-.8 2-2.2 2H36v-6.8z" fill="#ffffff"/><path d="M29 40v4 M39 40v4 M24 44h20" stroke="#dc2626" stroke-width="2.3" stroke-linecap="round"/></svg>';
+// Icona SVG per "Elisoccorso / Eliporto (HEMS)" (Grande E azzurra con elicottero rosso 118)
+const ICON_ELISOCCORSO = '<svg class="sign-eliporto sign-h-red" viewBox="0 0 64 64" width="23" height="23" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><path d="M7 6h45v11H19v10h23v10H19v10h33v11H7V6z" fill="#0284c7"/><g stroke="#ffffff" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"><line x1="27" y1="22" x2="57" y2="22"/><line x1="42" y1="22" x2="42" y2="26"/><path d="M23 29.5h11l4-3.5h10c5.8 0 9.5 3.3 9.5 7.2S53.8 40 48 40H36.5c-3.3 0-5.8-2.3-6.8-5.8L23 32.6v-3.1z"/><path d="M22 25.5l3 4.5-3 3"/><line x1="34" y1="43.8" x2="51" y2="43.8"/></g><line x1="27" y1="22" x2="57" y2="22" stroke="#b91c1c" stroke-width="2.5" stroke-linecap="round"/><line x1="42" y1="22" x2="42" y2="26" stroke="#b91c1c" stroke-width="2.3"/><path d="M22 25.5l3.2 4.5-3.2 3.2" fill="none" stroke="#dc2626" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M23 29.5h11l4-3.5h10c5.8 0 9.5 3.3 9.5 7.2S53.8 40 48 40H36.5c-3.3 0-5.8-2.3-6.8-5.8L23 32.6v-3.1z" fill="#dc2626"/><path d="M45 28.2h2.8c3.6 0 6.4 1.9 6.4 4.6 0 1.1-.7 1.9-2 1.9H45v-6.5z" fill="#ffffff"/><path d="M38 40v3.8 M47.5 40v3.8 M33.5 43.8h18.5" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round"/></svg>';
 
 // Funzione di sanificazione per prevenire attacchi XSS
 function escapeHtml(unsafe) {
@@ -1887,8 +1887,8 @@ const ICONS = {
     mercato: { emoji: ICON_MERCATO, label: 'Mercato settimanale' },
     semaforo: { emoji: '🚦', label: 'Senso unico alternato' },
     sagra: { emoji: ICON_SAGRA, label: 'Sagra / Manifestazione' },
-    eliporto: { emoji: ICON_ELISOCCORSO, label: 'Elisoccorso / Eliporto (H)' },
-    elisoccorso: { emoji: ICON_ELISOCCORSO, label: 'Elisoccorso / Eliporto (H)' }
+    eliporto: { emoji: ICON_ELISOCCORSO, label: 'Elisoccorso / Eliporto (E)' },
+    elisoccorso: { emoji: ICON_ELISOCCORSO, label: 'Elisoccorso / Eliporto (E)' }
 };
 
 // Stato dell'applicazione
