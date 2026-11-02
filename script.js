@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.28';
+const APP_VERSION = '3.9.29';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2396,7 +2396,7 @@ function buildIdentifiedPointIcon(entry) {
         `,
         iconSize: [0, 0],
         iconAnchor: [0, 0],
-        popupAnchor: [0, -62]
+        popupAnchor: [0, -54]
     });
 }
 
@@ -2423,16 +2423,16 @@ function buildIdentifiedPointPopupHtml(entry) {
     const safeIcon = entry.icon || '📍';
     const subtitleColor = entry.color === '#ef4444' ? 'color:#ef4444; font-weight:600;' : '';
     return `
-        <div class="popup-content identified-popup-box">
+        <div class="identified-popup-box">
             <h3 class="identified-popup-title">${safeIcon} ${escapeHtml(entry.label)}</h3>
-            <span class="identified-popup-subtitle" style="${subtitleColor}">${escapeHtml(entry.subtitle || 'Punto identificato sulla mappa')}</span>
-            ${entry.extraNote ? `<div class="user-note" style="margin-bottom:8px; text-align:left; font-size:0.8rem;"><strong>Nota:</strong> ${escapeHtml(entry.extraNote)}</div>` : ''}
+            ${entry.subtitle ? `<span class="identified-popup-subtitle" style="${subtitleColor}">${escapeHtml(entry.subtitle)}</span>` : ''}
+            ${entry.extraNote ? `<div class="user-note" style="margin-bottom:5px; text-align:left; font-size:0.74rem; padding:4px 6px;"><strong>Nota:</strong> ${escapeHtml(entry.extraNote)}</div>` : ''}
             <div class="identified-coords-row">
                 <span>${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}</span>
                 <button type="button" class="identified-copy-coords-btn" onclick="window.copyIdentifiedPointCoords('${entry.lat.toFixed(6)}', '${entry.lng.toFixed(6)}')">📋 Copia</button>
             </div>
             <div class="identified-rename-group">
-                <label class="identified-rename-label" for="identified-label-input-${entry.id}">✏️ Personalizza nome / nota punto:</label>
+                <label class="identified-rename-label" for="identified-label-input-${entry.id}">✏️ Nota / nome punto:</label>
                 <div class="identified-rename-row">
                     <input type="text" id="identified-label-input-${entry.id}" class="identified-rename-input" value="${escapeHtml(entry.label)}" placeholder="Es. Civico 14, Cancello..." maxlength="60" onkeydown="if(event.key==='Enter'){event.preventDefault();window.saveIdentifiedPointLabel('${entry.id}');}" />
                     <button type="button" class="identified-rename-save-btn" onclick="window.saveIdentifiedPointLabel('${entry.id}')">Salva</button>
@@ -2442,15 +2442,12 @@ function buildIdentifiedPointPopupHtml(entry) {
                 <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
                     🧭 Naviga con Google Maps
                 </a>
-                <button type="button" class="identified-delete-btn" onclick="window.removeIdentifiedPoint('${entry.id}')">
-                    🗑️ Cancella punto
-                </button>
             </div>
         </div>
     `;
 }
 
-function createIdentifiedPoint({ lat, lng, label, subtitle = 'Punto identificato sulla mappa', color = '#0284c7', icon = '📍', extraNote = '', source = 'manual', openPopup = true }) {
+function createIdentifiedPoint({ lat, lng, label, subtitle = '', color = '#0284c7', icon = '📍', extraNote = '', source = 'manual', openPopup = true }) {
     if (!map) return null;
 
     // Se proviene dalla barra di ricerca, sostituisce il precedente risultato di ricerca
@@ -2487,7 +2484,13 @@ function createIdentifiedPoint({ lat, lng, label, subtitle = 'Punto identificato
     marker.addTo(map);
     bindIdentifiedBadgeEvents(entry);
 
-    marker.bindPopup(buildIdentifiedPointPopupHtml(entry), { maxWidth: 300 });
+    marker.bindPopup(buildIdentifiedPointPopupHtml(entry), {
+        maxWidth: 220,
+        minWidth: 180,
+        className: 'compact-identified-popup',
+        autoPanPaddingTopLeft: [12, 140],
+        autoPanPaddingBottomRight: [12, 24]
+    });
     if (marker._openPopup) {
         marker.off('click', marker._openPopup, marker);
     }
@@ -2583,7 +2586,7 @@ window.saveIdentifiedPointLabel = function (id) {
     updateIdentifiedPoint(id, {
         label: newLabel,
         customRenamed: true,
-        subtitle: 'Punto personalizzato sulla mappa'
+        subtitle: ''
     });
     showToast(`✏️ Punto rinominato: ${newLabel}`, 'info', 2400);
 };
@@ -2677,15 +2680,14 @@ async function handleManualMapPointIdentify(lat, lng) {
     if (!current || current.customRenamed) return;
 
     if (geo && geo.label) {
-        const sub = geo.locality ? `Punto identificato • ${geo.locality}` : 'Punto identificato sulla mappa';
         updateIdentifiedPoint(entry.id, {
             label: geo.label,
-            subtitle: sub
+            subtitle: ''
         });
         showToast(`📍 Punto identificato: ${geo.label}`, 'info', 3000);
     } else {
         updateIdentifiedPoint(entry.id, {
-            subtitle: 'Punto selezionato sulla mappa'
+            subtitle: ''
         });
         showToast('📍 Punto identificato sulla mappa', 'info', 2500);
     }
@@ -2782,7 +2784,7 @@ async function performSearch() {
                 lat: foundLat,
                 lng: foundLon,
                 label: cleanStreetName,
-                subtitle: 'Via identificata con successo',
+                subtitle: '',
                 color: '#0284c7',
                 icon: '📍',
                 source: 'search',
