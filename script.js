@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.27';
+const APP_VERSION = '3.9.28';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -63,7 +63,25 @@ let authorizedUsersRef = null;
 let currentUser = null;
 let currentUserProfile = null;
 let allAuthorizedUsers = [];
+let activeSessionsRef = null;
 const DEFAULT_AUTH_DOMAIN = '@118fe.it';
+
+// Costanti e stato per Sessione Singola e Logout Inattività 30 min (Solo Operatori)
+const OPERATOR_INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minuti (1.800.000 ms)
+const OPERATOR_ACTIVITY_THROTTLE_MS = 5000; // Aggiorna timestamp locale max ogni 5s
+const OPERATOR_REMOTE_HEARTBEAT_MS = 60000; // Aggiorna heartbeat Firebase max ogni 60s
+let currentWatchedSessionRef = null;
+let currentWatchedSessionHandler = null;
+let currentLocalSessionId = null;
+let currentLastActivityTs = 0;
+let pendingExplicitLoginSessionId = null;
+let pendingGatekeeperReason = '';
+let inactivityTimeoutId = null;
+let inactivityCheckIntervalId = null;
+let activityListenersBound = false;
+let lastActivityWriteTs = 0;
+let lastRemoteHeartbeatTs = 0;
+let isForcingLogout = false;
 let urgentNewsData = []; // Notizie urgenti attive (massimo 3)
 let allUrgentNewsRaw = []; // Tutte le notizie (inclusi stati inattivi/scaduti per l'admin)
 let urgentNewsTimerInterval = null;
@@ -203,6 +221,7 @@ function initFirebase() {
             urgentNewsRef = db.ref("urgent_news");
             customRoutesRef = db.ref("custom_routes");
             authorizedUsersRef = db.ref("admin_settings/authorized_users");
+            activeSessionsRef = db.ref("admin_settings/active_sessions");
             isFirebaseOnline = true;
             console.log('🔥 Firebase collegato — database e auth attivi');
 
@@ -247,13 +266,16 @@ function initFirebase() {
             // Ascolto dello stato di autenticazione e controllo accessi
             auth.onAuthStateChanged(async (user) => {
                 if (!user) {
+                    stopOperatorSessionGuard();
                     currentUser = null;
                     currentUserProfile = null;
                     isAdmin = false;
                     console.log('🔒 Nessun utente loggato — Visualizzazione Gatekeeper di sicurezza');
                     stopAdminReportsListener();
                     stopAdminUsersListener();
-                    showGatekeeper();
+                    const reason = pendingGatekeeperReason;
+                    pendingGatekeeperReason = '';
+                    showGatekeeper(reason);
                     updateUI();
                     return;
                 }
@@ -300,11 +322,26 @@ function initFirebase() {
 
                     // Controllo stato disabilitato
                     if (profile.status === 'disabled') {
+                        stopOperatorSessionGuard();
                         console.warn('⛔ Account disabilitato!');
                         showToast("Account disabilitato dall'Amministratore. Accesso revocato.", "error", 5000);
+                        pendingGatekeeperReason = "Accesso negato: l'account è stato disabilitato dall'Amministratore.";
                         await auth.signOut();
                         showGatekeeper("Accesso negato: l'account è stato disabilitato dall'Amministratore.");
                         return;
+                    }
+
+                    isAdmin = (profile.role === 'admin' || user.email === ADMIN_EMAIL);
+
+                    // Sessione singola e logout automatico dopo 30 min di inattività (Solo Operatori, esclusi Admin)
+                    if (isAdmin) {
+                        pendingExplicitLoginSessionId = null;
+                        stopOperatorSessionGuard();
+                    } else {
+                        const sessionAllowed = await initOperatorSessionGuard(user);
+                        if (!sessionAllowed) {
+                            return;
+                        }
                     }
 
                     // Controllo obbligo cambio password
@@ -314,7 +351,6 @@ function initFirebase() {
                         hideMandatoryPasswordChangeModal();
                     }
 
-                    isAdmin = (profile.role === 'admin' || user.email === ADMIN_EMAIL);
                     hideGatekeeper();
 
                     if (isAdmin) {
@@ -329,6 +365,15 @@ function initFirebase() {
                 } catch (err) {
                     console.error('Errore gestione profilo utente:', err);
                     isAdmin = (user.email === ADMIN_EMAIL);
+                    if (isAdmin) {
+                        pendingExplicitLoginSessionId = null;
+                        stopOperatorSessionGuard();
+                    } else {
+                        const sessionAllowed = await initOperatorSessionGuard(user);
+                        if (!sessionAllowed) {
+                            return;
+                        }
+                    }
                     hideGatekeeper();
                     updateUI();
                 }
@@ -2297,17 +2342,7 @@ if (logoutBtn) {
             e.preventDefault();
             e.stopPropagation();
         }
-        try {
-            if (auth) {
-                await auth.signOut();
-                console.log('Disconnessione completata');
-            }
-        } catch (e) {
-            console.warn('Errore durante il logout:', e.message);
-        }
-        isAdmin = false;
-        updateUI();
-        showToast("Disconnessione completata (Utente)", "info", 2500);
+        await performCleanManualLogout(true);
     };
 
     logoutBtn.addEventListener('click', doAdminLogout);
@@ -6980,6 +7015,475 @@ function generateRandomPassword(length = 10) {
     return result;
 }
 
+// --- GESTIONE SESSIONE SINGOLA E AUTO-LOGOUT INATTIVITÀ (30 MIN - SOLO OPERATORI) ---
+
+function generateOperatorSessionId() {
+    return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+}
+
+function getOperatorSessionKey(uid) {
+    return 'ferrara_session_id_' + uid;
+}
+
+function getOperatorLastActivityKey(uid) {
+    return 'ferrara_last_activity_' + uid;
+}
+
+function saveLocalOperatorSession(uid, sessionId, lastActivityTs) {
+    if (!uid) return;
+    try {
+        if (sessionId) {
+            localStorage.setItem(getOperatorSessionKey(uid), sessionId);
+        }
+        if (lastActivityTs) {
+            localStorage.setItem(getOperatorLastActivityKey(uid), String(lastActivityTs));
+        }
+    } catch (e) {
+        console.warn('Errore salvataggio sessione locale:', e);
+    }
+}
+
+function getStoredOperatorLastActivity(uid) {
+    if (!uid) return currentLastActivityTs || 0;
+    try {
+        const raw = localStorage.getItem(getOperatorLastActivityKey(uid));
+        const parsed = raw ? parseInt(raw, 10) : 0;
+        return Math.max(parsed || 0, currentLastActivityTs || 0);
+    } catch (e) {
+        return currentLastActivityTs || 0;
+    }
+}
+
+function clearLocalOperatorSession(uid) {
+    if (!uid) return;
+    try {
+        localStorage.removeItem(getOperatorSessionKey(uid));
+        localStorage.removeItem(getOperatorLastActivityKey(uid));
+    } catch (e) {
+        console.warn('Errore pulizia sessione locale:', e);
+    }
+}
+
+async function releaseRemoteOperatorSessionIfOwned(uid, sessionId) {
+    if (!activeSessionsRef || !uid || !sessionId) return;
+    try {
+        const ref = activeSessionsRef.child(uid);
+        const snap = await ref.once('value');
+        const val = snap.val();
+        if (val && val.sessionId === sessionId) {
+            await ref.remove();
+        }
+    } catch (e) {
+        console.warn('Pulizia sessione remota non completata:', e);
+    }
+}
+
+function stopOperatorSessionGuard() {
+    if (currentWatchedSessionRef && currentWatchedSessionHandler) {
+        currentWatchedSessionRef.off('value', currentWatchedSessionHandler);
+    }
+    currentWatchedSessionRef = null;
+    currentWatchedSessionHandler = null;
+    currentLocalSessionId = null;
+    currentLastActivityTs = 0;
+    lastActivityWriteTs = 0;
+    lastRemoteHeartbeatTs = 0;
+
+    if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+        inactivityTimeoutId = null;
+    }
+    if (inactivityCheckIntervalId) {
+        clearInterval(inactivityCheckIntervalId);
+        inactivityCheckIntervalId = null;
+    }
+}
+
+function closeAllOpenAppModals() {
+    if (typeof closeUserUrgentNewsModal === 'function') {
+        closeUserUrgentNewsModal();
+    }
+    document.querySelectorAll('.modal-overlay').forEach(el => el.classList.add('hidden'));
+    if (typeof map !== 'undefined' && map && typeof map.closePopup === 'function') {
+        map.closePopup();
+    }
+}
+
+async function forceOperatorLogout(reasonMsg, releaseRemoteIfOwned = false, toastMsg = '') {
+    if (isForcingLogout) return;
+    isForcingLogout = true;
+
+    const uid = currentUser?.uid || auth?.currentUser?.uid || null;
+    let storedSessionId = null;
+    if (uid) {
+        try {
+            storedSessionId = localStorage.getItem(getOperatorSessionKey(uid));
+        } catch (e) {}
+    }
+    const sessionIdToRelease = currentLocalSessionId || storedSessionId;
+
+    stopOperatorSessionGuard();
+
+    try {
+        if (releaseRemoteIfOwned && uid && sessionIdToRelease) {
+            await releaseRemoteOperatorSessionIfOwned(uid, sessionIdToRelease);
+        }
+        if (uid) {
+            clearLocalOperatorSession(uid);
+        }
+        closeAllOpenAppModals();
+
+        if (reasonMsg) {
+            pendingGatekeeperReason = reasonMsg;
+        }
+        if (toastMsg || reasonMsg) {
+            showToast(toastMsg || reasonMsg, "error", 5000);
+        }
+
+        if (auth && auth.currentUser) {
+            await auth.signOut();
+        } else {
+            const r = pendingGatekeeperReason;
+            pendingGatekeeperReason = '';
+            showGatekeeper(r);
+        }
+    } catch (e) {
+        console.warn('Errore durante il logout automatico di sicurezza:', e);
+        showGatekeeper(reasonMsg || '');
+    } finally {
+        isAdmin = false;
+        updateUI();
+        isForcingLogout = false;
+    }
+}
+
+async function performCleanManualLogout(showSuccessToast = true) {
+    if (isForcingLogout) return;
+    isForcingLogout = true;
+
+    const uid = currentUser?.uid || auth?.currentUser?.uid || null;
+    const wasOperator = !isAdmin;
+    let storedSessionId = null;
+    if (uid) {
+        try {
+            storedSessionId = localStorage.getItem(getOperatorSessionKey(uid));
+        } catch (e) {}
+    }
+    const sessionIdToRelease = currentLocalSessionId || storedSessionId;
+
+    stopOperatorSessionGuard();
+
+    try {
+        if (wasOperator && uid && sessionIdToRelease) {
+            await releaseRemoteOperatorSessionIfOwned(uid, sessionIdToRelease);
+        }
+        if (uid) {
+            clearLocalOperatorSession(uid);
+        }
+        closeAllOpenAppModals();
+        pendingGatekeeperReason = '';
+
+        if (auth) {
+            await auth.signOut();
+            console.log('Disconnessione completata');
+        }
+    } catch (e) {
+        console.warn('Errore durante il logout manuale:', e.message);
+    } finally {
+        isAdmin = false;
+        updateUI();
+        isForcingLogout = false;
+        if (showSuccessToast) {
+            showToast("Disconnessione completata (Utente)", "info", 2500);
+        }
+    }
+}
+
+function scheduleOperatorInactivityTimeout() {
+    if (inactivityTimeoutId) {
+        clearTimeout(inactivityTimeoutId);
+        inactivityTimeoutId = null;
+    }
+    if (!currentUser || isAdmin || isForcingLogout) return;
+
+    const lastAct = getStoredOperatorLastActivity(currentUser.uid) || Date.now();
+    const elapsed = Date.now() - lastAct;
+    const remaining = Math.max(250, OPERATOR_INACTIVITY_TIMEOUT_MS - elapsed);
+
+    inactivityTimeoutId = setTimeout(() => {
+        checkOperatorInactivity();
+    }, remaining);
+}
+
+async function checkOperatorInactivity() {
+    if (!currentUser || isAdmin || isForcingLogout) return;
+
+    const uid = currentUser.uid;
+    const lastAct = getStoredOperatorLastActivity(uid);
+    if (!lastAct) return;
+
+    const elapsed = Date.now() - lastAct;
+    if (elapsed >= OPERATOR_INACTIVITY_TIMEOUT_MS) {
+        console.warn('⏱️ Sessione operatore scaduta per inattività (> 30 minuti)');
+        await forceOperatorLogout(
+            "⏱️ Sessione scaduta dopo 30 minuti di inattività. Effettua nuovamente l'accesso.",
+            true,
+            "Sessione terminata per inattività (30 min)"
+        );
+    } else {
+        scheduleOperatorInactivityTimeout();
+    }
+}
+
+function recordOperatorActivity() {
+    if (!currentUser || isAdmin || isForcingLogout) return;
+
+    const now = Date.now();
+    const uid = currentUser.uid;
+    const prevLastAct = getStoredOperatorLastActivity(uid);
+
+    // Se sono già trascorsi >= 30 minuti (es. telefono sbloccato dopo standby), disconnetti subito senza resettare il timer
+    if (prevLastAct > 0 && (now - prevLastAct >= OPERATOR_INACTIVITY_TIMEOUT_MS)) {
+        checkOperatorInactivity();
+        return;
+    }
+
+    if (now - lastActivityWriteTs < OPERATOR_ACTIVITY_THROTTLE_MS) {
+        return;
+    }
+
+    lastActivityWriteTs = now;
+    currentLastActivityTs = now;
+    saveLocalOperatorSession(uid, currentLocalSessionId, now);
+    scheduleOperatorInactivityTimeout();
+
+    if (activeSessionsRef && currentLocalSessionId && (now - lastRemoteHeartbeatTs >= OPERATOR_REMOTE_HEARTBEAT_MS)) {
+        lastRemoteHeartbeatTs = now;
+        activeSessionsRef.child(uid).once('value').then(snap => {
+            const val = snap.val();
+            if (val && val.sessionId === currentLocalSessionId) {
+                activeSessionsRef.child(uid).update({ lastActiveAt: now }).catch(() => {});
+            }
+        }).catch(() => {});
+    }
+}
+
+async function verifyRemoteOperatorSessionOnWake() {
+    if (!currentUser || isAdmin || isForcingLogout || !activeSessionsRef || !currentLocalSessionId) return;
+    try {
+        const uid = currentUser.uid;
+        const snap = await activeSessionsRef.child(uid).once('value');
+        const val = snap.val();
+        if (!currentUser || isAdmin || isForcingLogout) return;
+        let localStoredId = null;
+        try {
+            localStoredId = localStorage.getItem(getOperatorSessionKey(uid));
+        } catch (e) {}
+        if (val && val.sessionId && val.sessionId !== currentLocalSessionId) {
+            if (localStoredId && val.sessionId === localStoredId) {
+                currentLocalSessionId = localStoredId;
+                return;
+            }
+            await forceOperatorLogout(
+                "🔒 Sessione terminata: questo account ha effettuato l'accesso su un altro dispositivo.",
+                false,
+                "Disconnesso: nuovo accesso rilevato su un altro dispositivo"
+            );
+        }
+    } catch (e) {
+        // Ignora errori temporanei di rete al risveglio
+    }
+}
+
+function bindGlobalOperatorActivityListeners() {
+    if (activityListenersBound) return;
+    activityListenersBound = true;
+
+    const activityEvents = ['pointerdown', 'mousedown', 'mousemove', 'keydown', 'touchstart', 'touchmove', 'wheel', 'scroll', 'click'];
+    activityEvents.forEach(evt => {
+        window.addEventListener(evt, recordOperatorActivity, { passive: true, capture: true });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkOperatorInactivity();
+            verifyRemoteOperatorSessionOnWake();
+        }
+    });
+    window.addEventListener('pageshow', () => {
+        checkOperatorInactivity();
+        verifyRemoteOperatorSessionOnWake();
+    });
+    window.addEventListener('focus', () => {
+        checkOperatorInactivity();
+        verifyRemoteOperatorSessionOnWake();
+    });
+    window.addEventListener('online', () => {
+        checkOperatorInactivity();
+        verifyRemoteOperatorSessionOnWake();
+    });
+
+    window.addEventListener('storage', (e) => {
+        if (!currentUser || isAdmin || isForcingLogout) return;
+        const uid = currentUser.uid;
+        if (e.key === getOperatorSessionKey(uid) && e.newValue) {
+            currentLocalSessionId = e.newValue;
+        } else if (e.key === getOperatorLastActivityKey(uid) && e.newValue) {
+            const ts = parseInt(e.newValue, 10);
+            if (ts > currentLastActivityTs) {
+                currentLastActivityTs = ts;
+                scheduleOperatorInactivityTimeout();
+            }
+        }
+    });
+}
+
+async function initOperatorSessionGuard(user) {
+    if (!user) return false;
+
+    stopOperatorSessionGuard();
+    bindGlobalOperatorActivityListeners();
+
+    const uid = user.uid;
+    const now = Date.now();
+    const explicitSessionId = pendingExplicitLoginSessionId;
+    pendingExplicitLoginSessionId = null;
+
+    if (explicitSessionId) {
+        // 1. Nuovo login esplicito: registra nuova sessione e disconnette automaticamente l'eventuale vecchio dispositivo
+        currentLocalSessionId = explicitSessionId;
+        currentLastActivityTs = now;
+        lastActivityWriteTs = now;
+        lastRemoteHeartbeatTs = now;
+        saveLocalOperatorSession(uid, currentLocalSessionId, now);
+
+        if (activeSessionsRef) {
+            try {
+                await activeSessionsRef.child(uid).set({
+                    sessionId: currentLocalSessionId,
+                    uid: uid,
+                    email: user.email || '',
+                    loginAt: now,
+                    lastActiveAt: now
+                });
+            } catch (e) {
+                console.warn('Errore registrazione sessione attiva su Firebase:', e);
+            }
+        }
+    } else {
+        // 2. Ripristino sessione (ricarica pagina / riapertura app): verifica 30 min di inattività e sessione singola
+        let savedSessionId = null;
+        let savedLastAct = 0;
+        try {
+            savedSessionId = localStorage.getItem(getOperatorSessionKey(uid));
+            savedLastAct = parseInt(localStorage.getItem(getOperatorLastActivityKey(uid)) || '0', 10);
+        } catch (e) {}
+
+        if (savedLastAct > 0 && (now - savedLastAct >= OPERATOR_INACTIVITY_TIMEOUT_MS)) {
+            if (savedSessionId) {
+                await releaseRemoteOperatorSessionIfOwned(uid, savedSessionId);
+            }
+            clearLocalOperatorSession(uid);
+            await forceOperatorLogout(
+                "⏱️ Sessione scaduta dopo 30 minuti di inattività. Effettua nuovamente l'accesso.",
+                false,
+                "Sessione scaduta per inattività (30 min)"
+            );
+            return false;
+        }
+
+        if (activeSessionsRef) {
+            try {
+                const remoteSnap = await activeSessionsRef.child(uid).once('value');
+                const remoteVal = remoteSnap.val();
+
+                if (remoteVal && remoteVal.sessionId) {
+                    if (!savedSessionId || remoteVal.sessionId !== savedSessionId) {
+                        clearLocalOperatorSession(uid);
+                        await forceOperatorLogout(
+                            "🔒 Sessione terminata: questo account ha effettuato l'accesso su un altro dispositivo.",
+                            false,
+                            "Sessione attiva rilevata su un altro dispositivo"
+                        );
+                        return false;
+                    }
+                    if (!savedLastAct && remoteVal.lastActiveAt && (now - remoteVal.lastActiveAt >= OPERATOR_INACTIVITY_TIMEOUT_MS)) {
+                        await releaseRemoteOperatorSessionIfOwned(uid, savedSessionId);
+                        clearLocalOperatorSession(uid);
+                        await forceOperatorLogout(
+                            "⏱️ Sessione scaduta dopo 30 minuti di inattività. Effettua nuovamente l'accesso.",
+                            false,
+                            "Sessione scaduta per inattività (30 min)"
+                        );
+                        return false;
+                    }
+                }
+
+                currentLocalSessionId = savedSessionId || generateOperatorSessionId();
+                currentLastActivityTs = now;
+                lastActivityWriteTs = now;
+                lastRemoteHeartbeatTs = now;
+                saveLocalOperatorSession(uid, currentLocalSessionId, now);
+
+                await activeSessionsRef.child(uid).set({
+                    sessionId: currentLocalSessionId,
+                    uid: uid,
+                    email: user.email || '',
+                    loginAt: (remoteVal && remoteVal.loginAt) ? remoteVal.loginAt : now,
+                    lastActiveAt: now
+                });
+            } catch (e) {
+                console.warn('Verifica sessione remota al caricamento:', e);
+                currentLocalSessionId = savedSessionId || generateOperatorSessionId();
+                currentLastActivityTs = now;
+                lastActivityWriteTs = now;
+                saveLocalOperatorSession(uid, currentLocalSessionId, now);
+            }
+        } else {
+            currentLocalSessionId = savedSessionId || generateOperatorSessionId();
+            currentLastActivityTs = now;
+            lastActivityWriteTs = now;
+            saveLocalOperatorSession(uid, currentLocalSessionId, now);
+        }
+    }
+
+    // 3. Ascolto in tempo reale: se un altro dispositivo effettua il login con lo stesso account, disconnette subito questo
+    if (activeSessionsRef && currentLocalSessionId) {
+        const sessionRef = activeSessionsRef.child(uid);
+        const sessionHandler = (snapshot) => {
+            if (isForcingLogout || !currentUser || isAdmin || currentUser.uid !== uid) return;
+            const val = snapshot.val();
+            if (val && val.sessionId && val.sessionId !== currentLocalSessionId) {
+                let localStoredId = null;
+                try {
+                    localStoredId = localStorage.getItem(getOperatorSessionKey(uid));
+                } catch (e) {}
+                if (localStoredId && val.sessionId === localStoredId) {
+                    currentLocalSessionId = localStoredId;
+                    return;
+                }
+                console.warn('🔒 Rilevato nuovo login su altro dispositivo — disconnessione automatica in corso');
+                forceOperatorLogout(
+                    "🔒 Sei stato disconnesso perché questo account ha appena effettuato l'accesso su un altro dispositivo.",
+                    false,
+                    "Disconnesso: accesso effettuato su un altro dispositivo"
+                );
+            }
+        };
+        currentWatchedSessionRef = sessionRef;
+        currentWatchedSessionHandler = sessionHandler;
+        sessionRef.on('value', sessionHandler);
+    }
+
+    // 4. Avvio timer inattività 30 minuti + controllo periodico ogni 15s
+    scheduleOperatorInactivityTimeout();
+    inactivityCheckIntervalId = setInterval(() => {
+        checkOperatorInactivity();
+    }, 15000);
+
+    return true;
+}
+
 // Mostra / Nascondi Schermata Gatekeeper
 function showGatekeeper(errorMsg = '') {
     const gatekeeperOverlay = document.getElementById('auth-gatekeeper-overlay');
@@ -7036,9 +7540,12 @@ async function attemptGatekeeperLogin() {
     if (errorEl) errorEl.classList.add('hidden');
 
     try {
+        pendingGatekeeperReason = '';
+        pendingExplicitLoginSessionId = generateOperatorSessionId();
         await auth.signInWithEmailAndPassword(email, rawPass);
         if (passwordInput) passwordInput.value = '';
     } catch (err) {
+        pendingExplicitLoginSessionId = null;
         console.error('Errore Login 118:', err.code, err.message);
         let msg = 'Credenziali non corrette. Riprova.';
         if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
@@ -7166,6 +7673,11 @@ function openUserProfileModal() {
         const roleInfo = getRoleInfo(userRole);
         roleEl.className = `role-badge ${roleInfo.badgeClass}`;
         roleEl.textContent = roleInfo.label;
+    }
+
+    const sessionPolicyRow = document.getElementById('profile-session-policy-row');
+    if (sessionPolicyRow) {
+        sessionPolicyRow.classList.toggle('hidden', !!isAdmin);
     }
 
     if (newPassInput) newPassInput.value = '';
@@ -7766,6 +8278,9 @@ async function deleteAuthorizedUser(uid, name) {
 
         // Rimuovi dal Database
         await authorizedUsersRef.child(uid).remove();
+        if (activeSessionsRef) {
+            await activeSessionsRef.child(uid).remove().catch(() => {});
+        }
         showToast(`Account "${name}" rimosso e liberato con successo.`, "success", 3000);
     } catch (err) {
         console.error('Errore eliminazione utente:', err);
@@ -8047,7 +8562,7 @@ function initUsersModule() {
     }
     if (mandatoryLogoutBtn) {
         mandatoryLogoutBtn.addEventListener('click', async () => {
-            if (auth) await auth.signOut();
+            await performCleanManualLogout(true);
             hideMandatoryPasswordChangeModal();
         });
     }
@@ -8068,7 +8583,7 @@ function initUsersModule() {
     if (profileLogoutBtn) {
         profileLogoutBtn.addEventListener('click', async () => {
             document.getElementById('user-profile-modal')?.classList.add('hidden');
-            if (auth) await auth.signOut();
+            await performCleanManualLogout(true);
         });
     }
 

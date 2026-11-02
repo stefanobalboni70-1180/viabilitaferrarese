@@ -1,7 +1,7 @@
 {
-    "name": "DA CHI A L'App v3.9.27",
+    "name": "DA CHI A L'App v3.9.28",
     "short_name": "DA CHI A L'App",
-    "description": "Gestione viabilità e segnalazioni stradali per il 118 di Ferrara (v3.9.27)",
+    "description": "Gestione viabilità e segnalazioni stradali per il 118 di Ferrara (v3.9.28)",
     "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#0f172a",

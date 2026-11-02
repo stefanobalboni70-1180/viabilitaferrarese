@@ -36,7 +36,13 @@
     },
     "admin_settings": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null",
+      "active_sessions": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
     },
     "authorized_users": {
       ".read": "auth != null",
