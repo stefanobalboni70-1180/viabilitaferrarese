@@ -3460,6 +3460,146 @@ body.admin-logged-in .header-user-actions {
     border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Schermata di Apertura Mobile (~1,5s) & Gatekeeper Blu 118 & Giallo */
+.mobile-welcome-splash {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background:
+        radial-gradient(circle at 50% 24%, rgba(56, 189, 248, 0.38) 0%, transparent 58%),
+        linear-gradient(160deg, #0284c7 0%, #1d4ed8 52%, #1e3a8a 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000005;
+    padding: 24px;
+    box-sizing: border-box;
+    text-align: center;
+    transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+.mobile-welcome-splash.splash-fade-out {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+@media (min-width: 951px) {
+    .mobile-welcome-splash {
+        display: none !important;
+    }
+}
+
+.mobile-splash-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 340px;
+    width: 100%;
+    animation: modalPopIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.opening-icon-ring {
+    width: 64px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+    font-size: 30px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.opening-pill-tag {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    color: #ffffff;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.opening-brand-title {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.05;
+}
+
+.opening-brand-main {
+    display: block;
+    color: #ffffff;
+    font-size: 2.75rem;
+    font-weight: 900;
+    letter-spacing: -1.2px;
+    text-shadow: 0 4px 18px rgba(15, 23, 42, 0.38);
+}
+
+.opening-brand-badge {
+    display: inline-block;
+    margin-top: 7px;
+    padding: 4px 20px 6px;
+    border-radius: 14px;
+    background: #facc15;
+    color: #0f172a;
+    font-size: 2.15rem;
+    font-weight: 900;
+    letter-spacing: -0.7px;
+    line-height: 1.1;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.32), 0 0 0 2px rgba(255, 255, 255, 0.42);
+}
+
+.opening-brand-sub {
+    margin: 14px 0 0;
+    color: #e0f2fe;
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+}
+
+.opening-loader-track {
+    width: 150px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    overflow: hidden;
+    margin-top: 22px;
+}
+
+.opening-loader-bar {
+    height: 100%;
+    width: 100%;
+    border-radius: 999px;
+    background: #facc15;
+    transform-origin: left center;
+    animation: openingProgress 1.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes openingProgress {
+    0% { transform: scaleX(0.12); }
+    100% { transform: scaleX(1); }
+}
+
+.opening-version-label {
+    margin-top: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(224, 242, 254, 0.82);
+}
+
 /* Gatekeeper / Blocco Iniziale Accesso Riservato */
 .gatekeeper-overlay {
     position: fixed;
@@ -3467,73 +3607,120 @@ body.admin-logged-in .header-user-actions {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: radial-gradient(circle at center, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.98) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    height: 100dvh;
+    background:
+        radial-gradient(circle at 50% 18%, rgba(56, 189, 248, 0.36) 0%, transparent 56%),
+        linear-gradient(160deg, #0284c7 0%, #1d4ed8 52%, #1e3a8a 100%);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 999999;
-    padding: 16px;
+    padding: 18px 16px;
     overflow-y: auto;
     box-sizing: border-box;
+}
+
+.gatekeeper-shell {
+    width: 100%;
+    max-width: 430px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin: auto;
+}
+
+.gatekeeper-brand-hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.gatekeeper-brand-hero .opening-icon-ring {
+    width: 54px;
+    height: 54px;
+    font-size: 25px;
+    margin-bottom: 10px;
+}
+
+.gatekeeper-brand-hero .opening-brand-main {
+    font-size: 2.3rem;
+}
+
+.gatekeeper-brand-hero .opening-brand-badge {
+    font-size: 1.8rem;
+    padding: 3px 18px 5px;
+    margin-top: 5px;
+}
+
+.gatekeeper-hero-subtitle {
+    font-size: 0.86rem;
+    color: #e0f2fe;
+    font-weight: 600;
+    margin: 10px 0 0;
 }
 
 .gatekeeper-card {
     background: rgba(255, 255, 255, 0.98);
     color: #0f172a;
     border-radius: 22px;
-    padding: 32px 28px;
+    padding: 24px 24px 20px;
     width: 100%;
-    max-width: 440px;
-    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.2);
+    max-width: 430px;
+    box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.35);
     box-sizing: border-box;
     animation: modalPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.gatekeeper-header {
-    text-align: center;
-    margin-bottom: 22px;
-}
-
-.gatekeeper-icon-wrap {
-    width: 58px;
-    height: 58px;
-    background: #fee2e2;
-    border: 2px solid #fca5a5;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 12px;
-    font-size: 26px;
-    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
-}
-
-.gatekeeper-header h2 {
-    font-size: 1.25rem;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.5px;
-    margin-bottom: 4px;
-}
-
-.gatekeeper-subtitle {
-    font-size: 0.85rem;
-    color: #64748b;
-    font-weight: 600;
-    margin-bottom: 12px;
-}
-
 .gatekeeper-notice {
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 11px;
     padding: 8px 12px;
     font-size: 0.78rem;
-    color: #334155;
+    color: #0c4a6e;
     line-height: 1.4;
     text-align: center;
+    margin-bottom: 16px;
+}
+
+.gatekeeper-login-btn {
+    background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%);
+    border-radius: 11px;
+    padding: 12px 16px;
+    font-weight: 700;
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35);
+}
+
+.gatekeeper-login-btn:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #1e40af 100%);
+}
+
+@media (max-width: 480px) {
+    .gatekeeper-overlay {
+        padding: 14px;
+    }
+    .gatekeeper-shell {
+        gap: 12px;
+    }
+    .gatekeeper-brand-hero .opening-icon-ring {
+        width: 48px;
+        height: 48px;
+        font-size: 22px;
+        margin-bottom: 8px;
+    }
+    .gatekeeper-brand-hero .opening-brand-main {
+        font-size: 2.1rem;
+    }
+    .gatekeeper-brand-hero .opening-brand-badge {
+        font-size: 1.65rem;
+        padding: 3px 16px 4px;
+    }
+    .gatekeeper-card {
+        padding: 20px 18px 16px;
+        border-radius: 20px;
+    }
 }
 
 .gatekeeper-form .form-group {
@@ -4412,6 +4599,7 @@ span.hidden,
 #admin-logout-btn.hidden,
 #clear-identified-points-btn.hidden,
 #identify-picker-banner.hidden,
+#mobile-welcome-splash.hidden,
 #auth-gatekeeper-overlay.hidden {
     display: none !important;
 }

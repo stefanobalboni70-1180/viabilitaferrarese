@@ -6,14 +6,14 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>DA CHI A L'App v3.9.31 - Viabilità 118</title>
+    <title>DA CHI A L'App v3.9.32 - Viabilità 118</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="manifest.json?v=3.9.31">
-    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="manifest.json?v=3.9.32">
+    <meta name="theme-color" content="#0284c7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="DA CHI A L'App v3.9.31">
+    <meta name="apple-mobile-web-app-title" content="DA CHI A L'App v3.9.32">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -27,12 +27,39 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.9.31">
+    <link rel="stylesheet" href="style.css?v=3.9.32">
 </head>
 <body>
+    <!-- Schermata di Apertura / Benvenuto Mobile (~1,5s) — Blu 118 & Giallo -->
+    <div id="mobile-welcome-splash" class="mobile-welcome-splash" role="status" aria-label="Apertura DA CHI A L'App">
+        <div class="mobile-splash-inner">
+            <div class="opening-icon-ring">
+                <span class="opening-badge-icon">🚨</span>
+            </div>
+            <div class="opening-pill-tag">118 FERRARA</div>
+            <div class="opening-brand-title">
+                <span class="opening-brand-main">DA CHI A</span>
+                <span class="opening-brand-badge">L'App</span>
+            </div>
+            <p class="opening-brand-sub">Viabilità &amp; Emergenza Territoriale</p>
+            <div class="opening-loader-track">
+                <div class="opening-loader-bar"></div>
+            </div>
+            <span class="opening-version-label" id="splash-version-label">v. 3.9.32</span>
+        </div>
+    </div>
+    <script>
+        setTimeout(function () {
+            var sp = document.getElementById('mobile-welcome-splash');
+            if (sp && !sp.classList.contains('hidden')) {
+                sp.classList.add('splash-fade-out');
+                setTimeout(function () { sp.classList.add('hidden'); }, 380);
+            }
+        }, 2800);
+    </script>
     
     <div class="top-nav-wrapper">
         <header class="glass-header">
@@ -41,7 +68,7 @@
                 <div class="header-top-row">
                     <div class="header-row-title">
                         <div class="header-title-group">
-                            <h1>DA CHI A <span class="city-name">L'App</span> <span class="version-tag" id="app-version">v. 3.9.31</span></h1>
+                            <h1>DA CHI A <span class="city-name">L'App</span> <span class="version-tag" id="app-version">v. 3.9.32</span></h1>
                         </div>
                     </div>
                 </div>
@@ -689,44 +716,51 @@
          SISTEMA AUTENTICAZIONE E GESTIONE ACCESSI UTENTI 118
          ======================================================== -->
 
-    <!-- Gatekeeper: Schermata di Accesso Obbligatoria (Blocco Iniziale) -->
+    <!-- Gatekeeper: Schermata di Accesso Obbligatoria (Blocco Iniziale — Blu 118 & Giallo) -->
     <div id="auth-gatekeeper-overlay" class="gatekeeper-overlay hidden">
-        <div class="gatekeeper-card">
-            <div class="gatekeeper-header">
-                <div class="gatekeeper-icon-wrap">
-                    <span class="gatekeeper-badge-icon">🚨</span>
+        <div class="gatekeeper-shell">
+            <div class="gatekeeper-brand-hero">
+                <div class="opening-icon-ring">
+                    <span class="opening-badge-icon">🚨</span>
                 </div>
-                <h2>DA CHI A L'App</h2>
-                <p class="gatekeeper-subtitle">Portale Riservato Operatori e Personale 118</p>
+                <div class="opening-pill-tag">118 FERRARA</div>
+                <h2 class="opening-brand-title">
+                    <span class="opening-brand-main">DA CHI A</span>
+                    <span class="opening-brand-badge">L'App</span>
+                </h2>
+                <p class="gatekeeper-hero-subtitle">Portale Riservato Operatori e Personale 118</p>
+            </div>
+
+            <div class="gatekeeper-card">
                 <div class="gatekeeper-notice">
                     <span>🔒 Accesso protetto. Inserisci le credenziali fornite dall'Amministratore del servizio.</span>
                 </div>
-            </div>
 
-            <form id="gatekeeper-form" class="gatekeeper-form" onsubmit="return false;">
-                <div class="form-group">
-                    <label for="gatekeeper-username">👤 Username o Email</label>
-                    <input type="text" id="gatekeeper-username" placeholder="Es. mario.rossi oppure postazione1" autocomplete="username" required />
-                </div>
-
-                <div class="form-group">
-                    <label for="gatekeeper-password">🔑 Password</label>
-                    <div class="password-field-wrapper">
-                        <input type="password" id="gatekeeper-password" placeholder="Inserisci la password" autocomplete="current-password" required />
-                        <button type="button" class="toggle-pw-btn" data-target="gatekeeper-password" title="Mostra/Nascondi password">👁️</button>
+                <form id="gatekeeper-form" class="gatekeeper-form" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="gatekeeper-username">👤 Username o Email</label>
+                        <input type="text" id="gatekeeper-username" placeholder="Es. mario.rossi oppure postazione1" autocomplete="username" required />
                     </div>
-                </div>
 
-                <p id="gatekeeper-error" class="error-msg hidden"></p>
+                    <div class="form-group">
+                        <label for="gatekeeper-password">🔑 Password</label>
+                        <div class="password-field-wrapper">
+                            <input type="password" id="gatekeeper-password" placeholder="Inserisci la password" autocomplete="current-password" required />
+                            <button type="button" class="toggle-pw-btn" data-target="gatekeeper-password" title="Mostra/Nascondi password">👁️</button>
+                        </div>
+                    </div>
 
-                <button type="button" id="gatekeeper-submit-btn" class="primary-btn btn-block">
-                    <span>🔐</span> Accedi al Sistema 118
-                </button>
+                    <p id="gatekeeper-error" class="error-msg hidden"></p>
 
-                <div class="gatekeeper-links">
-                    <button type="button" id="gatekeeper-forgot-btn" class="link-btn">Hai dimenticato la password?</button>
-                </div>
-            </form>
+                    <button type="button" id="gatekeeper-submit-btn" class="primary-btn btn-block gatekeeper-login-btn">
+                        <span>🔐</span> Accedi al Sistema 118
+                    </button>
+
+                    <div class="gatekeeper-links">
+                        <button type="button" id="gatekeeper-forgot-btn" class="link-btn">Hai dimenticato la password?</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -1048,7 +1082,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
     <!-- App Script -->
-    <script src="script.js?v=3.9.31"></script>
+    <script src="script.js?v=3.9.32"></script>
 </body>
 </html>
 
