@@ -558,8 +558,8 @@ body.admin-logged-in .header-user-actions {
     justify-content: center;
 }
 .custom-marker.eliporto svg, .custom-marker.elisoccorso svg {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
 }
 
 /* Popup Styling */
@@ -2376,8 +2376,8 @@ body.admin-logged-in .header-user-actions {
 
     .custom-marker.eliporto svg,
     .custom-marker.elisoccorso svg {
-        width: 18px !important;
-        height: 18px !important;
+        width: 23px !important;
+        height: 23px !important;
     }
     
     .custom-marker.sagra img {
