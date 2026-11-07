@@ -6,14 +6,14 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>DA CHI A L'App v3.9.34 - Viabilità 118</title>
+    <title>DA CHI A L'App v3.9.35 - Viabilità 118</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="manifest.json?v=3.9.34">
+    <link rel="manifest" href="manifest.json?v=3.9.35">
     <meta name="theme-color" content="#0284c7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="DA CHI A L'App v3.9.34">
+    <meta name="apple-mobile-web-app-title" content="DA CHI A L'App v3.9.35">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -30,7 +30,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.9.34">
+    <link rel="stylesheet" href="style.css?v=3.9.35">
 </head>
 <body>
     <!-- Schermata di Apertura / Benvenuto Mobile (~1,5s) — Blu 118 & Giallo -->
@@ -48,7 +48,7 @@
             <div class="opening-loader-track">
                 <div class="opening-loader-bar"></div>
             </div>
-            <span class="opening-version-label" id="splash-version-label">v. 3.9.34</span>
+            <span class="opening-version-label" id="splash-version-label">v. 3.9.35</span>
         </div>
     </div>
     <script>
@@ -68,7 +68,7 @@
                 <div class="header-top-row">
                     <div class="header-row-title">
                         <div class="header-title-group">
-                            <h1>DA CHI A <span class="city-name">L'App</span> <span class="version-tag" id="app-version">v. 3.9.34</span></h1>
+                            <h1>DA CHI A <span class="city-name">L'App</span> <span class="version-tag" id="app-version">v. 3.9.35</span></h1>
                         </div>
                     </div>
                 </div>
@@ -126,6 +126,7 @@
                 <button class="filter-pill" data-filter="upcoming">⏳ Programmati (<span id="filter-count-upcoming">0</span>)</button>
                 <button class="filter-pill" data-filter="expired">⚪ Scaduti (<span id="filter-count-expired">0</span>)</button>
                 <button class="filter-pill" data-filter="all">Tutti (<span id="filter-count-all">0</span>)</button>
+                <button type="button" id="admin-add-coord-point-btn" class="admin-add-point-pill" title="Crea un punto inserendo i gradi sessagesimali Nord ed Est">➕ Nuovo Punto</button>
             </div>
         </div>
     </div>
@@ -265,15 +266,67 @@
                     </button>
                 </div>
 
-                <!-- Sezione 2: Nome Via / Strada -->
+                <!-- Sezione 2: Coordinate Sessagesimali Nord / Est -->
+                <div class="form-section-item dms-coords-box" id="admin-dms-box">
+                    <div class="dms-box-header">
+                        <label class="section-label" style="margin-bottom:0;">🧭 2. Coordinate Sessagesimali (Nord / Est)</label>
+                        <button type="button" id="admin-dms-detect-street-btn" class="dms-detect-street-btn" title="Rileva automaticamente il nome della via da queste coordinate">🔄 Rileva via</button>
+                    </div>
+                    <p class="dms-help">Inserisci Gradi (°), Primi (') e Secondi (") per Nord ed Est, oppure incolla la stringa completa.</p>
+
+                    <!-- Riga Latitudine Nord (N) -->
+                    <div class="dms-axis-row">
+                        <span class="dms-hemi-badge dms-hemi-n" title="Latitudine Nord">N</span>
+                        <div class="dms-unit-field">
+                            <input type="text" id="admin-lat-deg" inputmode="numeric" maxlength="3" placeholder="44" aria-label="Gradi Nord" autocomplete="off" />
+                            <span class="dms-unit-sym">°</span>
+                        </div>
+                        <div class="dms-unit-field">
+                            <input type="text" id="admin-lat-min" inputmode="decimal" maxlength="6" placeholder="50" aria-label="Primi Nord" autocomplete="off" />
+                            <span class="dms-unit-sym">'</span>
+                        </div>
+                        <div class="dms-unit-field dms-sec-field">
+                            <input type="text" id="admin-lat-sec" inputmode="decimal" maxlength="7" placeholder="17.16" aria-label="Secondi Nord" autocomplete="off" />
+                            <span class="dms-unit-sym">"</span>
+                        </div>
+                        <span class="dms-dir-label">Nord</span>
+                    </div>
+
+                    <!-- Riga Longitudine Est (E) -->
+                    <div class="dms-axis-row">
+                        <span class="dms-hemi-badge dms-hemi-e" title="Longitudine Est">E</span>
+                        <div class="dms-unit-field">
+                            <input type="text" id="admin-lng-deg" inputmode="numeric" maxlength="3" placeholder="11" aria-label="Gradi Est" autocomplete="off" />
+                            <span class="dms-unit-sym">°</span>
+                        </div>
+                        <div class="dms-unit-field">
+                            <input type="text" id="admin-lng-min" inputmode="decimal" maxlength="6" placeholder="37" aria-label="Primi Est" autocomplete="off" />
+                            <span class="dms-unit-sym">'</span>
+                        </div>
+                        <div class="dms-unit-field dms-sec-field">
+                            <input type="text" id="admin-lng-sec" inputmode="decimal" maxlength="7" placeholder="11.28" aria-label="Secondi Est" autocomplete="off" />
+                            <span class="dms-unit-sym">"</span>
+                        </div>
+                        <span class="dms-dir-label">Est</span>
+                    </div>
+
+                    <!-- Incolla rapido -->
+                    <div class="dms-paste-row">
+                        <input type="text" id="admin-coords-paste" placeholder="📋 Incolla rapido: es. 44° 50' 17.2&quot; N, 11° 37' 11.3&quot; E" autocomplete="off" />
+                    </div>
+
+                    <div id="admin-dms-preview" class="dms-preview-line">📌 Compila i campi Nord ed Est o fai doppio click sulla mappa</div>
+                </div>
+
+                <!-- Sezione 3: Nome Via / Strada -->
                 <div class="form-section-item">
-                    <label class="section-label" for="admin-marker-street">2. Nome Via / Strada (es. Via Ruffetta, Via Bologna...)</label>
+                    <label class="section-label" for="admin-marker-street">3. Nome Via / Strada (es. Via Ruffetta, Via Bologna...)</label>
                     <input type="text" id="admin-marker-street" placeholder="Rilevamento automatico o modifica..." style="padding: 10px 14px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(0, 0, 0, 0.2); color: var(--text-color); outline: none; font-size: 0.95rem; width: 100%; box-sizing: border-box;" />
                 </div>
 
-                <!-- Sezione 3: Note / Dettagli -->
+                <!-- Sezione 4: Note / Dettagli -->
                 <div class="form-section-item">
-                    <label class="section-label" for="admin-marker-note">3. Dettagli o note (opzionale)</label>
+                    <label class="section-label" for="admin-marker-note">4. Dettagli o note (opzionale)</label>
                     <textarea id="admin-marker-note" rows="2" placeholder="Es. Chiusura per asfaltatura, passaggio consentito solo a residenti..."></textarea>
                 </div>
 
@@ -373,7 +426,7 @@
                     <span class="loc-pin">📍</span>
                     <div class="loc-info">
                         <strong id="report-loc-name">Punto selezionato</strong>
-                        <small id="report-loc-coords">44.8381, 11.6198</small>
+                        <small id="report-loc-coords">44° 50' 17.16" N, 11° 37' 11.28" E</small>
                     </div>
                 </div>
             </div>
@@ -1082,7 +1135,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
     <!-- App Script -->
-    <script src="script.js?v=3.9.34"></script>
+    <script src="script.js?v=3.9.35"></script>
 </body>
 </html>
 

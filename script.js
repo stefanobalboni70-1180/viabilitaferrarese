@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.34';
+const APP_VERSION = '3.9.35';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -1878,6 +1878,267 @@ const DEFAULT_WEEKLY_MARKETS = [
 const FERRARA_COORDS = [44.8381, 11.6198];
 const MAP_ZOOM = 11;
 
+// -------------------------------------------------------
+// UTILITÀ COORDINATE SESSAGESIMALI (GRADI ° PRIMI ' SECONDI " NORD / EST)
+// -------------------------------------------------------
+
+function decimalToDmsParts(decimal, isLat = true, secDecimals = 2) {
+    const num = Number(decimal);
+    if (!Number.isFinite(num)) return null;
+    const hemi = isLat ? (num < 0 ? 'S' : 'N') : (num < 0 ? 'W' : 'E');
+    const abs = Math.abs(num);
+    let deg = Math.floor(abs);
+    const minFloat = (abs - deg) * 60;
+    let min = Math.floor(minFloat);
+    const factor = Math.pow(10, secDecimals);
+    let sec = Math.round(((minFloat - min) * 60) * factor) / factor;
+
+    if (sec >= 60) {
+        sec = 0;
+        min += 1;
+    }
+    if (min >= 60) {
+        min = 0;
+        deg += 1;
+    }
+    return { deg, min, sec, hemi };
+}
+
+function formatSingleDms(decimal, isLat = true, secDecimals = 2) {
+    const parts = decimalToDmsParts(decimal, isLat, secDecimals);
+    if (!parts) return '';
+    const minStr = String(parts.min).padStart(2, '0');
+    const secFixed = secDecimals > 0 ? parts.sec.toFixed(secDecimals) : String(Math.round(parts.sec));
+    const secStr = parts.sec < 10 ? `0${secFixed}` : secFixed;
+    return `${parts.deg}° ${minStr}' ${secStr}" ${parts.hemi}`;
+}
+
+function formatLatLngDms(lat, lng, secDecimals = 2) {
+    return `${formatSingleDms(lat, true, secDecimals)}, ${formatSingleDms(lng, false, secDecimals)}`;
+}
+
+function dmsFieldsToDecimal(degRaw, minRaw, secRaw, isLat = true) {
+    const axisName = isLat ? 'Nord (N)' : 'Est (E)';
+    const maxDeg = isLat ? 90 : 180;
+
+    const cleanField = (val) => String(val ?? '')
+        .trim()
+        .replace(/^[+\s]+/, '')
+        .replace(/[°º˚'"′″’‘”“\sNSEWO]+$/gi, '')
+        .replace(',', '.');
+
+    const dStr = cleanField(degRaw);
+    const mStr = cleanField(minRaw);
+    const sStr = cleanField(secRaw);
+
+    if (dStr === '' && mStr === '' && sStr === '') {
+        return { empty: true };
+    }
+    if (dStr === '') {
+        return { error: `Inserisci i gradi (°) per ${axisName}.` };
+    }
+    if (!/^\d+(?:\.\d+)?$/.test(dStr)) {
+        return { error: `Valore gradi (°) non valido per ${axisName}.` };
+    }
+    if (mStr !== '' && !/^\d+(?:\.\d+)?$/.test(mStr)) {
+        return { error: `Valore primi (') non valido per ${axisName}.` };
+    }
+    if (sStr !== '' && !/^\d+(?:\.\d+)?$/.test(sStr)) {
+        return { error: `Valore secondi (") non valido per ${axisName}.` };
+    }
+
+    const deg = parseFloat(dStr);
+    // Supporto inserimento diretto gradi decimali se primi e secondi sono vuoti
+    if (mStr === '' && sStr === '' && dStr.includes('.')) {
+        if (deg < 0 || deg > maxDeg) {
+            return { error: `I gradi per ${axisName} devono essere tra 0 e ${maxDeg}.` };
+        }
+        return { valid: true, decimal: deg };
+    }
+
+    if (!Number.isInteger(deg) || deg < 0 || deg > maxDeg) {
+        return { error: `I gradi (°) per ${axisName} devono essere un numero intero tra 0 e ${maxDeg}.` };
+    }
+
+    const min = mStr === '' ? 0 : parseFloat(mStr);
+    const sec = sStr === '' ? 0 : parseFloat(sStr);
+
+    if (min < 0 || min >= 60) {
+        return { error: `I primi (') per ${axisName} devono essere compresi tra 0 e 59.` };
+    }
+    if (!Number.isInteger(min) && sec > 0) {
+        return { error: `Se inserisci decimali nei primi (') per ${axisName}, lascia i secondi a 0.` };
+    }
+    if (sec < 0 || sec >= 60) {
+        return { error: `I secondi (") per ${axisName} devono essere inferiori a 60.` };
+    }
+
+    const decimal = deg + (min / 60) + (sec / 3600);
+    if (decimal > maxDeg) {
+        return { error: `Coordinata ${axisName} superiore al limite massimo (${maxDeg}°).` };
+    }
+
+    return { valid: true, decimal };
+}
+
+function parseSingleAxisDms(rawAxis, isLat = true) {
+    if (!rawAxis || typeof rawAxis !== 'string') return null;
+    let s = rawAxis.trim()
+        .replace(/[′’‘´]/g, "'")
+        .replace(/(?:''|[″”“])/g, '"')
+        .replace(/[º˚]/g, '°');
+
+    // Verifica assenza di parole estranee (es. nomi di vie)
+    const strippedWords = s
+        .replace(/\b(?:NORD|SUD|EST|OVEST|NORTH|SOUTH|EAST|WEST|LAT|LON|LNG)\b/gi, '')
+        .replace(/[NSEWO]/gi, '')
+        .replace(/[0-9°'".,;:/+\-\s]/g, '');
+    if (/[a-zA-Z]/.test(strippedWords)) {
+        const leftover = strippedWords.replace(/[dmsDMS]/g, '');
+        if (leftover.length > 0) return null;
+    }
+
+    let hemi = isLat ? 'N' : 'E';
+    let isNeg = false;
+    if (/^\s*-/.test(s)) isNeg = true;
+    if (/\b(?:SUD|SOUTH)\b|S/i.test(s) && isLat) hemi = 'S';
+    if (/\b(?:OVEST|WEST)\b|[WO]/i.test(s) && !isLat) hemi = 'W';
+    if (isNeg) hemi = isLat ? 'S' : 'W';
+
+    // All'interno di un singolo asse la virgola tra cifre è sempre separatore decimale
+    s = s.replace(/(\d),(\d)/g, '$1.$2');
+    const matches = s.match(/\d+(?:\.\d+)?/g);
+    if (!matches || matches.length === 0 || matches.length > 3) return null;
+
+    const maxDeg = isLat ? 90 : 180;
+    let decimalAbs = null;
+
+    if (matches.length === 1) {
+        decimalAbs = parseFloat(matches[0]);
+        if (!Number.isFinite(decimalAbs) || decimalAbs < 0 || decimalAbs > maxDeg) return null;
+    } else if (matches.length === 2) {
+        const deg = parseFloat(matches[0]);
+        const min = parseFloat(matches[1]);
+        if (!Number.isInteger(deg) || deg < 0 || deg > maxDeg || min < 0 || min >= 60) return null;
+        decimalAbs = deg + (min / 60);
+    } else {
+        const deg = parseFloat(matches[0]);
+        const min = parseFloat(matches[1]);
+        const sec = parseFloat(matches[2]);
+        if (!Number.isInteger(deg) || !Number.isInteger(min) || deg < 0 || deg > maxDeg || min < 0 || min >= 60 || sec < 0 || sec >= 60) return null;
+        decimalAbs = deg + (min / 60) + (sec / 3600);
+    }
+
+    if (decimalAbs > maxDeg) return null;
+    const signed = (hemi === 'S' || hemi === 'W') ? -decimalAbs : decimalAbs;
+    const parts = decimalToDmsParts(signed, isLat, 2);
+    return { ...parts, decimal: signed };
+}
+
+function parseFullCoordinates(rawInput) {
+    if (!rawInput || typeof rawInput !== 'string') return null;
+    const norm = rawInput.trim()
+        .replace(/[′’‘´]/g, "'")
+        .replace(/(?:''|[″”“])/g, '"')
+        .replace(/[º˚]/g, '°');
+
+    if (!/\d/.test(norm)) return null;
+
+    // Esclude indirizzi stradali (es. "Via Bologna 14, Ferrara")
+    const alphaCheck = norm
+        .replace(/\b(?:NORD|SUD|EST|OVEST|NORTH|SOUTH|EAST|WEST|LAT|LON|LNG)\b/gi, '')
+        .replace(/[NSEWOdmsDMS]/g, '')
+        .replace(/[^a-zA-ZÀ-ÿ]/g, '');
+    if (alphaCheck.length > 0) return null;
+
+    let latPartStr = null;
+    let lngPartStr = null;
+
+    // 1. Formato con lettere cardinali suffisse: es. 44° 50' 17,2" N, 11° 37' 11,3" E
+    const suffixMatch = norm.match(/^(.*?(?:\b(?:NORD|SUD|NORTH|SOUTH)\b|[NS]))\s*[,;/\-–—]?\s*(.*?(?:\b(?:EST|OVEST|EAST|WEST)\b|[EWO]))\s*$/i);
+    if (suffixMatch) {
+        latPartStr = suffixMatch[1];
+        lngPartStr = suffixMatch[2];
+    }
+
+    // 2. Formato con lettere cardinali prefisse: es. N 44° 50' 17.2" E 11° 37' 11.3"
+    if (!latPartStr) {
+        const prefixMatch = norm.match(/^((?:\b(?:NORD|SUD|NORTH|SOUTH)\b|[NS])\s*[^EWO]+?)\s*[,;/\-–—\s]\s*((?:\b(?:EST|OVEST|EAST|WEST)\b|[EWO])\s*.+)$/i);
+        if (prefixMatch) {
+            latPartStr = prefixMatch[1];
+            lngPartStr = prefixMatch[2];
+        }
+    }
+
+    // 3. Formato con due simboli di grado ° senza lettere cardinali
+    if (!latPartStr) {
+        const twoDegMatch = norm.match(/^([+-]?\s*\d+\s*°[^°]+?)\s*[,;/\s]\s*([+-]?\s*\d+\s*°.+)$/);
+        if (twoDegMatch) {
+            latPartStr = twoDegMatch[1];
+            lngPartStr = twoDegMatch[2];
+        }
+    }
+
+    // 4. Sei numeri separati da spazi (G M S G M S)
+    if (!latPartStr) {
+        const sixTokens = norm.replace(/(\d),(\d)/g, '$1.$2').split(/[\s;/]+/).filter(Boolean);
+        if (sixTokens.length === 6 && sixTokens.every(t => /^[+-]?\d+(?:\.\d+)?$/.test(t))) {
+            latPartStr = sixTokens.slice(0, 3).join(' ');
+            lngPartStr = sixTokens.slice(3, 6).join(' ');
+        }
+    }
+
+    // 5. Coppia decimale (es. "44.8381, 11.6198" oppure "44,8381; 11,6198" o "44,8381 11,6198")
+    if (!latPartStr) {
+        if (norm.includes(';') || norm.includes('/')) {
+            const parts = norm.split(/[;/]/).map(p => p.trim()).filter(Boolean);
+            if (parts.length === 2) {
+                latPartStr = parts[0];
+                lngPartStr = parts[1];
+            }
+        } else if ((norm.match(/,/g) || []).length === 1 && norm.includes('.')) {
+            const parts = norm.split(',').map(p => p.trim()).filter(Boolean);
+            if (parts.length === 2) {
+                latPartStr = parts[0];
+                lngPartStr = parts[1];
+            }
+        } else {
+            const spaceParts = norm.split(/\s+/).filter(Boolean);
+            if (spaceParts.length === 2) {
+                latPartStr = spaceParts[0];
+                lngPartStr = spaceParts[1];
+            }
+        }
+    }
+
+    if (!latPartStr || !lngPartStr) return null;
+
+    const latParsed = parseSingleAxisDms(latPartStr, true);
+    const lngParsed = parseSingleAxisDms(lngPartStr, false);
+    if (!latParsed || !lngParsed) return null;
+
+    return {
+        lat: latParsed.decimal,
+        lng: lngParsed.decimal,
+        latParts: latParsed,
+        lngParts: lngParsed
+    };
+}
+
+window.copyPointCoordsDms = function (lat, lng) {
+    const text = formatLatLngDms(Number(lat), Number(lng), 2);
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(`📋 Coordinate copiate: ${text}`, 'info', 2500);
+        }).catch(() => {
+            showToast(`Coordinate: ${text}`, 'info', 3200);
+        });
+    } else {
+        showToast(`Coordinate: ${text}`, 'info', 3200);
+    }
+};
+
 // Configurazione Icone
 const ICONS = {
     lavori: { emoji: '🚧', label: 'Lavori in corso' },
@@ -1954,6 +2215,16 @@ const schedDaysPicker = document.getElementById('sched-days-picker');
 const adminMarkerError = document.getElementById('admin-marker-error');
 const adminSaveMarkerBtn = document.getElementById('admin-save-marker-btn');
 const adminCancelMarkerBtn = document.getElementById('admin-cancel-marker-btn');
+const adminAddCoordPointBtn = document.getElementById('admin-add-coord-point-btn');
+const adminLatDeg = document.getElementById('admin-lat-deg');
+const adminLatMin = document.getElementById('admin-lat-min');
+const adminLatSec = document.getElementById('admin-lat-sec');
+const adminLngDeg = document.getElementById('admin-lng-deg');
+const adminLngMin = document.getElementById('admin-lng-min');
+const adminLngSec = document.getElementById('admin-lng-sec');
+const adminCoordsPaste = document.getElementById('admin-coords-paste');
+const adminDmsPreview = document.getElementById('admin-dms-preview');
+const adminDmsDetectStreetBtn = document.getElementById('admin-dms-detect-street-btn');
 
 // Elementi DOM (Admin Auth)
 const loginModal = document.getElementById('login-modal');
@@ -2098,7 +2369,7 @@ function updateUI() {
         if (adminNewsBtn) adminNewsBtn.classList.remove('hidden');
         if (adminRoutesBtn) adminRoutesBtn.classList.remove('hidden');
         if (adminUsersBtn) adminUsersBtn.classList.remove('hidden');
-        if (headerSubtitle) headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa per aggiungere/programmare una segnalazione";
+        if (headerSubtitle) headerSubtitle.textContent = "Modalità Admin: fai DOPPIO CLICK sulla mappa o usa '+ Nuovo Punto' (coordinate N/E) per inserire una segnalazione";
     } else {
         if (searchContainer) searchContainer.classList.add('hidden');
         if (adminFilterBar) adminFilterBar.classList.add('hidden');
@@ -2274,19 +2545,27 @@ function locateUser(showErrorAlert = true, initialLoad = false) {
             }
 
             // Aggiorna o crea il marker posizione
+            const userLocPopupHtml = `
+                <div class="popup-content">
+                    <h3>📍 La tua posizione</h3>
+                    <div class="popup-dms-box">
+                        <div class="popup-dms-lines">
+                            <span>${formatSingleDms(latitude, true)}</span>
+                            <span>${formatSingleDms(longitude, false)}</span>
+                        </div>
+                        <button type="button" class="identified-copy-coords-btn" onclick="window.copyPointCoordsDms(${latitude}, ${longitude})">📋 Copia</button>
+                    </div>
+                    <span class="popup-date">Precisione: ±${Math.round(accuracy)} m</span>
+                </div>
+            `;
             if (userLocationMarker) {
                 userLocationMarker.setLatLng([latitude, longitude]);
+                userLocationMarker.setPopupContent(userLocPopupHtml);
             } else {
                 userLocationMarker = L.marker([latitude, longitude], {
                     icon: createUserLocationIcon(),
                     zIndexOffset: 1000
-                }).addTo(map)
-                .bindPopup(`
-                    <div class="popup-content">
-                        <h3>📍 La tua posizione</h3>
-                        <span class="popup-date">Precisione: ±${Math.round(accuracy)} m</span>
-                    </div>
-                `);
+                }).addTo(map).bindPopup(userLocPopupHtml);
             }
 
             if (locateBtn) {
@@ -2422,13 +2701,18 @@ function buildIdentifiedPointPopupHtml(entry) {
     const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${entry.lat},${entry.lng}`;
     const safeIcon = entry.icon || '📍';
     const subtitleColor = entry.color === '#ef4444' ? 'color:#ef4444; font-weight:600;' : '';
+    const dmsNorth = formatSingleDms(entry.lat, true);
+    const dmsEast = formatSingleDms(entry.lng, false);
     return `
         <div class="identified-popup-box">
             <h3 class="identified-popup-title">${safeIcon} ${escapeHtml(entry.label)}</h3>
             ${entry.subtitle ? `<span class="identified-popup-subtitle" style="${subtitleColor}">${escapeHtml(entry.subtitle)}</span>` : ''}
             ${entry.extraNote ? `<div class="user-note" style="margin-bottom:5px; text-align:left; font-size:0.74rem; padding:4px 6px;"><strong>Nota:</strong> ${escapeHtml(entry.extraNote)}</div>` : ''}
             <div class="identified-coords-row">
-                <span>${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}</span>
+                <div class="identified-dms-lines">
+                    <span>${dmsNorth}</span>
+                    <span>${dmsEast}</span>
+                </div>
                 <button type="button" class="identified-copy-coords-btn" onclick="window.copyIdentifiedPointCoords('${entry.lat.toFixed(6)}', '${entry.lng.toFixed(6)}')">📋 Copia</button>
             </div>
             <div class="identified-rename-group">
@@ -2592,16 +2876,7 @@ window.saveIdentifiedPointLabel = function (id) {
 };
 
 window.copyIdentifiedPointCoords = function (latStr, lngStr) {
-    const text = `${latStr}, ${lngStr}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(`📋 Coordinate copiate: ${text}`, 'info', 2200);
-        }).catch(() => {
-            showToast(`Coordinate: ${text}`, 'info', 3000);
-        });
-    } else {
-        showToast(`Coordinate: ${text}`, 'info', 3000);
-    }
+    window.copyPointCoordsDms(parseFloat(latStr), parseFloat(lngStr));
 };
 
 function enableIdentifyPointMode() {
@@ -2662,7 +2937,7 @@ async function reverseGeocodeDetailed(lat, lng) {
 async function handleManualMapPointIdentify(lat, lng) {
     disableIdentifyPointMode();
 
-    const tempLabel = `Punto (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    const tempLabel = `Punto (${formatLatLngDms(lat, lng, 1)})`;
     const entry = createIdentifiedPoint({
         lat,
         lng,
@@ -2732,6 +3007,33 @@ document.addEventListener('click', (ev) => {
 async function performSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
+
+    // 0. Se la ricerca contiene coordinate sessagesimali (N/E) o decimali valide, vai direttamente al punto
+    const parsedCoords = parseFullCoordinates(query);
+    if (parsedCoords) {
+        map.flyTo([parsedCoords.lat, parsedCoords.lng], 17, { duration: 1.2 });
+        const dmsLabel = formatLatLngDms(parsedCoords.lat, parsedCoords.lng);
+        const ptEntry = createIdentifiedPoint({
+            lat: parsedCoords.lat,
+            lng: parsedCoords.lng,
+            label: dmsLabel,
+            subtitle: 'Coordinate geografiche',
+            color: '#0284c7',
+            icon: '🧭',
+            source: 'search',
+            openPopup: true
+        });
+        reverseGeocodeDetailed(parsedCoords.lat, parsedCoords.lng).then(geo => {
+            if (geo && geo.label && ptEntry && !ptEntry.customRenamed) {
+                updateIdentifiedPoint(ptEntry.id, {
+                    label: geo.label,
+                    subtitle: ''
+                });
+            }
+        });
+        showToast(`🧭 Coordinate trovate: ${dmsLabel}`, 'info', 3500);
+        return;
+    }
 
     searchBtn.innerHTML = '<span class="search-icon">⏳</span><span class="btn-text">...</span>';
     searchBtn.disabled = true;
@@ -2978,9 +3280,242 @@ filterPills.forEach(pill => {
 // GESTIONE MODALE INSERIMENTO & MODIFICA (ADMIN)
 // -------------------------------------------------------
 
+let adminDmsDirty = false;
+let adminDmsGeocodeTimer = null;
+
+function setAdminDmsPreviewState(text, status = 'neutral') {
+    if (!adminDmsPreview) return;
+    adminDmsPreview.textContent = text;
+    adminDmsPreview.classList.remove('valid', 'invalid');
+    if (status === 'valid') adminDmsPreview.classList.add('valid');
+    if (status === 'invalid') adminDmsPreview.classList.add('invalid');
+}
+
+function populateAdminDmsFields(lat, lng, markDirty = false) {
+    const latParts = decimalToDmsParts(lat, true, 2);
+    const lngParts = decimalToDmsParts(lng, false, 2);
+    if (!latParts || !lngParts) return;
+
+    const fmtSecInput = (sec) => {
+        const rounded = Math.round(sec * 100) / 100;
+        return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0$/, '');
+    };
+
+    if (adminLatDeg) adminLatDeg.value = String(latParts.deg);
+    if (adminLatMin) adminLatMin.value = String(latParts.min);
+    if (adminLatSec) adminLatSec.value = fmtSecInput(latParts.sec);
+
+    if (adminLngDeg) adminLngDeg.value = String(lngParts.deg);
+    if (adminLngMin) adminLngMin.value = String(lngParts.min);
+    if (adminLngSec) adminLngSec.value = fmtSecInput(lngParts.sec);
+
+    if (adminCoordsPaste) adminCoordsPaste.value = '';
+    adminDmsDirty = !!markDirty;
+
+    setAdminDmsPreviewState(
+        `📌 ${formatLatLngDms(lat, lng, 2)}  (dec: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})`,
+        'valid'
+    );
+}
+
+function clearAdminDmsFields() {
+    [adminLatDeg, adminLatMin, adminLatSec, adminLngDeg, adminLngMin, adminLngSec, adminCoordsPaste].forEach(el => {
+        if (el) el.value = '';
+    });
+    adminDmsDirty = false;
+    setAdminDmsPreviewState('📌 Inserisci Gradi (°), Primi (\') e Secondi (") Nord / Est oppure incolla la stringa', 'neutral');
+}
+
+function readAdminDmsCoordinates() {
+    const northRes = dmsFieldsToDecimal(
+        adminLatDeg ? adminLatDeg.value : '',
+        adminLatMin ? adminLatMin.value : '',
+        adminLatSec ? adminLatSec.value : '',
+        true
+    );
+    const eastRes = dmsFieldsToDecimal(
+        adminLngDeg ? adminLngDeg.value : '',
+        adminLngMin ? adminLngMin.value : '',
+        adminLngSec ? adminLngSec.value : '',
+        false
+    );
+
+    if (northRes.empty && eastRes.empty) {
+        return { empty: true };
+    }
+    if (northRes.empty) {
+        return { error: 'Compila anche la latitudine Nord (N).' };
+    }
+    if (eastRes.empty) {
+        return { error: 'Compila anche la longitudine Est (E).' };
+    }
+    if (northRes.error) {
+        return { error: northRes.error };
+    }
+    if (eastRes.error) {
+        return { error: eastRes.error };
+    }
+
+    return {
+        valid: true,
+        lat: northRes.decimal,
+        lng: eastRes.decimal
+    };
+}
+
+function handleAdminDmsFieldChange(autoDetectStreet = true) {
+    adminDmsDirty = true;
+    if (adminMarkerError) adminMarkerError.classList.add('hidden');
+
+    const res = readAdminDmsCoordinates();
+    if (res.empty) {
+        setAdminDmsPreviewState('📌 Inserisci Gradi (°), Primi (\') e Secondi (") Nord / Est', 'neutral');
+        return;
+    }
+    if (res.error) {
+        setAdminDmsPreviewState(`⚠️ ${res.error}`, 'invalid');
+        return;
+    }
+
+    pendingLatLng = { lat: res.lat, lng: res.lng };
+    setAdminDmsPreviewState(
+        `📌 ${formatLatLngDms(res.lat, res.lng, 2)}  (dec: ${res.lat.toFixed(5)}, ${res.lng.toFixed(5)})`,
+        'valid'
+    );
+
+    if (autoDetectStreet && adminMarkerStreet && !adminMarkerStreet.value.trim()) {
+        if (adminDmsGeocodeTimer) clearTimeout(adminDmsGeocodeTimer);
+        adminDmsGeocodeTimer = setTimeout(async () => {
+            const street = await reverseGeocode(res.lat, res.lng);
+            if (street && adminMarkerStreet && !adminMarkerStreet.value.trim()) {
+                adminMarkerStreet.value = street;
+            }
+        }, 450);
+    }
+}
+
+function applyPastedStringToAdminDms(rawText, targetAxis = null) {
+    if (!rawText) return false;
+    const full = parseFullCoordinates(rawText);
+    if (full) {
+        populateAdminDmsFields(full.lat, full.lng, true);
+        pendingLatLng = { lat: full.lat, lng: full.lng };
+        if (adminMarkerStreet && !adminMarkerStreet.value.trim()) {
+            reverseGeocode(full.lat, full.lng).then(street => {
+                if (street && adminMarkerStreet && !adminMarkerStreet.value.trim()) {
+                    adminMarkerStreet.value = street;
+                }
+            });
+        }
+        return true;
+    }
+
+    if (targetAxis === 'lat' || targetAxis === 'lng') {
+        const isLat = targetAxis === 'lat';
+        const single = parseSingleAxisDms(rawText, isLat);
+        if (single && /[°'"\sNSEWO,;]/i.test(rawText.trim())) {
+            const fmtSec = (sec) => {
+                const r = Math.round(sec * 100) / 100;
+                return Number.isInteger(r) ? String(r) : r.toFixed(2).replace(/0$/, '');
+            };
+            if (isLat) {
+                if (adminLatDeg) adminLatDeg.value = String(single.deg);
+                if (adminLatMin) adminLatMin.value = String(single.min);
+                if (adminLatSec) adminLatSec.value = fmtSec(single.sec);
+            } else {
+                if (adminLngDeg) adminLngDeg.value = String(single.deg);
+                if (adminLngMin) adminLngMin.value = String(single.min);
+                if (adminLngSec) adminLngSec.value = fmtSec(single.sec);
+            }
+            handleAdminDmsFieldChange(true);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+[
+    { el: adminLatDeg, axis: 'lat' },
+    { el: adminLatMin, axis: 'lat' },
+    { el: adminLatSec, axis: 'lat' },
+    { el: adminLngDeg, axis: 'lng' },
+    { el: adminLngMin, axis: 'lng' },
+    { el: adminLngSec, axis: 'lng' }
+].forEach(({ el, axis }) => {
+    if (!el) return;
+    el.addEventListener('input', () => handleAdminDmsFieldChange(true));
+    el.addEventListener('paste', (ev) => {
+        const pasted = (ev.clipboardData || window.clipboardData)?.getData('text') || '';
+        if (pasted && /[°'"\sNSEWO;/]/i.test(pasted.trim())) {
+            if (applyPastedStringToAdminDms(pasted, axis)) {
+                ev.preventDefault();
+            }
+        }
+    });
+});
+
+if (adminCoordsPaste) {
+    adminCoordsPaste.addEventListener('input', () => {
+        const val = adminCoordsPaste.value.trim();
+        if (!val) return;
+        const parsed = parseFullCoordinates(val);
+        if (parsed) {
+            populateAdminDmsFields(parsed.lat, parsed.lng, true);
+            adminCoordsPaste.value = '';
+            pendingLatLng = { lat: parsed.lat, lng: parsed.lng };
+            showToast('🧭 Coordinate Nord/Est acquisite!', 'info', 2000);
+            if (adminMarkerStreet && !adminMarkerStreet.value.trim()) {
+                reverseGeocode(parsed.lat, parsed.lng).then(street => {
+                    if (street && adminMarkerStreet && !adminMarkerStreet.value.trim()) {
+                        adminMarkerStreet.value = street;
+                    }
+                });
+            }
+        } else {
+            setAdminDmsPreviewState('⚠️ Formato non riconosciuto. Esempio: 44° 50\' 17.2" N, 11° 37\' 11.3" E', 'invalid');
+        }
+    });
+}
+
+if (adminDmsDetectStreetBtn) {
+    adminDmsDetectStreetBtn.addEventListener('click', async () => {
+        const res = readAdminDmsCoordinates();
+        if (res.empty || res.error) {
+            setAdminDmsPreviewState(`⚠️ ${res.error || 'Inserisci prima le coordinate Nord ed Est.'}`, 'invalid');
+            return;
+        }
+        adminDmsDetectStreetBtn.disabled = true;
+        adminDmsDetectStreetBtn.textContent = '⏳...';
+        try {
+            const street = await reverseGeocode(res.lat, res.lng);
+            if (street && adminMarkerStreet) {
+                adminMarkerStreet.value = street;
+                showToast(`📍 Via rilevata: ${street}`, 'info', 2500);
+            } else {
+                showToast('Nessun nome via trovato per queste coordinate.', 'warning', 2500);
+            }
+        } finally {
+            adminDmsDetectStreetBtn.disabled = false;
+            adminDmsDetectStreetBtn.textContent = '🔄 Rileva via';
+        }
+    });
+}
+
+if (adminAddCoordPointBtn) {
+    adminAddCoordPointBtn.addEventListener('click', () => {
+        if (!isAdmin) return;
+        openMarkerModal(null, null);
+        setTimeout(() => {
+            if (adminLatDeg) adminLatDeg.focus();
+        }, 80);
+    });
+}
+
 function openMarkerModal(latlng = null, markerToEdit = null) {
-    pendingLatLng = latlng;
+    pendingLatLng = latlng ? { lat: Number(latlng.lat), lng: Number(latlng.lng) } : null;
     editingMarkerId = markerToEdit ? (markerToEdit.id || markerToEdit.fbKey) : null;
+    if (adminDmsGeocodeTimer) clearTimeout(adminDmsGeocodeTimer);
 
     if (adminMarkerError) adminMarkerError.classList.add('hidden');
 
@@ -2990,6 +3525,8 @@ function openMarkerModal(latlng = null, markerToEdit = null) {
         selectedAdminType = markerToEdit.type || 'lavori';
         if (adminMarkerStreet) adminMarkerStreet.value = markerToEdit.street || '';
         if (adminMarkerNote) adminMarkerNote.value = markerToEdit.note || '';
+
+        populateAdminDmsFields(markerToEdit.lat, markerToEdit.lng, false);
 
         const sched = markerToEdit.schedule || { mode: 'always' };
         selectedScheduleMode = sched.mode || 'always';
@@ -3011,13 +3548,16 @@ function openMarkerModal(latlng = null, markerToEdit = null) {
         if (adminSchedTimeEnd) adminSchedTimeEnd.value = '14:00';
         selectedRecurringDays = [1, 2, 3, 4, 5];
 
-        // Rileva in automatico la via per precompilare il campo modificabile
         if (latlng) {
+            populateAdminDmsFields(latlng.lat, latlng.lng, false);
+            // Rileva in automatico la via per precompilare il campo modificabile
             reverseGeocode(latlng.lat, latlng.lng).then(street => {
                 if (street && adminMarkerStreet && !adminMarkerStreet.value) {
                     adminMarkerStreet.value = street;
                 }
             });
+        } else {
+            clearAdminDmsFields();
         }
     }
 
@@ -3047,8 +3587,10 @@ function openMarkerModal(latlng = null, markerToEdit = null) {
 
 function closeMarkerModal() {
     if (modalOverlay) modalOverlay.classList.add('hidden');
+    if (adminDmsGeocodeTimer) clearTimeout(adminDmsGeocodeTimer);
     pendingLatLng = null;
     editingMarkerId = null;
+    adminDmsDirty = false;
 }
 
 if (closeModalBtn) closeModalBtn.addEventListener('click', closeMarkerModal);
@@ -3111,6 +3653,23 @@ if (adminSaveMarkerBtn) {
             return;
         }
 
+        // Validazione coordinate sessagesimali Nord / Est
+        const dmsCheck = readAdminDmsCoordinates();
+        if (dmsCheck.error) {
+            if (adminMarkerError) {
+                adminMarkerError.textContent = dmsCheck.error;
+                adminMarkerError.classList.remove('hidden');
+            }
+            return;
+        }
+        if (dmsCheck.empty && !pendingLatLng && !editingMarkerId) {
+            if (adminMarkerError) {
+                adminMarkerError.textContent = "Inserisci le coordinate Nord (N) ed Est (E) in gradi sessagesimali.";
+                adminMarkerError.classList.remove('hidden');
+            }
+            return;
+        }
+
         let scheduleObj = { mode: selectedScheduleMode };
 
         if (selectedScheduleMode === 'window') {
@@ -3141,6 +3700,11 @@ if (adminSaveMarkerBtn) {
             const markerIdx = markersData.findIndex(m => String(m.id) === String(editingMarkerId) || String(m.fbKey) === String(editingMarkerId));
             if (markerIdx !== -1) {
                 const currentMarker = markersData[markerIdx];
+                const coordsChanged = adminDmsDirty && dmsCheck.valid;
+                if (coordsChanged) {
+                    currentMarker.lat = dmsCheck.lat;
+                    currentMarker.lng = dmsCheck.lng;
+                }
                 currentMarker.type = selectedAdminType;
                 currentMarker.note = note || null;
                 currentMarker.schedule = scheduleObj;
@@ -3150,6 +3714,8 @@ if (adminSaveMarkerBtn) {
 
                 if (isFirebaseOnline && markersRef && currentMarker.fbKey) {
                     markersRef.child(currentMarker.fbKey).update({
+                        lat: currentMarker.lat,
+                        lng: currentMarker.lng,
                         type: selectedAdminType,
                         note: note || null,
                         schedule: scheduleObj,
@@ -3157,23 +3723,37 @@ if (adminSaveMarkerBtn) {
                     }).catch(e => console.warn('Errore aggiornamento Firebase:', e.message));
                 }
 
+                const targetLat = currentMarker.lat;
+                const targetLng = currentMarker.lng;
                 saveToLocalStorage();
                 closeMarkerModal();
                 refreshMarkers();
                 updateRoadSegments();
+                if (coordsChanged && map) {
+                    map.flyTo([targetLat, targetLng], Math.max(map.getZoom(), 16), { duration: 1.0 });
+                }
                 showToast("✅ Segnalazione modificata con successo!", "success");
             }
         } else {
-            // Creazione nuovo marker
-            if (!pendingLatLng) {
-                closeMarkerModal();
+            // Creazione nuovo marker (da coordinate sessagesimali o doppio click mappa)
+            const shouldUseDms = (adminDmsDirty || !pendingLatLng) && dmsCheck.valid;
+            const finalCoords = shouldUseDms ? { lat: dmsCheck.lat, lng: dmsCheck.lng } : pendingLatLng;
+
+            if (!finalCoords) {
+                if (adminMarkerError) {
+                    adminMarkerError.textContent = "Inserisci le coordinate Nord (N) ed Est (E) del punto.";
+                    adminMarkerError.classList.remove('hidden');
+                }
                 return;
             }
-            const lat = pendingLatLng.lat;
-            const lng = pendingLatLng.lng;
+            const lat = finalCoords.lat;
+            const lng = finalCoords.lng;
 
             addMarker(lat, lng, selectedAdminType, null, true, note || null, null, customStreet || null, scheduleObj);
             closeMarkerModal();
+            if (shouldUseDms && map) {
+                map.flyTo([lat, lng], Math.max(map.getZoom(), 16), { duration: 1.1 });
+            }
             showToast("✅ Segnalazione inserita!", "success");
 
             // Se la via non è stata inserita a mano, rileva automaticamente in background
@@ -3187,6 +3767,7 @@ if (adminSaveMarkerBtn) {
                             markersRef.child(lastMarker.fbKey).update({ street: street });
                         }
                         saveToLocalStorage();
+                        refreshMarkers();
                         updateRoadSegments();
                         console.log(`📍 Via rilevata automaticamente: ${street}`);
                     }
@@ -3261,6 +3842,16 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
         if (safeNote) {
             popupContent += `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>`;
         }
+
+        popupContent += `
+            <div class="popup-dms-box">
+                <div class="popup-dms-lines">
+                    <span>🧭 ${formatSingleDms(lat, true)}</span>
+                    <span>&nbsp;&nbsp;&nbsp;${formatSingleDms(lng, false)}</span>
+                </div>
+                <button type="button" class="identified-copy-coords-btn" onclick="window.copyPointCoordsDms(${lat}, ${lng})">📋 Copia</button>
+            </div>
+        `;
 
         const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
         popupContent += `
@@ -4336,7 +4927,7 @@ function updateSelectedLocationUI(lat, lng, streetName) {
         reportLocName.textContent = streetName ? `📍 ${streetName}` : '📍 Posizione selezionata';
     }
     if (reportLocCoords) {
-        reportLocCoords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        reportLocCoords.textContent = formatLatLngDms(lat, lng);
     }
 }
 
@@ -4852,7 +5443,7 @@ function renderAdminReportsList() {
                     <span class="report-card-time">🕒 ${dateStr}</span>
                 </div>
 
-                ${safeStreet ? `<span class="report-card-street">📍 ${safeStreet}</span>` : `<span class="report-card-street">📍 Lat: ${r.lat.toFixed(4)}, Lng: ${r.lng.toFixed(4)}</span>`}
+                ${safeStreet ? `<span class="report-card-street">📍 ${safeStreet}</span>` : `<span class="report-card-street">📍 ${formatLatLngDms(r.lat, r.lng)}</span>`}
 
                 ${safeNote ? `<div class="report-card-note"><strong>Dettagli:</strong> ${safeNote}</div>` : ''}
                 ${safeAuthor ? `<div class="report-card-author">👤 Inviato da: <strong>${safeAuthor}</strong>${safePhone ? ` &bull; 📞 <a href="tel:${safePhone}" style="color:#3b82f6; text-decoration:none;">${safePhone}</a>` : ''}</div>` : ''}
@@ -4924,6 +5515,13 @@ window.previewReportOnMap = function (reportId) {
             <span style="background:#f59e0b; color:white; font-size:0.75rem; font-weight:bold; padding:2px 8px; border-radius:999px;">🔔 SEGNALAZIONE DA REVISIONARE</span>
             <h3>${config.emoji} ${safeType}</h3>
             ${safeStreet ? `<div class="user-note" style="background:#eff6ff; border-color:#3b82f6;"><strong>📍 Via:</strong> ${safeStreet}</div>` : ''}
+            <div class="popup-dms-box">
+                <div class="popup-dms-lines">
+                    <span>🧭 ${formatSingleDms(report.lat, true)}</span>
+                    <span>&nbsp;&nbsp;&nbsp;${formatSingleDms(report.lng, false)}</span>
+                </div>
+                <button type="button" class="identified-copy-coords-btn" onclick="window.copyPointCoordsDms(${report.lat}, ${report.lng})">📋 Copia</button>
+            </div>
             ${safeNote ? `<div class="user-note"><strong>Nota:</strong> ${safeNote}</div>` : ''}
             ${safeAuthor ? `<div class="user-note" style="background:#f8fafc; border-color:#94a3b8;"><strong>👤 Inviato da:</strong> ${safeAuthor}${safePhone ? ` &bull; 📞 <a href="tel:${safePhone}" style="color:#3b82f6; text-decoration:none;">${safePhone}</a>` : ''}</div>` : ''}
             <div style="display:flex; gap:6px; width:100%; margin-top:4px;">

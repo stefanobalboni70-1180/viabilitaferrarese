@@ -4582,6 +4582,260 @@ body.admin-logged-in .header-user-actions {
     text-align: center;
 }
 
+/* -----------------------------------------------------------
+   COORDINATE SESSAGESIMALI (GRADI ° PRIMI ' SECONDI " N / E)
+----------------------------------------------------------- */
+
+.admin-add-point-pill {
+    margin-left: auto;
+    background: linear-gradient(135deg, #0284c7, #1d4ed8);
+    color: #ffffff;
+    border: none;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+    transition: all 0.2s ease;
+}
+
+.admin-add-point-pill:hover {
+    background: linear-gradient(135deg, #0369a1, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(2, 132, 199, 0.42);
+}
+
+.dms-coords-box {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-top: 16px;
+}
+
+.dms-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dms-detect-street-btn {
+    background: rgba(2, 132, 199, 0.2);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    color: #38bdf8;
+    border-radius: 7px;
+    padding: 3px 9px;
+    font-size: 0.73rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.18s ease;
+}
+
+.dms-detect-street-btn:hover {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+.dms-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 4px 0 10px 0;
+    line-height: 1.3;
+}
+
+.dms-axis-row {
+    display: grid;
+    grid-template-columns: 28px 1fr 1fr 1.25fr 38px;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.dms-hemi-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.dms-hemi-n {
+    background: rgba(56, 189, 248, 0.18);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+.dms-hemi-e {
+    background: rgba(16, 185, 129, 0.18);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.dms-unit-field {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    padding: 0 7px;
+    height: 34px;
+    box-sizing: border-box;
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.dms-unit-field:focus-within {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.dms-unit-field input {
+    width: 100%;
+    min-width: 0;
+    background: transparent !important;
+    border: none !important;
+    color: #f8fafc !important;
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-family: 'Inter', monospace;
+    padding: 4px 2px !important;
+    outline: none !important;
+    text-align: right;
+}
+
+.dms-unit-field input::placeholder {
+    color: rgba(148, 163, 184, 0.48);
+    font-weight: 400;
+}
+
+.dms-unit-sym {
+    color: #38bdf8;
+    font-weight: 800;
+    font-size: 0.88rem;
+    margin-left: 3px;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.dms-dir-label {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    text-align: left;
+}
+
+.dms-paste-row {
+    margin-top: 6px;
+}
+
+.dms-paste-row input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px dashed rgba(148, 163, 184, 0.35);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    color: #e2e8f0;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.dms-paste-row input:focus {
+    border-color: #38bdf8;
+    border-style: solid;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.dms-preview-line {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: #94a3b8;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 7px;
+    padding: 5px 8px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.dms-preview-line.valid {
+    color: #38bdf8;
+    border-left: 3px solid #38bdf8;
+}
+
+.dms-preview-line.invalid {
+    color: #fca5a5;
+    border-left: 3px solid #ef4444;
+}
+
+/* Riga Coordinate Sessagesimali nei Popup Marker */
+.popup-dms-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-family: monospace;
+    font-size: 0.74rem;
+    color: #1e293b;
+}
+
+.popup-dms-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.3;
+    font-weight: 600;
+}
+
+.identified-dms-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.28;
+    font-weight: 600;
+    font-size: 0.69rem;
+}
+
+@media (max-width: 768px) {
+    .admin-add-point-pill {
+        margin-left: 0;
+        padding: 4px 8px;
+        font-size: 0.72rem;
+    }
+
+    .dms-axis-row {
+        grid-template-columns: 24px 1fr 1fr 1.25fr 32px;
+        gap: 4px;
+    }
+
+    .dms-unit-field {
+        padding: 0 5px;
+        height: 32px;
+    }
+
+    .dms-unit-field input {
+        font-size: 0.82rem;
+    }
+}
+
 /* Regola Master Assoluta: .hidden ha sempre la massima priorita */
 .hidden,
 [hidden],
