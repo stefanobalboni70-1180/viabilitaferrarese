@@ -1,5 +1,5 @@
 // Viabilità Ferrara 118 - Client App Logic
-const APP_VERSION = '3.9.35';
+const APP_VERSION = '3.9.36';
 
 // Icona SVG per "Divieto di transito con mano sbarrata" (Strada chiusa)
 const ICON_STRADA_CHIUSA = '<svg class="sign-hand-barred" viewBox="0 0 32 32" width="22" height="22" style="vertical-align:middle; display:inline-block;" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="13.5" fill="#ffffff" stroke="#ef4444" stroke-width="2.8"/><g fill="#1e293b"><path d="M10 16c-.6 0-1-.4-1-1 0-.4.2-.8.5-1l1.5-1.2c.4-.3.9-.2 1.2.2.3.4.2.9-.2 1.2l-1 0.8v1z"/><rect x="12" y="10" width="1.8" height="6.5" rx="0.9"/><rect x="14.2" y="8.5" width="1.8" height="8" rx="0.9"/><rect x="16.4" y="9.2" width="1.8" height="7.3" rx="0.9"/><rect x="18.6" y="11" width="1.8" height="5.5" rx="0.9"/><path d="M11 15h9.5c.5 0 1 .4 1 1v1.5c0 2.8-2 5-5.2 5s-5.3-2.2-5.3-5V16c0-.6.5-1 1-1z"/></g><line x1="6.5" y1="6.5" x2="25.5" y2="25.5" stroke="#ef4444" stroke-width="2.8" stroke-linecap="round"/></svg>';
@@ -2139,6 +2139,22 @@ window.copyPointCoordsDms = function (lat, lng) {
     }
 };
 
+// Genera i pulsanti per inviare la destinazione al display dell'auto (CarPlay / Android Auto)
+function buildCarNavButtonsHtml(lat, lng, gmapsLabel = 'Naviga con Google Maps') {
+    const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    const wazeUrl = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+    const appleUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+    return `
+        <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn" style="margin-top: 6px; margin-bottom: 4px;">
+            🧭 ${escapeHtml(gmapsLabel)}
+        </a>
+        <div class="car-nav-extra-row">
+            <a href="${wazeUrl}" target="_blank" rel="noopener noreferrer" class="car-nav-mini-btn waze" title="Invia a Waze su Android Auto / CarPlay">🚗 Waze</a>
+            <a href="${appleUrl}" target="_blank" rel="noopener noreferrer" class="car-nav-mini-btn apple" title="Invia a Mappe su Apple CarPlay">🍎 CarPlay Mappe</a>
+        </div>
+    `;
+}
+
 // Configurazione Icone
 const ICONS = {
     lavori: { emoji: '🚧', label: 'Lavori in corso' },
@@ -2723,9 +2739,7 @@ function buildIdentifiedPointPopupHtml(entry) {
                 </div>
             </div>
             <div class="identified-popup-actions">
-                <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn">
-                    🧭 Naviga con Google Maps
-                </a>
+                ${buildCarNavButtonsHtml(entry.lat, entry.lng, 'Naviga con Google Maps')}
             </div>
         </div>
     `;
@@ -3853,12 +3867,7 @@ function addMarker(lat, lng, type, id = null, save = true, note = null, fbKey = 
             </div>
         `;
 
-        const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-        popupContent += `
-            <a href="${navUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn" style="margin-top: 8px; margin-bottom: 8px;">
-                🧭 Naviga con Google Maps
-            </a>
-        `;
+        popupContent += buildCarNavButtonsHtml(lat, lng, 'Naviga con Google Maps');
 
         if (isAdmin) {
             popupContent += `
@@ -4730,8 +4739,10 @@ async function updateRoadSegments() {
                 className: 'road-segment-tooltip'
             });
 
+            polyline._segmentMeta = { type: segment.type, streetName: segment.streetName };
             activeSegments[segKey] = polyline;
         } else {
+            activeSegments[segKey]._segmentMeta = { type: segment.type, streetName: segment.streetName };
             activeSegments[segKey].setLatLngs(initialCoords);
         }
     });
@@ -5670,6 +5681,15 @@ function triggerEmergencyNewsAlert() {
         const latestNews = urgentNewsData[0];
         const newsText = latestNews.text || 'Nuova allerta di viabilità provinciale a Ferrara';
         showSystemNotification('🚨 COMUNICAZIONE URGENTE 118', newsText);
+
+        // 4. Se la Modalità Guida Auto 118 è attiva, legge ad alta voce la notizia urgente sulle casse dell'auto
+        if (typeof isDriveModeActive !== 'undefined' && isDriveModeActive && typeof speakDriveMessage === 'function') {
+            setTimeout(() => {
+                if (isDriveModeActive) {
+                    speakDriveMessage(`Comunicazione urgente 118: ${newsText}`, true, false);
+                }
+            }, 2100);
+        }
     }
 }
 
@@ -6998,12 +7018,7 @@ function createRoutePopupContent(route) {
     let navRouteHtml = '';
     if (route.points && route.points.length > 0) {
         const startPt = route.points[0];
-        const routeNavUrl = `https://www.google.com/maps/dir/?api=1&destination=${startPt[0]},${startPt[1]}`;
-        navRouteHtml = `
-            <a href="${routeNavUrl}" target="_blank" rel="noopener noreferrer" class="gmaps-nav-btn" style="margin-top: 8px; margin-bottom: 6px;">
-                🧭 Naviga al percorso con Google Maps
-            </a>
-        `;
+        navRouteHtml = buildCarNavButtonsHtml(startPt[0], startPt[1], 'Naviga al percorso');
     }
 
     return `
@@ -7679,6 +7694,9 @@ async function releaseRemoteOperatorSessionIfOwned(uid, sessionId) {
 }
 
 function stopOperatorSessionGuard() {
+    if (typeof stopDriveMode === 'function' && typeof isDriveModeActive !== 'undefined' && isDriveModeActive) {
+        stopDriveMode(true);
+    }
     if (currentWatchedSessionRef && currentWatchedSessionHandler) {
         currentWatchedSessionRef.off('value', currentWatchedSessionHandler);
     }
@@ -9316,6 +9334,724 @@ setInterval(() => {
     renderCustomRoutesOnMap();
 }, 30000);
 
+// =========================================================================
+// MODALITÀ GUIDA / CO-PILOTA AUTO 118 (CarPlay / Android Auto / Bluetooth)
+// =========================================================================
+let isDriveModeActive = false;
+let driveWatchId = null;
+let driveFollowVehicle = true;
+let driveHasInitialZoom = false;
+let driveManualPanPauseUntil = 0;
+let driveAlertRadius = 500;
+let driveWakeLock = null;
+let driveAnnouncedHazards = new Map();
+let lastDriveSpokenMessage = '';
+let lastNearestDriveHazard = null;
+let lastDriveGpsCoords = null;
+let driveAudioCtx = null;
+
+function getDriveAudioContext() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return null;
+        if (!driveAudioCtx || driveAudioCtx.state === 'closed') {
+            driveAudioCtx = new AudioCtx();
+        }
+        if (driveAudioCtx.state === 'suspended') {
+            driveAudioCtx.resume().catch(() => {});
+        }
+        return driveAudioCtx;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Breve segnale acustico di pre-attivazione (~160ms) per risvegliare l'amplificatore Bluetooth / CarPlay / Android Auto
+// evitando il taglio della prima sillaba del messaggio vocale TTS
+function playDrivePreChime(isCritical = false) {
+    try {
+        const ctx = getDriveAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const notes = isCritical
+            ? [{ f: 880, t: 0, d: 0.08 }, { f: 1174.66, t: 0.09, d: 0.11 }]
+            : [{ f: 659.25, t: 0, d: 0.08 }, { f: 880, t: 0.09, d: 0.10 }];
+
+        notes.forEach(n => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(n.f, now + n.t);
+            gain.gain.setValueAtTime(0.001, now + n.t);
+            gain.gain.exponentialRampToValueAtTime(0.22, now + n.t + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + n.t);
+            osc.stop(now + n.t + n.d + 0.01);
+        });
+    } catch (e) {
+        // Ignora errori WebAudio su dispositivi con restrizioni
+    }
+}
+
+function pickItalianVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices() || [];
+    const itVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('it'));
+    if (itVoices.length === 0) return null;
+    // Preferisci voci naturali / premium se disponibili
+    return itVoices.find(v => /premium|enhanced|natural|alice|luca|federica|elsa|google/i.test(v.name)) || itVoices[0];
+}
+
+function speakDriveMessage(text, isCritical = false, immediateGesture = false) {
+    if (!text) return;
+    lastDriveSpokenMessage = text;
+    if (!('speechSynthesis' in window)) return;
+
+    const doSpeak = () => {
+        try {
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'it-IT';
+            const voice = pickItalianVoice();
+            if (voice) utter.voice = voice;
+            utter.rate = 1.02;
+            utter.pitch = 1.0;
+            utter.volume = 1.0;
+            window.speechSynthesis.speak(utter);
+        } catch (e) {
+            console.warn('TTS Modalità Guida non disponibile:', e);
+        }
+    };
+
+    // Su iOS Safari lo sblocco iniziale deve avvenire in modo sincrono dentro il click dell'utente
+    if (immediateGesture) {
+        playDrivePreChime(isCritical);
+        doSpeak();
+    } else {
+        playDrivePreChime(isCritical);
+        setTimeout(doSpeak, 185);
+    }
+}
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * toRad;
+    const dLng = (lng2 - lng1) * toRad;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function pointToSegmentMeters(pLat, pLng, aLat, aLng, bLat, bLng) {
+    const latScale = 111320;
+    const lngScale = 111320 * Math.cos(pLat * Math.PI / 180);
+    const ax = (aLng - pLng) * lngScale;
+    const ay = (aLat - pLat) * latScale;
+    const bx = (bLng - pLng) * lngScale;
+    const by = (bLat - pLat) * latScale;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    let t = 0;
+    if (lenSq > 0.0001) {
+        t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
+    }
+    const cx = ax + t * dx;
+    const cy = ay + t * dy;
+    return {
+        dist: Math.sqrt(cx * cx + cy * cy),
+        lat: aLat + t * (bLat - aLat),
+        lng: aLng + t * (bLng - aLng)
+    };
+}
+
+function flattenLatLngArray(rawPoints) {
+    const out = [];
+    if (!Array.isArray(rawPoints)) return out;
+    for (const item of rawPoints) {
+        if (!item) continue;
+        if (Array.isArray(item)) {
+            if (item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
+                out.push([item[0], item[1]]);
+            } else {
+                out.push(...flattenLatLngArray(item));
+            }
+        } else if (typeof item.lat === 'number' && typeof item.lng === 'number') {
+            out.push([item.lat, item.lng]);
+        }
+    }
+    return out;
+}
+
+function pointToPolylineMeters(pLat, pLng, rawPoints) {
+    const pts = flattenLatLngArray(rawPoints);
+    if (pts.length === 0) return null;
+    if (pts.length === 1) {
+        return {
+            dist: haversineMeters(pLat, pLng, pts[0][0], pts[0][1]),
+            lat: pts[0][0],
+            lng: pts[0][1]
+        };
+    }
+    let best = null;
+    for (let i = 0; i < pts.length - 1; i++) {
+        const res = pointToSegmentMeters(pLat, pLng, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+        if (!best || res.dist < best.dist) {
+            best = res;
+        }
+    }
+    return best;
+}
+
+function formatDriveDistanceLabel(meters) {
+    if (meters < 50) return `${Math.max(5, Math.round(meters / 5) * 5)} m`;
+    if (meters < 1000) return `${Math.round(meters / 10) * 10} m`;
+    return `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+}
+
+function formatDriveDistanceSpoken(meters) {
+    if (meters < 50) return `${Math.max(10, Math.round(meters / 5) * 5)} metri`;
+    if (meters < 1000) return `${Math.round(meters / 10) * 10} metri`;
+    const km = (meters / 1000).toFixed(1).replace('.', ' virgola ');
+    return `${km} chilometri`;
+}
+
+function getDriveHazardMetaByType(type) {
+    switch (type) {
+        case 'chiusa':
+            return { icon: '⛔', label: 'Strada chiusa', critical: true };
+        case 'ponte':
+            return { icon: '🌉', label: 'Ponte interrotto', critical: true };
+        case 'incidente':
+            return { icon: '🚨', label: 'Incidente stradale', critical: true };
+        case 'semaforo':
+            return { icon: '🚦', label: 'Senso unico alternato', critical: false };
+        case 'lavori':
+            return { icon: '🚧', label: 'Lavori in corso', critical: false };
+        case 'mercato':
+            return { icon: '🛒', label: 'Mercato attivo su strada', critical: false };
+        case 'sagra':
+            return { icon: '🎪', label: 'Manifestazione o sagra', critical: false };
+        default:
+            return { icon: '⚠️', label: (ICONS[type] && ICONS[type].label) || 'Segnalazione viabilità', critical: false };
+    }
+}
+
+async function requestDriveWakeLock() {
+    if (!('wakeLock' in navigator) || !navigator.wakeLock) return;
+    try {
+        if (driveWakeLock) return;
+        driveWakeLock = await navigator.wakeLock.request('screen');
+        driveWakeLock.addEventListener('release', () => {
+            driveWakeLock = null;
+        });
+    } catch (e) {
+        // WakeLock non concesso o browser non supportato
+    }
+}
+
+async function releaseDriveWakeLock() {
+    if (!driveWakeLock) return;
+    try {
+        await driveWakeLock.release();
+    } catch (e) {
+        // Ignora
+    }
+    driveWakeLock = null;
+}
+
+function collectActiveDriveHazards(lat, lng) {
+    const now = new Date();
+    const grouped = new Map();
+
+    // 1. Marker attivi (escludendo eliporti che sono siti di atterraggio HEMS e non ostacoli stradali)
+    markersData.forEach(m => {
+        if (!m || m.lat == null || m.lng == null) return;
+        if (m.type === 'eliporto' || m.type === 'elisoccorso') return;
+        if (isPermanentlyDeletedMarker(m, m.id, m.fbKey)) return;
+        if (getMarkerScheduleStatus(m, now) !== 'active') return;
+
+        const mLat = Number(m.lat);
+        const mLng = Number(m.lng);
+        if (isNaN(mLat) || isNaN(mLng)) return;
+
+        const dist = haversineMeters(lat, lng, mLat, mLng);
+        const streetClean = (m.street || '').trim();
+        const streetNorm = (streetClean && typeof normalizeStreetKey === 'function')
+            ? (normalizeStreetKey(streetClean) || streetClean.toLowerCase())
+            : '';
+        const key = m.segmentId
+            ? `seg_${m.type}_${m.segmentId}`
+            : (streetNorm ? `mk_${m.type}_${streetNorm}` : `mk_${m.id}`);
+
+        const meta = getDriveHazardMetaByType(m.type);
+        const existing = grouped.get(key);
+        if (!existing || dist < existing.dist) {
+            grouped.set(key, {
+                key,
+                dist,
+                lat: mLat,
+                lng: mLng,
+                type: m.type,
+                icon: meta.icon,
+                typeLabel: meta.label,
+                critical: meta.critical,
+                street: streetClean || (existing ? existing.street : ''),
+                note: (m.note || '').trim() || (existing ? existing.note : '')
+            });
+        }
+    });
+
+    // 2. Tratti stradali rossi attivi (polilinee tra coppie di marker della stessa via)
+    Object.entries(activeSegments || {}).forEach(([segKey, poly]) => {
+        if (!poly || typeof poly.getLatLngs !== 'function') return;
+        if (map && typeof map.hasLayer === 'function' && !map.hasLayer(poly)) return;
+        const segMeta = poly._segmentMeta || {};
+        const segType = segMeta.type || 'chiusa';
+        if (segType === 'eliporto' || segType === 'elisoccorso') return;
+
+        const proj = pointToPolylineMeters(lat, lng, poly.getLatLngs());
+        if (!proj) return;
+
+        const streetClean = (segMeta.streetName || '').trim();
+        const streetNorm = (streetClean && typeof normalizeStreetKey === 'function')
+            ? (normalizeStreetKey(streetClean) || streetClean.toLowerCase())
+            : segKey;
+        const key = `mk_${segType}_${streetNorm}`;
+        const meta = getDriveHazardMetaByType(segType);
+        const existing = grouped.get(key);
+
+        if (!existing || proj.dist < existing.dist) {
+            grouped.set(key, {
+                key,
+                dist: proj.dist,
+                lat: proj.lat,
+                lng: proj.lng,
+                type: segType,
+                icon: meta.icon,
+                typeLabel: meta.label,
+                critical: meta.critical,
+                street: streetClean || (existing ? existing.street : ''),
+                note: existing ? existing.note : ''
+            });
+        }
+    });
+
+    // 3. Percorsi eventi speciali attivi (cortei, gare podistiche/ciclistiche, processioni)
+    (customRoutesData || []).forEach(route => {
+        if (!route || !isCustomRouteVisible(route, now)) return;
+        if (!Array.isArray(route.points) || route.points.length < 2) return;
+
+        const proj = pointToPolylineMeters(lat, lng, route.points);
+        if (!proj) return;
+
+        const rtCfg = ROUTE_TYPES_CONFIG[route.type] || ROUTE_TYPES_CONFIG['corteo'] || { icon: '🚩', label: 'Evento stradale' };
+        const key = `rt_${route.id}`;
+        grouped.set(key, {
+            key,
+            dist: proj.dist,
+            lat: proj.lat,
+            lng: proj.lng,
+            type: 'evento_percorso',
+            icon: rtCfg.icon,
+            typeLabel: rtCfg.label,
+            critical: true,
+            street: (route.name || '').trim(),
+            note: (route.description || '').trim()
+        });
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.dist - b.dist);
+}
+
+function buildSpokenHazardText(hazard, isCloseReminder = false) {
+    const prefix = isCloseReminder ? 'Attenzione ravvicinata: ' : 'Attenzione 118: ';
+    const distSpeech = formatDriveDistanceSpoken(hazard.dist);
+    const streetPart = hazard.street ? ` in ${hazard.street}` : '';
+    let notePart = '';
+    if (hazard.note) {
+        const cleanNote = hazard.note.replace(/\s+/g, ' ').trim();
+        notePart = `. ${cleanNote.length > 105 ? cleanNote.slice(0, 102) + '...' : cleanNote}`;
+    }
+    return `${prefix}${hazard.typeLabel} a ${distSpeech}${streetPart}${notePart}.`;
+}
+
+function updateDriveHudUI(nearestWithinRadius, nearestOverall) {
+    const hudBar = document.getElementById('drive-hud-bar');
+    const alertBox = document.getElementById('drive-hud-alert-box');
+    const iconEl = document.getElementById('drive-hud-alert-icon');
+    const titleEl = document.getElementById('drive-hud-alert-title');
+    const subEl = document.getElementById('drive-hud-alert-sub');
+    const navBtn = document.getElementById('drive-hud-nav-btn');
+    if (!hudBar || !alertBox || !iconEl || !titleEl || !subEl) return;
+
+    hudBar.classList.remove('has-warning', 'has-danger');
+    alertBox.classList.remove('clear', 'warning', 'danger');
+
+    if (nearestWithinRadius) {
+        const isDanger = nearestWithinRadius.critical || nearestWithinRadius.dist <= 180;
+        hudBar.classList.add(isDanger ? 'has-danger' : 'has-warning');
+        alertBox.classList.add(isDanger ? 'danger' : 'warning');
+        iconEl.textContent = nearestWithinRadius.icon || '⚠️';
+
+        const distStr = formatDriveDistanceLabel(nearestWithinRadius.dist);
+        const whereStr = nearestWithinRadius.street ? ` — ${nearestWithinRadius.street}` : '';
+        titleEl.textContent = `${nearestWithinRadius.typeLabel.toUpperCase()} a ${distStr}${whereStr}`;
+        subEl.textContent = nearestWithinRadius.note
+            ? nearestWithinRadius.note
+            : 'Criticità attiva sul percorso — valuta percorso alternativo';
+
+        if (navBtn) {
+            navBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${nearestWithinRadius.lat},${nearestWithinRadius.lng}`;
+            navBtn.classList.remove('hidden');
+        }
+    } else {
+        alertBox.classList.add('clear');
+        iconEl.textContent = '🟢';
+        titleEl.textContent = `Nessuna criticità entro ${formatDriveDistanceLabel(driveAlertRadius)}`;
+        if (nearestOverall && nearestOverall.dist < 8000) {
+            const whereStr = nearestOverall.street ? ` (${nearestOverall.street})` : '';
+            subEl.textContent = `Più vicina: ${nearestOverall.typeLabel}${whereStr} a ${formatDriveDistanceLabel(nearestOverall.dist)}`;
+        } else {
+            subEl.textContent = 'Viabilità libera nel raggio impostato • Audio attivo su auto';
+        }
+        if (navBtn) {
+            navBtn.classList.add('hidden');
+        }
+    }
+}
+
+function evaluateDriveProximity(lat, lng, speedMps = null, accuracy = null) {
+    if (!isDriveModeActive) return;
+    lastDriveGpsCoords = { lat, lng, speedMps, accuracy, ts: Date.now() };
+
+    // Mantieni viva la sessione operatore durante la guida a mani libere
+    if (typeof recordOperatorActivity === 'function') {
+        recordOperatorActivity();
+    }
+
+    // Aggiorna pill velocità
+    const speedPill = document.getElementById('drive-speed-pill');
+    if (speedPill) {
+        if (typeof speedMps === 'number' && !isNaN(speedMps) && speedMps >= 0) {
+            const kmh = Math.round(speedMps * 3.6);
+            speedPill.textContent = `${kmh} km/h`;
+        } else {
+            speedPill.textContent = 'GPS attivo';
+        }
+    }
+
+    // Aggiorna il puntino blu del mezzo sulla mappa
+    if (map) {
+        const accText = accuracy ? `Precisione: ±${Math.round(accuracy)} m` : 'Modalità Guida attiva';
+        const userLocPopupHtml = `
+            <div class="popup-content">
+                <h3>🚗 Posizione Mezzo 118</h3>
+                <div class="popup-dms-box">
+                    <div class="popup-dms-lines">
+                        <span>${formatSingleDms(lat, true)}</span>
+                        <span>${formatSingleDms(lng, false)}</span>
+                    </div>
+                    <button type="button" class="identified-copy-coords-btn" onclick="window.copyPointCoordsDms(${lat}, ${lng})">📋 Copia</button>
+                </div>
+                <span class="popup-date">${accText}</span>
+            </div>
+        `;
+        if (userLocationMarker) {
+            userLocationMarker.setLatLng([lat, lng]);
+            userLocationMarker.setPopupContent(userLocPopupHtml);
+        } else {
+            userLocationMarker = L.marker([lat, lng], {
+                icon: createUserLocationIcon(),
+                zIndexOffset: 1000
+            }).addTo(map).bindPopup(userLocPopupHtml);
+        }
+
+        if (driveFollowVehicle && Date.now() > driveManualPanPauseUntil) {
+            if (!driveHasInitialZoom) {
+                driveHasInitialZoom = true;
+                const targetZoom = Math.max(map.getZoom() || 13, 15);
+                map.setView([lat, lng], targetZoom, { animate: true });
+            } else {
+                map.panTo([lat, lng], { animate: true, duration: 0.65 });
+            }
+        }
+    }
+
+    const hazards = collectActiveDriveHazards(lat, lng);
+    const nearestOverall = hazards.length > 0 ? hazards[0] : null;
+    const withinRadius = hazards.filter(h => h.dist <= driveAlertRadius);
+    const nearestWithin = withinRadius.length > 0 ? withinRadius[0] : null;
+    lastNearestDriveHazard = nearestWithin || nearestOverall;
+
+    // Ri-arma automaticamente gli avvisi da cui il mezzo si è allontanato (isteresi +250m)
+    const currentDistByKey = new Map(hazards.map(h => [h.key, h.dist]));
+    for (const [key] of driveAnnouncedHazards.entries()) {
+        const curDist = currentDistByKey.get(key);
+        if (curDist === undefined || curDist > driveAlertRadius + 250) {
+            driveAnnouncedHazards.delete(key);
+        }
+    }
+
+    updateDriveHudUI(nearestWithin, nearestOverall);
+
+    // Gestione annuncio vocale automatico sulle casse dell'auto
+    if (nearestWithin) {
+        const prev = driveAnnouncedHazards.get(nearestWithin.key);
+        const nowTs = Date.now();
+        if (!prev) {
+            driveAnnouncedHazards.set(nearestWithin.key, {
+                announcedAt: nowTs,
+                firstDist: nearestWithin.dist,
+                closeWarned: nearestWithin.dist <= 165
+            });
+            const msg = buildSpokenHazardText(nearestWithin, false);
+            speakDriveMessage(msg, nearestWithin.critical, false);
+        } else if (
+            nearestWithin.critical &&
+            !prev.closeWarned &&
+            prev.firstDist > 230 &&
+            nearestWithin.dist <= 150 &&
+            nowTs - prev.announcedAt > 12000
+        ) {
+            prev.closeWarned = true;
+            prev.announcedAt = nowTs;
+            const msg = buildSpokenHazardText(nearestWithin, true);
+            speakDriveMessage(msg, true, false);
+        }
+    }
+}
+
+function startDriveMode() {
+    if (!navigator.geolocation) {
+        showToast('❌ Il dispositivo non supporta il GPS per la Modalità Guida', 'error', 3500);
+        return;
+    }
+
+    isDriveModeActive = true;
+    driveHasInitialZoom = false;
+    driveAnnouncedHazards.clear();
+    lastNearestDriveHazard = null;
+
+    const driveBtn = document.getElementById('drive-mode-btn');
+    const hudBar = document.getElementById('drive-hud-bar');
+    const followBtn = document.getElementById('drive-follow-btn');
+    const titleEl = document.getElementById('drive-hud-alert-title');
+    const subEl = document.getElementById('drive-hud-alert-sub');
+
+    document.body.classList.add('drive-mode-active');
+    if (driveBtn) {
+        driveBtn.classList.add('active');
+        driveBtn.title = 'Disattiva Modalità Guida Auto 118';
+    }
+    if (hudBar) hudBar.classList.remove('hidden');
+    if (followBtn) followBtn.classList.toggle('active', driveFollowVehicle);
+    if (titleEl) titleEl.textContent = 'Aggancio segnale GPS del mezzo...';
+    if (subEl) subEl.textContent = 'Audio avvisi attivo su CarPlay, Android Auto o Bluetooth';
+
+    // Sblocco sincrono immediato di AudioContext + SpeechSynthesis (fondamentale per iOS / CarPlay)
+    getDriveAudioContext();
+    speakDriveMessage(
+        `Modalità guida 118 attivata. Preavviso impostato a ${formatDriveDistanceSpoken(driveAlertRadius)}.`,
+        false,
+        true
+    );
+
+    requestDriveWakeLock();
+    if (map && typeof map.invalidateSize === 'function') {
+        setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    if (driveWatchId !== null) {
+        navigator.geolocation.clearWatch(driveWatchId);
+    }
+
+    driveWatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+            const { latitude, longitude, speed, accuracy } = pos.coords;
+            evaluateDriveProximity(latitude, longitude, speed, accuracy);
+        },
+        (err) => {
+            console.warn('Errore GPS Modalità Guida:', err);
+            if (titleEl) {
+                titleEl.textContent = err && err.code === 1
+                    ? 'Permesso GPS negato — abilita la posizione sul telefono'
+                    : 'Segnale GPS debole — in attesa di ricezione satelliti...';
+            }
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 2000,
+            timeout: 12000
+        }
+    );
+
+    showToast('🚗 Modalità Guida Auto 118 attiva: avvisi vocali pronti', 'success', 3200);
+}
+
+function stopDriveMode(silent = false) {
+    isDriveModeActive = false;
+    if (driveWatchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(driveWatchId);
+        driveWatchId = null;
+    }
+    if ('speechSynthesis' in window) {
+        try {
+            window.speechSynthesis.cancel();
+        } catch (e) {}
+    }
+    releaseDriveWakeLock();
+    driveAnnouncedHazards.clear();
+
+    document.body.classList.remove('drive-mode-active');
+    const driveBtn = document.getElementById('drive-mode-btn');
+    const hudBar = document.getElementById('drive-hud-bar');
+    if (driveBtn) {
+        driveBtn.classList.remove('active');
+        driveBtn.title = 'Modalità Guida Auto 118 (Avvisi vocali automatici su CarPlay / Android Auto / Bluetooth)';
+    }
+    if (hudBar) {
+        hudBar.classList.add('hidden');
+        hudBar.classList.remove('has-warning', 'has-danger');
+    }
+    if (map && typeof map.invalidateSize === 'function') {
+        setTimeout(() => map.invalidateSize(), 150);
+    }
+    if (!silent) {
+        showToast('🛑 Modalità Guida Auto 118 disattivata', 'info', 2500);
+    }
+}
+
+function initDriveModeModule() {
+    const driveBtn = document.getElementById('drive-mode-btn');
+    const radiusSelect = document.getElementById('drive-radius-select');
+    const voiceRepeatBtn = document.getElementById('drive-voice-repeat-btn');
+    const followBtn = document.getElementById('drive-follow-btn');
+    const exitBtn = document.getElementById('drive-exit-btn');
+
+    // Ripristina raggio di preavviso salvato
+    try {
+        const savedRadius = parseInt(localStorage.getItem('ferrara_drive_alert_radius'), 10);
+        if ([300, 500, 800, 1200].includes(savedRadius)) {
+            driveAlertRadius = savedRadius;
+            if (radiusSelect) radiusSelect.value = String(savedRadius);
+        }
+    } catch (e) {}
+
+    if ('speechSynthesis' in window) {
+        // Pre-carica l'elenco voci su iOS/Android
+        window.speechSynthesis.getVoices();
+        if (typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+        }
+    }
+
+    if (driveBtn) {
+        driveBtn.addEventListener('click', () => {
+            if (isDriveModeActive) {
+                stopDriveMode(false);
+            } else {
+                startDriveMode();
+            }
+        });
+    }
+
+    if (exitBtn) {
+        exitBtn.addEventListener('click', () => stopDriveMode(false));
+    }
+
+    if (radiusSelect) {
+        radiusSelect.addEventListener('change', () => {
+            const val = parseInt(radiusSelect.value, 10);
+            if ([300, 500, 800, 1200].includes(val)) {
+                driveAlertRadius = val;
+                try {
+                    localStorage.setItem('ferrara_drive_alert_radius', String(val));
+                } catch (e) {}
+                driveAnnouncedHazards.clear();
+                if (isDriveModeActive && lastDriveGpsCoords) {
+                    evaluateDriveProximity(
+                        lastDriveGpsCoords.lat,
+                        lastDriveGpsCoords.lng,
+                        lastDriveGpsCoords.speedMps,
+                        lastDriveGpsCoords.accuracy
+                    );
+                }
+                showToast(`🔔 Preavviso vocale impostato a ${formatDriveDistanceLabel(val)}`, 'info', 2200);
+            }
+        });
+    }
+
+    if (voiceRepeatBtn) {
+        voiceRepeatBtn.addEventListener('click', () => {
+            if (!isDriveModeActive) return;
+            if (lastNearestDriveHazard && lastNearestDriveHazard.dist <= driveAlertRadius) {
+                const msg = buildSpokenHazardText(lastNearestDriveHazard, false);
+                speakDriveMessage(msg, lastNearestDriveHazard.critical, true);
+            } else if (lastNearestDriveHazard && lastNearestDriveHazard.dist < 8000) {
+                const whereStr = lastNearestDriveHazard.street ? ` in ${lastNearestDriveHazard.street}` : '';
+                speakDriveMessage(
+                    `Nessuna criticità entro ${formatDriveDistanceSpoken(driveAlertRadius)}. Segnalazione più vicina: ${lastNearestDriveHazard.typeLabel}${whereStr}, a ${formatDriveDistanceSpoken(lastNearestDriveHazard.dist)}.`,
+                    false,
+                    true
+                );
+            } else {
+                speakDriveMessage(
+                    `Viabilità libera entro ${formatDriveDistanceSpoken(driveAlertRadius)}. Audio collegato correttamente.`,
+                    false,
+                    true
+                );
+            }
+        });
+    }
+
+    if (followBtn) {
+        followBtn.addEventListener('click', () => {
+            driveFollowVehicle = !driveFollowVehicle;
+            driveManualPanPauseUntil = 0;
+            followBtn.classList.toggle('active', driveFollowVehicle);
+            if (driveFollowVehicle && lastDriveGpsCoords && map) {
+                map.flyTo([lastDriveGpsCoords.lat, lastDriveGpsCoords.lng], Math.max(map.getZoom(), 15), {
+                    animate: true,
+                    duration: 0.7
+                });
+            }
+        });
+    }
+
+    // Se l'operatore trascina manualmente la mappa per esplorare una via, sospendi l'auto-centratura per 12s
+    if (map && typeof map.on === 'function') {
+        map.on('dragstart', () => {
+            if (isDriveModeActive && driveFollowVehicle) {
+                driveManualPanPauseUntil = Date.now() + 12000;
+            }
+        });
+    }
+
+    // Ri-acquisisce il blocco schermo attivo quando si torna sulla scheda dell'app
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && isDriveModeActive) {
+            requestDriveWakeLock();
+        }
+    });
+
+    // Rivalutazione periodica di sicurezza (es. attivazione a orario di chiusure/mercati mentre il veicolo è fermo)
+    setInterval(() => {
+        if (isDriveModeActive && lastDriveGpsCoords && Date.now() - lastDriveGpsCoords.ts < 60000) {
+            evaluateDriveProximity(
+                lastDriveGpsCoords.lat,
+                lastDriveGpsCoords.lng,
+                lastDriveGpsCoords.speedMps,
+                lastDriveGpsCoords.accuracy
+            );
+        }
+    }, 20000);
+}
+
 // Gestione Schermata di Apertura / Benvenuto Mobile (~1,5s)
 function initMobileWelcomeSplash() {
     const splash = document.getElementById('mobile-welcome-splash');
@@ -9347,6 +10083,7 @@ function initMobileWelcomeSplash() {
 document.addEventListener('DOMContentLoaded', () => {
     initMobileWelcomeSplash();
     initMap();
+    initDriveModeModule();
     initUrgentNewsModule();
     initPushModule();
     initCustomRoutesModule();

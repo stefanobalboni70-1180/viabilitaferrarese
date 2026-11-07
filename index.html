@@ -6,14 +6,14 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>DA CHI A L'App v3.9.35 - Viabilità 118</title>
+    <title>DA CHI A L'App v3.9.36 - Viabilità 118</title>
     
     <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="manifest.json?v=3.9.35">
+    <link rel="manifest" href="manifest.json?v=3.9.36">
     <meta name="theme-color" content="#0284c7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="DA CHI A L'App v3.9.35">
+    <meta name="apple-mobile-web-app-title" content="DA CHI A L'App v3.9.36">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -30,7 +30,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css?v=3.9.35">
+    <link rel="stylesheet" href="style.css?v=3.9.36">
 </head>
 <body>
     <!-- Schermata di Apertura / Benvenuto Mobile (~1,5s) — Blu 118 & Giallo -->
@@ -48,7 +48,7 @@
             <div class="opening-loader-track">
                 <div class="opening-loader-bar"></div>
             </div>
-            <span class="opening-version-label" id="splash-version-label">v. 3.9.35</span>
+            <span class="opening-version-label" id="splash-version-label">v. 3.9.36</span>
         </div>
     </div>
     <script>
@@ -68,7 +68,7 @@
                 <div class="header-top-row">
                     <div class="header-row-title">
                         <div class="header-title-group">
-                            <h1>DA CHI A <span class="city-name">L'App</span> <span class="version-tag" id="app-version">v. 3.9.35</span></h1>
+                            <h1>DA CHI A <span class="city-name">L'App</span> <span class="version-tag" id="app-version">v. 3.9.36</span></h1>
                         </div>
                     </div>
                 </div>
@@ -180,6 +180,36 @@
         </div>
     </div>
 
+    <!-- Cruscotto Modalità Guida / Co-pilota Auto 118 (Audio CarPlay / Android Auto / Bluetooth) -->
+    <div id="drive-hud-bar" class="drive-hud-bar hidden" role="region" aria-label="Modalità Guida Auto 118">
+        <div class="drive-hud-top">
+            <div class="drive-hud-badge-group">
+                <span class="drive-live-dot"></span>
+                <span class="drive-hud-mode-title">🚗 GUIDA AUTO 118</span>
+                <span id="drive-speed-pill" class="drive-speed-pill">-- km/h</span>
+            </div>
+            <div class="drive-hud-controls">
+                <select id="drive-radius-select" class="drive-radius-select" title="Distanza di preavviso vocale">
+                    <option value="300">🔔 300 m</option>
+                    <option value="500" selected>🔔 500 m</option>
+                    <option value="800">🔔 800 m</option>
+                    <option value="1200">🔔 1,2 km</option>
+                </select>
+                <button type="button" id="drive-voice-repeat-btn" class="drive-ctrl-btn" title="Ripeti avviso vocale sulle casse dell'auto">🔊 Voce</button>
+                <button type="button" id="drive-follow-btn" class="drive-ctrl-btn active" title="Mantieni mappa centrata sul veicolo">🎯 Segui</button>
+                <button type="button" id="drive-exit-btn" class="drive-ctrl-btn exit" title="Disattiva Modalità Guida">✕</button>
+            </div>
+        </div>
+        <div id="drive-hud-alert-box" class="drive-hud-alert-box clear">
+            <span id="drive-hud-alert-icon" class="drive-hud-alert-icon">🟢</span>
+            <div class="drive-hud-alert-texts">
+                <strong id="drive-hud-alert-title">Ricerca segnale GPS in corso...</strong>
+                <span id="drive-hud-alert-sub">L'audio degli avvisi esce su CarPlay, Android Auto o Bluetooth del mezzo</span>
+            </div>
+            <a id="drive-hud-nav-btn" href="#" target="_blank" rel="noopener noreferrer" class="drive-hud-nav-btn hidden" title="Invia navigazione al display dell'auto">🧭 Auto</a>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <!-- Pulsante Cancella tutti i punti identificati -->
@@ -190,6 +220,15 @@
             <path d="M10 11v6"></path>
             <path d="M14 11v6"></path>
             <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+        </svg>
+    </button>
+
+    <!-- Pulsante Modalità Guida / Avvisi Vocali Auto 118 -->
+    <button id="drive-mode-btn" class="locate-btn drive-mode-btn" title="Modalità Guida Auto 118 (Avvisi vocali automatici su CarPlay / Android Auto / Bluetooth)" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"></path>
+            <circle cx="6.5" cy="16.5" r="2.5"></circle>
+            <circle cx="16.5" cy="16.5" r="2.5"></circle>
         </svg>
     </button>
 
@@ -1135,7 +1174,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
     <!-- App Script -->
-    <script src="script.js?v=3.9.35"></script>
+    <script src="script.js?v=3.9.36"></script>
 </body>
 </html>
 
